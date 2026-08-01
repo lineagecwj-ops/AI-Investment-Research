@@ -12,14 +12,18 @@ if str(SRC_PATH) not in sys.path:
 from dashboard import build_comparison_rows
 from dashboard import format_decimal
 from dashboard import format_integer
+from dashboard import format_industry
 from dashboard import format_market_cap
 from dashboard import format_na
 from dashboard import format_percentage
+from dashboard import format_sector
 from dashboard import indicator_help
 from dashboard import indicator_label
+from dashboard import INDUSTRY_TRANSLATIONS
 from dashboard import INDICATOR_HELP_TEXT
 from dashboard import INDICATOR_LABELS
 from dashboard import query_stock_batch
+from dashboard import SECTOR_TRANSLATIONS
 from dashboard import stock_display_data
 from models import Stock
 from stock_service import StockDataError
@@ -65,6 +69,41 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(format_percentage(0.285), "28.50%")
         self.assertEqual(format_percentage(None), "N/A")
 
+    def test_known_sector_translation(self):
+        self.assertEqual(format_sector("Technology"), "Technology（科技）")
+        self.assertEqual(format_sector("Financial Services"), "Financial Services（金融服務）")
+
+    def test_known_industry_translation(self):
+        self.assertEqual(format_industry("Semiconductors"), "Semiconductors（半導體）")
+
+    def test_unknown_classification_falls_back_to_english(self):
+        self.assertEqual(format_sector("Specialty Business Services"), "Specialty Business Services")
+        self.assertEqual(format_industry("Unknown Industry"), "Unknown Industry")
+
+    def test_missing_classification_formats_as_na(self):
+        self.assertEqual(format_sector(None), "N/A")
+        self.assertEqual(format_industry(None), "N/A")
+
+    def test_translation_mappings_cover_required_values(self):
+        required_sectors = [
+            "Technology",
+            "Healthcare",
+            "Financial Services",
+            "Consumer Cyclical",
+            "Consumer Defensive",
+            "Industrials",
+            "Energy",
+            "Basic Materials",
+            "Communication Services",
+            "Real Estate",
+            "Utilities",
+        ]
+
+        for sector in required_sectors:
+            self.assertIn(sector, SECTOR_TRANSLATIONS)
+
+        self.assertIn("Semiconductors", INDUSTRY_TRANSLATIONS)
+
     def test_stock_display_data_formats_all_fields(self):
         display_data = stock_display_data(self.sample_stock())
 
@@ -75,6 +114,8 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(display_data["Trailing PE"], "57.68")
         self.assertEqual(display_data["EPS"], "3.48")
         self.assertEqual(display_data["ROE"], "28.50%")
+        self.assertEqual(display_data["Sector"], "Technology（科技）")
+        self.assertEqual(display_data["Industry"], "Semiconductors（半導體）")
 
     def test_bilingual_indicator_labels(self):
         self.assertEqual(indicator_label("current_price"), "Current Price（目前股價）")
@@ -116,8 +157,8 @@ class DashboardFormattingTestCase(unittest.TestCase):
                     "Forward P/E（預估本益比）": "44.30",
                     "EPS（每股盈餘）": "3.48",
                     "ROE（股東權益報酬率）": "28.50%",
-                    "Sector（產業類別）": "Technology",
-                    "Industry（細分產業）": "Semiconductors",
+                    "Sector（產業類別）": "Technology（科技）",
+                    "Industry（細分產業）": "Semiconductors（半導體）",
                 }
             ],
         )

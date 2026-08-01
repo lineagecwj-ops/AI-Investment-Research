@@ -41,6 +41,36 @@ INDICATOR_HELP_TEXT = {
 }
 
 
+SECTOR_TRANSLATIONS = {
+    "Technology": "科技",
+    "Healthcare": "醫療保健",
+    "Financial Services": "金融服務",
+    "Consumer Cyclical": "非必需消費",
+    "Consumer Defensive": "必需消費",
+    "Industrials": "工業",
+    "Energy": "能源",
+    "Basic Materials": "原物料",
+    "Communication Services": "通訊服務",
+    "Real Estate": "房地產",
+    "Utilities": "公用事業",
+}
+
+
+INDUSTRY_TRANSLATIONS = {
+    "Semiconductors": "半導體",
+    "Consumer Electronics": "消費性電子",
+    "Software - Infrastructure": "基礎架構軟體",
+    "Software - Application": "應用軟體",
+    "Banks - Diversified": "多元化銀行",
+    "Credit Services": "信貸服務",
+    "Drug Manufacturers - General": "綜合製藥",
+    "Medical Devices": "醫療器材",
+    "Oil & Gas Integrated": "綜合石油天然氣",
+    "Telecom Services": "電信服務",
+    "Utilities - Regulated Electric": "受監管電力公用事業",
+}
+
+
 def indicator_label(indicator: str) -> str:
     return INDICATOR_LABELS[indicator]
 
@@ -106,6 +136,28 @@ def format_percentage(value: float | None) -> str:
     return f"{value * 100:.2f}%"
 
 
+def format_localized_classification(
+    value: str | None,
+    translations: dict[str, str],
+) -> str:
+    if value is None or value == "":
+        return "N/A"
+
+    translation = translations.get(value)
+    if translation is None:
+        return value
+
+    return f"{value}（{translation}）"
+
+
+def format_sector(value: str | None) -> str:
+    return format_localized_classification(value, SECTOR_TRANSLATIONS)
+
+
+def format_industry(value: str | None) -> str:
+    return format_localized_classification(value, INDUSTRY_TRANSLATIONS)
+
+
 def stock_display_data(stock: Stock) -> dict[str, str]:
     return {
         "Company Name": format_na(stock.company_name),
@@ -117,8 +169,8 @@ def stock_display_data(stock: Stock) -> dict[str, str]:
         "Forward PE": format_decimal(stock.forward_pe),
         "EPS": format_decimal(stock.trailing_eps),
         "ROE": format_percentage(stock.return_on_equity),
-        "Sector": format_na(stock.sector),
-        "Industry": format_na(stock.industry),
+        "Sector": format_sector(stock.sector),
+        "Industry": format_industry(stock.industry),
     }
 
 
@@ -133,8 +185,8 @@ def stock_comparison_row(stock: Stock) -> dict[str, str]:
         indicator_label("forward_pe"): format_decimal(stock.forward_pe),
         indicator_label("trailing_eps"): format_decimal(stock.trailing_eps),
         indicator_label("return_on_equity"): format_percentage(stock.return_on_equity),
-        indicator_label("sector"): format_na(stock.sector),
-        indicator_label("industry"): format_na(stock.industry),
+        indicator_label("sector"): format_sector(stock.sector),
+        indicator_label("industry"): format_industry(stock.industry),
     }
 
 
