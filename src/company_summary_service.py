@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import logging
 import re
+import ssl
 from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 from typing import Callable
+from urllib.error import HTTPError
 from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import urlopen
@@ -178,7 +180,9 @@ def fetch_taiwan_company_summary(
     records = json_loader(build_gcis_company_registration_url(business_no))
     business_items = parse_business_items(records)
     if not business_items:
-        raise CompanySummarySourceError(f"{symbol} has no usable official business items.")
+        raise CompanySummarySourceError(
+            f"{symbol} has no parsed MOEA business items from company registration response."
+        )
 
     return build_official_summary(profile, business_items)
 
@@ -213,12 +217,18 @@ def request_json(url: str) -> list[dict]:
     try:
         with urlopen(url, timeout=10) as response:
             payload = response.read().decode("utf-8-sig")
+    except HTTPError as exc:
+        raise CompanySummarySourceError(f"HTTP {exc.code} while requesting {url}") from exc
     except (OSError, URLError) as exc:
-        raise CompanySummarySourceError(str(exc)) from exc
+        raise CompanySummarySourceError(describe_transport_error(url, exc)) from exc
 
-    data = json.loads(payload)
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise CompanySummarySourceError(f"Invalid JSON response from {url}: {exc}") from exc
+
     if not isinstance(data, list):
-        raise CompanySummarySourceError("Official API response is not a list.")
+        raise CompanySummarySourceError(f"Official API response from {url} is not a list.")
 
     return data
 
@@ -264,18 +274,46 @@ def parse_business_items(records: list[dict]) -> list[str]:
         if not isinstance(record, dict):
             continue
 
-        item = first_text_value(record, BUSINESS_ITEM_KEYS)
-        if not item:
-            continue
+        candidate_items = extract_business_item_candidates(record)
 
-        normalized = item.strip()
-        if normalized in seen:
-            continue
+        for item in candidate_items:
+            normalized = item.strip()
+            if not normalized or normalized in seen:
+                continue
 
-        seen.add(normalized)
-        items.append(normalized)
+            seen.add(normalized)
+            items.append(normalized)
 
     return items
+
+
+def extract_business_item_candidates(record: dict) -> list[str]:
+    candidates = []
+
+    nested_business_items = record.get("Cmp_Business")
+    if isinstance(nested_business_items, list):
+        for item_record in nested_business_items:
+            if not isinstance(item_record, dict):
+                continue
+
+            item = first_text_value(item_record, BUSINESS_ITEM_KEYS)
+            if item:
+                candidates.append(item)
+
+    item = first_text_value(record, BUSINESS_ITEM_KEYS)
+    if item:
+        candidates.append(item)
+
+    return candidates
+
+
+def describe_transport_error(url: str, error: Exception) -> str:
+    reason = error.reason if isinstance(error, URLError) else error
+
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return f"TLS certificate verification failed while requesting {url}: {reason}"
+
+    return f"Transport error while requesting {url}: {error}"
 
 
 def build_official_summary(
@@ -287,7 +325,7 @@ def build_official_summary(
     industry = profile.get("industry")
     highlighted_items = business_items[:4]
     item_text = "、".join(highlighted_items)
-    industry_text = f"屬於 {industry} 產業，" if industry else ""
+    industry_text = build_industry_text(industry)
     short_summary = (
         f"{name}（{code}）{industry_text}依台灣官方公開資料，"
         f"登記營業項目包含：{item_text}。"
@@ -315,6 +353,17 @@ def first_text_value(record: dict, keys: tuple[str, ...]) -> str | None:
             return value.strip()
 
     return None
+
+
+def build_industry_text(industry: str | None) -> str:
+    if not industry:
+        return ""
+
+    normalized = industry.strip()
+    if not normalized or normalized.isdigit():
+        return ""
+
+    return f"屬於 {normalized} 產業，"
 
 
 def shorten_summary(summary: str, max_sentences: int = 3, max_chars: int = 360) -> str:

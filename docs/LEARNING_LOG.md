@@ -1,5 +1,34 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 02 Batch C MOEA Runtime Integration Patch
+
+### Completed Features
+
+- 修正 MOEA 公司登記資料 parser，支援 real API schema：top-level company record 內的 nested `Cmp_Business` list，並從每個 item 讀取 `Business_Item_Desc`。
+- 保留舊式 top-level `Business_Item_Desc` parsing 作為 backward-compatible support。
+- 空值、malformed nested item、重複營業項目會被忽略或去重，並保留原始順序。
+- 改善 MOEA transport / response error 訊息，區分 TLS certificate verification、HTTP、invalid JSON、response type、schema parse / no business item 等失敗原因。
+- TWSE `產業別` 若為純數字 code，例如 `24`，不再顯示成「屬於 24 產業」；本 Patch 不新增產業 code mapping。
+
+### TLS Notes
+
+- 在目前 Python runtime 中，MOEA HTTPS endpoint 仍發生 `SSL: CERTIFICATE_VERIFY_FAILED` / `Missing Subject Key Identifier`。
+- 使用 `certifi` CA bundle 仍無法通過該 endpoint 的憑證驗證。
+- 程式沒有關閉 SSL verification；MOEA transport failure 時維持 Yahoo Finance English fallback。
+
+### Testing Notes
+
+- `tests/test_company_summary_service.py` fixture 已改成 nested `Cmp_Business` real schema。
+- 新增測試涵蓋 2454-like / 2330-like nested response、empty / missing / malformed nested data、duplicate `Business_Item_Desc`、flat field backward compatibility。
+- Tests 不依賴 live network。
+
+### Modified Files
+
+- 修改 `src/company_summary_service.py`
+- 修改 `tests/test_company_summary_service.py`
+- 修改 `docs/COMPANY_SUMMARY_LOCALIZATION.md`
+- 修改 `docs/LEARNING_LOG.md`
+
 ## 2026-08-01 — Sprint 02 Batch C Company Summary Semantics Patch
 
 ### Completed Features

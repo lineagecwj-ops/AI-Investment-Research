@@ -14,7 +14,9 @@ if str(SRC_PATH) not in sys.path:
 from company_name_service import TPEX_OTC_COMPANIES_URL
 from company_name_service import TWSE_LISTED_COMPANIES_URL
 from company_summary_service import build_company_summary_display
+from company_summary_service import build_official_summary
 from company_summary_service import clear_company_summary_memory_cache
+from company_summary_service import parse_business_items
 from company_summary_service import shorten_summary
 from models import Stock
 
@@ -50,15 +52,28 @@ class CompanySummaryServiceTestCase(unittest.TestCase):
             return []
         if "22099131" in url:
             return [
-                {"Business_Item_Desc": "電子零組件製造業"},
-                {"Business_Item_Desc": "產品設計業"},
-                {"Business_Item_Desc": "資訊軟體服務業"},
+                {
+                    "Business_Accounting_NO": "22099131",
+                    "Company_Name": "台灣積體電路製造股份有限公司",
+                    "Cmp_Business": [
+                        {"Business_Seq_NO": "0001", "Business_Item": "CC01080", "Business_Item_Desc": "電子零組件製造業"},
+                        {"Business_Seq_NO": "0002", "Business_Item": "CC01090", "Business_Item_Desc": "電池製造業"},
+                        {"Business_Seq_NO": "0003", "Business_Item": "       ", "Business_Item_Desc": "依客戶之訂單與其提供之產品設計說明，以從事製造與銷售積體電路。"},
+                    ],
+                }
             ]
         if "84149961" in url:
             return [
-                {"Business_Item_Desc": "電子材料批發業"},
-                {"Business_Item_Desc": "資訊軟體服務業"},
-                {"Business_Item_Desc": "資料處理服務業"},
+                {
+                    "Business_Accounting_NO": "84149961",
+                    "Company_Name": "聯發科技股份有限公司",
+                    "Cmp_Business": [
+                        {"Business_Seq_NO": "0001", "Business_Item": "CC01080", "Business_Item_Desc": "電子零組件製造業"},
+                        {"Business_Seq_NO": "0002", "Business_Item": "F401010", "Business_Item_Desc": "國際貿易業"},
+                        {"Business_Seq_NO": "0003", "Business_Item": "I301010", "Business_Item_Desc": "資訊軟體服務業"},
+                        {"Business_Seq_NO": "0004", "Business_Item": "I501010", "Business_Item_Desc": "產品設計業"},
+                    ],
+                }
             ]
 
         return []
@@ -95,7 +110,58 @@ class CompanySummaryServiceTestCase(unittest.TestCase):
 
         self.assertTrue(summary.is_localized)
         self.assertIn("聯發科技股份有限公司", summary.short_summary)
+        self.assertIn("電子零組件製造業", summary.short_summary)
         self.assertIn("資訊軟體服務業", summary.short_summary)
+
+    def test_parse_business_items_supports_real_nested_moea_schema(self):
+        records = [
+            {
+                "Business_Accounting_NO": "84149961",
+                "Cmp_Business": [
+                    {"Business_Item_Desc": "電子零組件製造業"},
+                    {"Business_Item_Desc": "  國際貿易業  "},
+                    {"Business_Item_Desc": ""},
+                    {"Business_Item_Desc": "電子零組件製造業"},
+                    {"Business_Item_Desc": "資訊軟體服務業"},
+                ],
+            }
+        ]
+
+        self.assertEqual(
+            parse_business_items(records),
+            ["電子零組件製造業", "國際貿易業", "資訊軟體服務業"],
+        )
+
+    def test_parse_business_items_handles_empty_missing_and_malformed_nested_schema(self):
+        records = [
+            {"Cmp_Business": []},
+            {"Company_Name": "Missing business field"},
+            {"Cmp_Business": [None, "bad", {"Business_Item_Desc": "   "}]},
+        ]
+
+        self.assertEqual(parse_business_items(records), [])
+
+    def test_parse_business_items_keeps_flat_field_backward_compatibility(self):
+        records = [
+            {"Business_Item_Desc": "電子零組件製造業"},
+            {"Business_Item_Desc": "電子零組件製造業"},
+            {"營業項目": "資訊軟體服務業"},
+        ]
+
+        self.assertEqual(parse_business_items(records), ["電子零組件製造業", "資訊軟體服務業"])
+
+    def test_numeric_twse_industry_code_is_not_displayed_as_industry_name(self):
+        summary = build_official_summary(
+            {
+                "symbol": "2454.TW",
+                "code": "2454",
+                "name": "聯發科技股份有限公司",
+                "industry": "24",
+            },
+            ["電子零組件製造業"],
+        )
+
+        self.assertNotIn("屬於 24 產業", summary.short_summary)
 
     def test_localized_summary_disclaimer_clarifies_registration_scope(self):
         summary = build_company_summary_display(

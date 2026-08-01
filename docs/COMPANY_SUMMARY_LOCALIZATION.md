@@ -24,6 +24,17 @@ Fields used:
 - Business accounting number
 - Registered business item description
 
+Real MOEA response shape:
+
+- Top-level response is a list of company records.
+- Each company record can include `Cmp_Business`.
+- `Cmp_Business` is a list of business item records.
+- Each nested business item can include `Business_Item_Desc`.
+
+The parser supports this nested `Cmp_Business` shape and keeps backward-compatible support for flat `Business_Item_Desc` fields.
+
+TWSE `產業別` can be a numeric industry code such as `24`. Numeric codes are not displayed as Chinese industry names unless a trusted mapping is introduced separately.
+
 ## Display Behavior
 
 The Research page shows:
@@ -56,9 +67,18 @@ Localized Taiwan summaries use a lightweight runtime JSON cache:
 
 If official sources are unavailable but a stale cache exists, the stale cache can be used for presentation. If no localized summary exists, the app falls back to Yahoo Finance English text.
 
+## TLS and Fallback
+
+The MOEA endpoint currently fails certificate verification in the tested Python runtime with `Missing Subject Key Identifier`. Using `certifi` as the trusted CA bundle does not resolve this server certificate issue.
+
+The application does not disable SSL verification. If MOEA transport fails, localized company registration summary is unavailable and the Research page falls back to Yahoo Finance English text.
+
+Transport, HTTP, JSON, schema, and no-business-item failures are reported with distinct error messages through `CompanySummarySourceError` so the fallback reason remains diagnosable.
+
 ## Known Limitations
 
 - The MVP does not use AI, LLM, translation API, Google Translate, news, or web scraping.
 - Official company registration business items are not the same as a polished business description, main revenue source, main product list, or core business statement.
+- MOEA localized summaries depend on a TLS-verifiable official endpoint. If the official certificate cannot be verified, the secure behavior is Yahoo fallback.
 - The service does not build a large company profile database.
 - Coverage depends on official profile fields containing a usable business accounting number.
