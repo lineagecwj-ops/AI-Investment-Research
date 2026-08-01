@@ -1,5 +1,8 @@
 import sys
 import unittest
+from datetime import UTC
+from datetime import date
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,17 +14,29 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from dashboard import build_comparison_rows
+from dashboard import build_historical_chart_rows
+from dashboard import build_historical_overview
+from dashboard import build_historical_table_rows
+from dashboard import build_historical_trend_display
 from dashboard import format_currency_value
 from dashboard import format_debt_to_equity
 from dashboard import format_decimal
+from dashboard import format_eps
 from dashboard import format_integer
 from dashboard import format_industry
 from dashboard import format_market_cap
+from dashboard import format_missing
 from dashboard import format_na
+from dashboard import format_period_end
 from dashboard import format_percentage
 from dashboard import format_price
 from dashboard import format_ratio
 from dashboard import format_sector
+from dashboard import format_yoy
+from dashboard import has_enough_historical_data
+from dashboard import historical_cache_status_text
+from dashboard import historical_metric_help
+from dashboard import historical_stale_warning_text
 from dashboard import indicator_help
 from dashboard import indicator_label
 from dashboard import INDUSTRY_TRANSLATIONS
@@ -30,6 +45,8 @@ from dashboard import INDICATOR_LABELS
 from dashboard import query_stock_batch
 from dashboard import SECTOR_TRANSLATIONS
 from dashboard import stock_display_data
+from models import HistoricalFinancialPeriod
+from models import HistoricalFinancialSeries
 from models import Stock
 from stock_service import StockDataError
 
@@ -99,6 +116,15 @@ class DashboardFormattingTestCase(unittest.TestCase):
     def test_roe_percentage_formatting(self):
         self.assertEqual(format_percentage(0.285), "28.50%")
         self.assertEqual(format_percentage(None), "N/A")
+
+    def test_historical_formatters_use_friendly_na_and_period_end(self):
+        self.assertEqual(format_missing(None), "N/A")
+        self.assertEqual(format_eps(12.345), "12.35")
+        self.assertEqual(format_eps(None), "N/A")
+        self.assertEqual(format_yoy(0.125), "12.50%")
+        self.assertEqual(format_yoy(None), "N/A")
+        self.assertEqual(format_period_end(date(2026, 1, 31)), "FY ending 2026-01-31")
+        self.assertEqual(format_period_end(date(2025, 9, 30)), "FY ending 2025-09-30")
 
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
@@ -241,6 +267,216 @@ class DashboardQueryTestCase(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertEqual(failures[0].symbol, "INVALID")
         self.assertEqual(failures[0].message, "Yahoo Finance 回傳資料缺少目前價格。")
+
+
+class HistoricalTrendDashboardTestCase(unittest.TestCase):
+
+    def sample_series(self, is_stale=False):
+        return HistoricalFinancialSeries(
+            symbol="TEST",
+            currency="USD",
+            fetched_at=datetime(2026, 8, 1, 10, 0, tzinfo=UTC),
+            is_stale=is_stale,
+            periods=[
+                HistoricalFinancialPeriod(
+                    symbol="TEST",
+                    period_end=date(2022, 12, 31),
+                    period_year=2022,
+                    currency="USD",
+                    revenue=100.0,
+                    gross_profit=40.0,
+                    operating_income=25.0,
+                    net_income=20.0,
+                    eps=1.0,
+                    gross_margin=0.4,
+                    operating_margin=0.25,
+                    net_margin=0.2,
+                    operating_cash_flow=30.0,
+                    capital_expenditure=-10.0,
+                    free_cash_flow=20.0,
+                    total_assets=500.0,
+                    total_debt=80.0,
+                    total_equity=300.0,
+                    cash_and_cash_equivalents=50.0,
+                ),
+                HistoricalFinancialPeriod(
+                    symbol="TEST",
+                    period_end=date(2024, 12, 31),
+                    period_year=2024,
+                    currency="USD",
+                    revenue=140.0,
+                    gross_profit=70.0,
+                    operating_income=35.0,
+                    net_income=28.0,
+                    eps=1.4,
+                    gross_margin=0.5,
+                    operating_margin=0.25,
+                    net_margin=0.2,
+                    operating_cash_flow=42.0,
+                    capital_expenditure=-12.0,
+                    free_cash_flow=30.0,
+                    total_assets=650.0,
+                    total_debt=None,
+                    total_equity=360.0,
+                    cash_and_cash_equivalents=None,
+                ),
+                HistoricalFinancialPeriod(
+                    symbol="TEST",
+                    period_end=date(2025, 12, 31),
+                    period_year=2025,
+                    currency="USD",
+                    revenue=210.0,
+                    gross_profit=None,
+                    operating_income=52.5,
+                    net_income=42.0,
+                    eps=None,
+                    gross_margin=None,
+                    operating_margin=0.25,
+                    net_margin=0.2,
+                    operating_cash_flow=60.0,
+                    capital_expenditure=-15.0,
+                    free_cash_flow=45.0,
+                    total_assets=800.0,
+                    total_debt=110.0,
+                    total_equity=420.0,
+                    cash_and_cash_equivalents=90.0,
+                ),
+            ],
+        )
+
+    def test_historical_overview_includes_range_currency_and_cache_status(self):
+        stock = Stock(symbol="TEST", company_name="Test Co", currency="USD")
+
+        with patch("dashboard.get_display_company_name", return_value="Test Co"):
+            overview = build_historical_overview(self.sample_series(), stock)
+
+        self.assertEqual(overview.symbol, "TEST")
+        self.assertEqual(overview.company_name, "Test Co")
+        self.assertEqual(overview.currency, "USD")
+        self.assertEqual(overview.annual_periods, "2022–2025")
+        self.assertEqual(overview.available_periods, "3")
+        self.assertIn("FY ending 2022-12-31", overview.period_range)
+        self.assertIn("7 天內快取", overview.cache_status)
+        self.assertIsNone(overview.stale_warning)
+
+    def test_stale_cache_presentation_uses_warning_without_traceback(self):
+        series = self.sample_series(is_stale=True)
+
+        self.assertEqual(historical_cache_status_text(series), "歷史資料：顯示本機較舊快取")
+        self.assertEqual(
+            historical_stale_warning_text(series),
+            "目前 Yahoo Finance 查詢失敗，顯示本機較舊的歷史資料。",
+        )
+        self.assertNotIn("Traceback", historical_stale_warning_text(series))
+
+    def test_revenue_values_and_yoy_keep_gap_as_na(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.revenue_rows[0]["Revenue"], "USD 100")
+        self.assertEqual(display.revenue_rows[0]["YoY"], "N/A")
+        self.assertEqual(display.revenue_rows[1]["YoY"], "N/A")
+        self.assertEqual(display.revenue_rows[2]["YoY"], "50.00%")
+
+    def test_eps_missing_existing_and_yoy_presentation(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.earnings_rows[0]["EPS"], "1.00")
+        self.assertEqual(display.earnings_rows[1]["EPS YoY"], "N/A")
+        self.assertEqual(display.earnings_rows[2]["EPS"], "N/A")
+        self.assertIn("Yahoo Finance 目前未提供此期 EPS", display.missing_data_notes[0])
+
+    def test_margin_percentage_partial_data(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.margin_rows[0]["Gross Margin"], "40.00%")
+        self.assertEqual(display.margin_rows[1]["Operating Margin"], "25.00%")
+        self.assertEqual(display.margin_rows[2]["Gross Margin"], "N/A")
+
+    def test_cash_flow_displays_negative_capex_and_explanation_exists(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.cash_flow_rows[0]["Operating Cash Flow"], "USD 30")
+        self.assertEqual(display.cash_flow_rows[0]["Capital Expenditure"], "USD -10")
+        self.assertEqual(display.cash_flow_rows[0]["Free Cash Flow"], "USD 20")
+        self.assertIn("負數表示 cash outflow", historical_metric_help("capital_expenditure"))
+
+    def test_financial_position_currency_and_missing_values(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.financial_position_rows[1]["Total Debt"], "N/A")
+        self.assertEqual(display.financial_position_rows[1]["Cash"], "N/A")
+        self.assertEqual(display.financial_position_rows[2]["Total Equity"], "USD 420")
+
+    def test_period_semantics_for_nvda_and_aapl_like_dates(self):
+        nvda = HistoricalFinancialSeries(
+            symbol="NVDA",
+            currency="USD",
+            periods=[
+                HistoricalFinancialPeriod(
+                    symbol="NVDA",
+                    period_end=date(2026, 1, 31),
+                    period_year=2026,
+                    revenue=1.0,
+                )
+            ],
+        )
+        aapl = HistoricalFinancialSeries(
+            symbol="AAPL",
+            currency="USD",
+            periods=[
+                HistoricalFinancialPeriod(
+                    symbol="AAPL",
+                    period_end=date(2025, 9, 30),
+                    period_year=2025,
+                    revenue=1.0,
+                )
+            ],
+        )
+
+        self.assertEqual(build_historical_table_rows(nvda)[0]["Period End"], "FY ending 2026-01-31")
+        self.assertEqual(build_historical_table_rows(aapl)[0]["Period End"], "FY ending 2025-09-30")
+
+    def test_full_table_uses_oldest_to_newest_and_no_nan_visible(self):
+        rows = build_historical_table_rows(self.sample_series())
+
+        self.assertEqual(
+            [row["Period End"] for row in rows],
+            [
+                "FY ending 2022-12-31",
+                "FY ending 2024-12-31",
+                "FY ending 2025-12-31",
+            ],
+        )
+        all_values = [value for row in rows for value in row.values()]
+        self.assertNotIn("None", all_values)
+        self.assertNotIn("nan", [value.lower() for value in all_values])
+        self.assertIn("N/A", all_values)
+
+    def test_chart_rows_keep_numeric_none_for_streamlit_charts(self):
+        rows = build_historical_chart_rows(self.sample_series(), ["revenue", "eps"])
+
+        self.assertEqual(rows[0]["Period End"], "FY ending 2022-12-31")
+        self.assertEqual(rows[0]["Revenue"], 100.0)
+        self.assertIsNone(rows[2]["EPS"])
+
+    def test_insufficient_series_detection(self):
+        series = HistoricalFinancialSeries(
+            symbol="PARTIAL",
+            periods=[
+                HistoricalFinancialPeriod(
+                    symbol="PARTIAL",
+                    period_end=date(2025, 12, 31),
+                    period_year=2025,
+                    revenue=100.0,
+                )
+            ],
+        )
+
+        self.assertFalse(has_enough_historical_data(series, ["revenue"]))
+        self.assertIn(
+            "目前可取得的歷史資料不足",
+            build_historical_trend_display(HistoricalFinancialSeries(symbol="EMPTY")).missing_data_notes[0],
+        )
 
 
 if __name__ == "__main__":
