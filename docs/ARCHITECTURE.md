@@ -178,6 +178,7 @@ Responsibilities:
 - Use direct Yahoo `Free Cash Flow` when available
 - Derive Free Cash Flow as `Operating Cash Flow + Capital Expenditure` when direct FCF is unavailable
 - Sort normalized periods oldest to newest
+- Set `period_year` from the year component of `period_end`; this is not official fiscal-year metadata
 - Use independent 7-day historical cache before refreshing Yahoo
 - Return stale historical cache with `is_stale=True` when Yahoo refresh fails and stale data exists
 
@@ -235,7 +236,7 @@ Responsibilities:
 - Provide deterministic helper metrics for future research presentation
 - Keep derived metrics separate from Yahoo raw mapping and SQLite persistence
 - Avoid AI analysis, scoring, or buy / sell judgement
-- Calculate deterministic historical YoY growth helpers without trend classification
+- Calculate deterministic historical YoY growth helpers only for consecutive `period_year` values and without trend classification
 
 ---
 

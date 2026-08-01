@@ -49,6 +49,8 @@ free_cash_flow = operating_cash_flow + capital_expenditure
 
 If either input is missing or non-finite, derived `free_cash_flow` is `None`.
 
+Technical debt: provider Capital Expenditure sign convention must be validated before relying on derived FCF for symbols or periods where Yahoo direct `Free Cash Flow` is unavailable.
+
 ## Balance Sheet Aliases
 
 | Project field | Yahoo row label priority | Value type |
@@ -91,7 +93,9 @@ If revenue is missing, zero, or non-finite, or if the numerator is missing or no
 
 ## Period Convention
 
-Yahoo annual statement columns are normalized to `period_end` dates. `fiscal_year` is derived from `period_end.year`.
+Yahoo annual statement columns are normalized to `period_end` dates. `period_year` is the year component derived from `period_end`.
+
+`period_year` is not Yahoo official fiscal-year metadata and may not equal a company's formal fiscal year label. Future UI should prefer showing `FY ending YYYY-MM-DD` or equivalent period-end wording.
 
 Normalized periods are sorted oldest to newest. This supports future trend rendering without relying on Yahoo column order.
 
@@ -122,6 +126,8 @@ Current stock snapshot cache remains 24 hours in the `stocks` table.
 
 If the historical cache is fresh, callers receive SQLite data. If cache is missing or expired, the service refreshes from Yahoo, normalizes statements, and upserts rows. If Yahoo refresh fails and stale cache exists, the service returns stale data with `is_stale=True` and logs the refresh failure.
 
+Technical debt: series freshness currently uses the latest row `fetched_at` for a symbol. Per-row freshness is preserved in SQLite but not exposed separately to callers.
+
 ## Derived YoY Metrics
 
 Sprint 03 Batch A adds deterministic helper functions only:
@@ -135,6 +141,8 @@ Formula:
 ```text
 (current - previous) / abs(previous)
 ```
+
+YoY is calculated only when `current.period_year == previous.period_year + 1`. If the year gap is not exactly one year, growth is `None` and the multi-year change is not labeled YoY.
 
 If previous revenue or net income is missing or zero, growth is `None`. EPS YoY requires previous EPS to be positive; previous EPS less than or equal to zero returns `None`.
 

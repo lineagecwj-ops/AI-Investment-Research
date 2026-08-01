@@ -11,7 +11,8 @@
 - 新增 `historical_financials` SQLite table，使用 `(symbol, period_end)` primary key，採 non-destructive upsert。
 - Historical fundamentals 使用獨立 7-day TTL；current stock snapshot 仍維持 24-hour TTL。
 - Yahoo refresh failure 且 stale historical cache 存在時，回傳 stale series 並標記 `is_stale=True`。
-- 新增 deterministic YoY helpers：Revenue、EPS、Net Income through generic field helper；不做 improving / deteriorating classification。
+- 新增 deterministic YoY helpers：Revenue、EPS、Net Income through generic field helper；只在 `period_year` 連續時才計算，不做 improving / deteriorating classification。
+- `HistoricalFinancialPeriod.period_year` 代表由 `period_end` 取出的年份，不是 Yahoo 官方 fiscal year metadata。
 
 ### Live Data Audit Notes
 
@@ -24,8 +25,8 @@
 ### Testing Notes
 
 - 新增 `tests/test_historical_financial_service.py`，覆蓋 annual statement parsing、alias priority、missing row、empty DataFrame、NaN、margin、FCF、period sorting、duplicate period、partial data、Yahoo fetch mock、fresh/expired/stale cache API。
-- 擴充 `tests/test_database.py`，覆蓋 historical table 初始化、upsert、read、TTL、stale read、stock cache unaffected。
-- 擴充 `tests/test_research_metrics.py`，覆蓋 Revenue / EPS / Net Income YoY helper。
+- 擴充 `tests/test_database.py`，覆蓋 historical table 初始化、upsert、read、TTL、stale read、stock cache unaffected、legacy `fiscal_year` table migration。
+- 擴充 `tests/test_research_metrics.py`，覆蓋 Revenue / EPS / Net Income YoY helper 與 missing-year gap。
 - Automated tests 使用 mocked DataFrame 與 temporary SQLite，不依賴 live Yahoo network。
 
 ### Modified / Added Files
@@ -46,6 +47,8 @@
 - 本 Batch 不新增 Research UI、chart、technical analysis、AI / LLM、Buy / Sell / Hold、quarterly persistence、TTM 或 FX conversion。
 - Yahoo row labels 與 historical coverage 由 provider 控制，文件中的代表性 audit 不是全市場保證。
 - Partial period 會保留；完全沒有 MVP modeled value 的 raw annual column 會被 filtered out。
+- Provider Capital Expenditure sign convention must be validated before relying on derived FCF where Yahoo direct FCF is unavailable.
+- Historical series freshness currently uses the latest row `fetched_at`; per-row freshness is not separately exposed to callers.
 
 ## 2026-08-02 — Sprint 02 Batch C MOEA Runtime Integration Patch
 
