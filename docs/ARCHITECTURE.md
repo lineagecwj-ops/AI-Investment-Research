@@ -2,25 +2,36 @@
 
 ## Version
 
-v0.4
+v0.5
 
 ---
 
 # Current Architecture
 
 ```
-main.py
-    │
-    ▼
-stock_service.py
-    │
-    ├── database.py
-    │       └── SQLite stock cache
-    │
-    └── Yahoo Finance API
+                  Core Services
+                       │
+             ┌─────────┴─────────┐
+             │                   │
+         Console UI         Streamlit UI
+         src/main.py            app.py
+             │                   │
+             └─────────┬─────────┘
+                       │
+                       ▼
+               stock_service.py
+                       │
+            ┌──────────┴──────────┐
+            │                     │
+       database.py          Yahoo Finance API
+            │
+            └── SQLite stock cache
 
 watchlist_service.py
     └── JSON watchlist
+
+dashboard.py
+    └── Dashboard presentation helpers
 
 models.py
     └── Stock
@@ -42,6 +53,29 @@ Responsibilities:
 - Control application flow
 - Display results
 - Console menu integration
+
+---
+
+### app.py
+
+Responsibilities:
+
+- Streamlit application entry point
+- Dashboard page layout and widgets
+- Session state for keeping query results across Streamlit reruns
+- User-friendly Streamlit messages for stock query and Watchlist errors
+- Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
+
+---
+
+### dashboard.py
+
+Responsibilities:
+
+- Format Stock values for dashboard display
+- Build comparison table rows
+- Run batch stock lookup with partial failure handling
+- Keep dashboard presentation logic testable outside Streamlit widget callbacks
 
 ---
 
@@ -104,7 +138,7 @@ Responsibilities:
 User
    │
    ▼
-main.py
+main.py or app.py
    │
    ▼
 stock_service.py
@@ -130,10 +164,31 @@ database.py
 SQLite cache
    │
    ▼
-main.py
+main.py or app.py
    │
    ▼
 Display
+```
+
+## Streamlit Watchlist Flow
+
+```
+User
+   │
+   ▼
+app.py
+   │
+   ▼
+watchlist_service.py
+   │
+   ▼
+data/watchlist.json
+   │
+   ▼
+app.py
+   │
+   ▼
+Display / Query selected symbols through stock_service.py
 ```
 
 ---
@@ -146,4 +201,3 @@ Planned modules:
 - news_service.py
 - ai_service.py
 - report_service.py
-- dashboard.py

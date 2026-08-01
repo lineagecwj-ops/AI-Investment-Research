@@ -1,5 +1,80 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 01 Batch C
+
+### Completed Features
+
+- Feature 1 — Streamlit Dashboard MVP
+  - 新增根目錄 `app.py` 作為 Streamlit application entry point。
+  - Dashboard 使用 `st.set_page_config()` 與 wide layout。
+  - 保留 `src/main.py` console application，Streamlit 只作為新的 presentation layer。
+
+- Feature 2 — Stock Search
+  - Dashboard 支援單一股票與逗號分隔多股票輸入，例如 `2330`、`NVDA`、`2330,NVDA,AAPL`。
+  - 股票代號解析重用 `src/symbol_utils.py`。
+  - 股票資料查詢重用 `src/stock_service.py`，不在 `app.py` 直接使用 Yahoo Finance 或 SQLite。
+  - 股票資訊使用 Streamlit metric、columns、container 呈現。
+
+- Feature 3 — Watchlist UI
+  - Dashboard 支援顯示、新增、移除與查詢 Watchlist 股票。
+  - Watchlist persistence 重用 `src/watchlist_service.py`，不在 `app.py` 直接讀寫 JSON。
+  - `WatchlistDataError` 會以 `st.error()` 顯示，不向一般使用者顯示 Python traceback。
+
+- Feature 4 — Multi-stock Comparison
+  - Dashboard 支援手動輸入多股票，或從 Watchlist 選擇多支股票。
+  - 比較表格至少包含 Symbol、Company、Current Price、Currency、Market Cap、Trailing PE、Forward PE、EPS、ROE、Sector、Industry。
+  - Current Price 保留原始 currency，並提示不可直接作為跨幣別排名。
+
+- Feature 5 — Presentation Helper Tests
+  - 新增 `src/dashboard.py`，集中 dashboard formatting、comparison row 與 batch query partial failure handling。
+  - 新增 `tests/test_dashboard.py`，避免 automated tests 依賴真正 Yahoo Finance 網路。
+
+### Modified / Added Files
+
+- 新增 `app.py`
+- 新增 `src/dashboard.py`
+- 新增 `tests/test_dashboard.py`
+- 新增 `requirements.txt`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Data Flow Notes
+
+- Dashboard stock query：`app.py` → `symbol_utils.py` → `dashboard.py` → `stock_service.py` → `database.py` / Yahoo Finance → `Stock` → `dashboard.py` formatting → `app.py` display。
+- Dashboard Watchlist：`app.py` → `watchlist_service.py` → `data/watchlist.json` → display 或轉交 `stock_service.py` 查詢。
+- Comparison：手動輸入與 Watchlist 選取合併去重後，走同一個 batch stock lookup flow。
+
+### Streamlit State Notes
+
+- `st.session_state` 保存 stock search、Watchlist query、comparison 的成功結果與失敗結果。
+- 使用 `st.form()` 降低一般 widget rerun 造成的意外重複 query。
+- Watchlist add / remove 成功後使用 `st.rerun()` refresh list。
+
+### Software Engineering Concepts
+
+- Presentation Layer
+- Service reuse
+- Streamlit rerun behavior
+- Session state
+- Display formatting helpers
+- Partial failure handling
+
+### Code Review Focus
+
+- `app.py` 是否只負責 Streamlit UI 與流程，不直接碰 Yahoo Finance、SQLite、JSON。
+- `src/dashboard.py` 的格式化規則是否符合 dashboard MVP 需求。
+- Watchlist add / remove / query 在 Streamlit rerun 下是否符合日常使用。
+- Comparison 對手動輸入與 Watchlist 選取的合併方式是否簡單、可預期。
+- `tests/test_dashboard.py` 是否有效保護 display formatting 與 partial failure behavior。
+
+### Known Limits
+
+- Cache visibility 目前只顯示「資料可能使用 24 小時內的本地快取」，尚未揭露每支股票的 cache hit / Yahoo fetch 與 `fetched_at`。
+- Dashboard 目前沒有 chart、AI analysis、news、portfolio、technical indicator、recommendation engine。
+- 無效股票錯誤仍沿用 Batch A / B 的 service error 訊息，尚未細分 invalid symbol 類型。
+- Streamlit smoke test 尚未加入 automated tests；目前以 manual validation 搭配 helper tests 驗證。
+
 ## 2026-08-01 — Sprint 01 Batch B
 
 ### Completed Features

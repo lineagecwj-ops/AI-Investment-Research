@@ -32,6 +32,8 @@ AI-Investment-Research 是一個結合 AI 與投資研究的個人專案。
 - ✅ 建立 VS Code 開發環境
 - ✅ 建立 Project Prompt
 - ✅ 建立 README
+- ✅ 建立 Console MVP
+- ✅ 建立 Streamlit Dashboard MVP
 
 ---
 
@@ -42,6 +44,12 @@ AI-Investment-Research 是一個結合 AI 與投資研究的個人專案。
 ---
 
 ## MVP 使用方式
+
+安裝 runtime dependencies：
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
 
 使用專案虛擬環境執行主程式：
 
@@ -76,3 +84,25 @@ NVDA
 股票查詢會先檢查本機 SQLite cache。若 24 小時內已有 fresh cache，會直接使用本機資料；若沒有資料或 cache 已過期，才查詢 Yahoo Finance 並更新 cache。
 
 Watchlist 可新增、移除、列出股票，資料儲存在 `data/watchlist.json`。SQLite cache 儲存在 `data/stocks.db`。這兩個檔案屬於 runtime / personal data，不提交到 Git。
+
+## Dashboard 使用方式
+
+使用 Streamlit 啟動 Dashboard：
+
+```bash
+.venv/bin/streamlit run app.py
+```
+
+Dashboard 目前提供：
+
+- `Dashboard`：股票搜尋，可輸入單一股票或逗號分隔多股票，顯示公司、價格、市值、PE、EPS、ROE、Sector、Industry。
+- `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
+- `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
+
+Dashboard 與 console application 共用既有 service layer：
+
+- 股票代號 normalization 與 parsing：`src/symbol_utils.py`
+- Yahoo Finance 查詢與 SQLite cache：`src/stock_service.py`、`src/database.py`
+- Watchlist persistence：`src/watchlist_service.py`
+
+Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
