@@ -1,5 +1,52 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 03 Batch A Historical Fundamental Data Foundation
+
+### Completed Features
+
+- 新增 `HistoricalFinancialPeriod` 與 `HistoricalFinancialSeries`，讓 current `Stock` snapshot 與多年 annual financial records 分開。
+- 新增 `src/historical_financial_service.py`，集中處理 Yahoo annual `income_stmt`、`cashflow`、`balance_sheet` 的 row label alias normalization。
+- Historical margins 由 annual statement 自行計算，不使用 Yahoo snapshot margin。
+- Free Cash Flow 優先使用 Yahoo `Free Cash Flow`；缺值時依 live audit 的 CapEx 負值語意，用 `Operating Cash Flow + Capital Expenditure` deterministic derivation。
+- 新增 `historical_financials` SQLite table，使用 `(symbol, period_end)` primary key，採 non-destructive upsert。
+- Historical fundamentals 使用獨立 7-day TTL；current stock snapshot 仍維持 24-hour TTL。
+- Yahoo refresh failure 且 stale historical cache 存在時，回傳 stale series 並標記 `is_stale=True`。
+- 新增 deterministic YoY helpers：Revenue、EPS、Net Income through generic field helper；不做 improving / deteriorating classification。
+
+### Live Data Audit Notes
+
+- 代表股票：`2330.TW`、`2454.TW`、`NVDA`、`AAPL`。
+- 四支股票目前 raw annual statement columns 皆為 5 個年度。
+- Normalized usable MVP periods：`2330.TW` 4、`2454.TW` 5、`NVDA` 4、`AAPL` 4。
+- `Capital Expenditure` 在四支代表股票皆為負數，與 Yahoo direct `Free Cash Flow = Operating Cash Flow + Capital Expenditure` 一致。
+- 台股 currency context 為 `TWD`，美股為 `USD`；本 Batch 不做 FX conversion。
+
+### Testing Notes
+
+- 新增 `tests/test_historical_financial_service.py`，覆蓋 annual statement parsing、alias priority、missing row、empty DataFrame、NaN、margin、FCF、period sorting、duplicate period、partial data、Yahoo fetch mock、fresh/expired/stale cache API。
+- 擴充 `tests/test_database.py`，覆蓋 historical table 初始化、upsert、read、TTL、stale read、stock cache unaffected。
+- 擴充 `tests/test_research_metrics.py`，覆蓋 Revenue / EPS / Net Income YoY helper。
+- Automated tests 使用 mocked DataFrame 與 temporary SQLite，不依賴 live Yahoo network。
+
+### Modified / Added Files
+
+- 新增 `src/historical_financial_service.py`
+- 新增 `tests/test_historical_financial_service.py`
+- 新增 `docs/HISTORICAL_FUNDAMENTAL_DATA_AUDIT.md`
+- 修改 `src/models.py`
+- 修改 `src/database.py`
+- 修改 `src/research_metrics.py`
+- 修改 `tests/test_database.py`
+- 修改 `tests/test_research_metrics.py`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- 本 Batch 不新增 Research UI、chart、technical analysis、AI / LLM、Buy / Sell / Hold、quarterly persistence、TTM 或 FX conversion。
+- Yahoo row labels 與 historical coverage 由 provider 控制，文件中的代表性 audit 不是全市場保證。
+- Partial period 會保留；完全沒有 MVP modeled value 的 raw annual column 會被 filtered out。
+
 ## 2026-08-02 — Sprint 02 Batch C MOEA Runtime Integration Patch
 
 ### Completed Features

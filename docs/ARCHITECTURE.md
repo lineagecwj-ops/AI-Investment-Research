@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.7
+v0.8
 
 ---
 
@@ -47,9 +47,14 @@ company_summary_service.py
 
 models.py
     └── Stock
+    └── HistoricalFinancialPeriod
+    └── HistoricalFinancialSeries
 
 research_metrics.py
     └── Deterministic research metric helpers
+
+historical_financial_service.py
+    └── Yahoo annual financial statement normalization + historical fundamentals service
 
 symbol_utils.py
     └── Stock symbol normalization
@@ -161,6 +166,23 @@ Responsibilities:
 
 ---
 
+### historical_financial_service.py
+
+Responsibilities:
+
+- Retrieve Yahoo Finance annual `income_stmt`, `cashflow`, and `balance_sheet`
+- Keep Yahoo raw financial statement DataFrame handling outside UI and database code
+- Normalize statement row labels through centralized alias priority lists
+- Build `HistoricalFinancialSeries` and `HistoricalFinancialPeriod`
+- Calculate historical margins from annual revenue and income statement values
+- Use direct Yahoo `Free Cash Flow` when available
+- Derive Free Cash Flow as `Operating Cash Flow + Capital Expenditure` when direct FCF is unavailable
+- Sort normalized periods oldest to newest
+- Use independent 7-day historical cache before refreshing Yahoo
+- Return stale historical cache with `is_stale=True` when Yahoo refresh fails and stale data exists
+
+---
+
 ### database.py
 
 Responsibilities:
@@ -169,6 +191,9 @@ Responsibilities:
 - Persist Stock model fields in `data/stocks.db`
 - Apply simple additive SQLite schema migrations for new Stock snapshot fields
 - Return fresh cached Stock data when `fetched_at` is within 24 hours
+- Persist historical fundamentals in a separate `historical_financials` table
+- Return fresh cached historical fundamentals when `fetched_at` is within 7 days
+- Preserve stale historical cache rows if Yahoo refresh fails
 - Keep SQL persistence details outside `main.py` and `models.py`
 
 ---
@@ -200,6 +225,8 @@ Responsibilities:
 - Currently contains:
 
     - Stock
+    - HistoricalFinancialPeriod
+    - HistoricalFinancialSeries
 
 ### research_metrics.py
 
@@ -208,6 +235,7 @@ Responsibilities:
 - Provide deterministic helper metrics for future research presentation
 - Keep derived metrics separate from Yahoo raw mapping and SQLite persistence
 - Avoid AI analysis, scoring, or buy / sell judgement
+- Calculate deterministic historical YoY growth helpers without trend classification
 
 ---
 
@@ -248,6 +276,62 @@ main.py or app.py
    ▼
 Display
 ```
+
+## Historical Fundamentals Data Flow
+
+```
+Caller
+   │
+   ▼
+historical_financial_service.py
+   │
+   ├── database.py
+   │      │
+   │      ├── Fresh 7-day cache hit
+   │      │      ▼
+   │      │   HistoricalFinancialSeries
+   │      │
+   │      └── Cache missing / expired
+   │
+   ▼
+Yahoo Finance annual statements
+   │
+   ├── income_stmt
+   ├── cashflow
+   └── balance_sheet
+   │
+   ▼
+Alias normalization + deterministic derived metrics
+   │
+   ▼
+HistoricalFinancialSeries
+   │
+   ▼
+database.py
+   │
+   ▼
+historical_financials table
+```
+
+## Snapshot vs Historical Responsibilities
+
+Current snapshot:
+
+- Model: `Stock`
+- Table: `stocks`
+- TTL: 24 hours
+- Source surface: `yfinance.Ticker.info`
+- Scope: latest available price, valuation, profitability, growth, cash/debt, company summary fields
+
+Historical fundamentals:
+
+- Model: `HistoricalFinancialSeries` containing `HistoricalFinancialPeriod`
+- Table: `historical_financials`
+- TTL: 7 days
+- Source surface: annual `income_stmt`, `cashflow`, and `balance_sheet`
+- Scope: annual revenue, profit, EPS, margins, cash flow, assets, debt, equity, cash
+
+The Streamlit UI and console UI do not parse Yahoo financial statement DataFrames. Database code does not own Yahoo row label semantics.
 
 ## Taiwan Company Name Localization Flow
 
