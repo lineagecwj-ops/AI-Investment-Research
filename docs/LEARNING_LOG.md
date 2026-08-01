@@ -1,5 +1,65 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 02 Batch B Research Dashboard
+
+### Completed Features
+
+- 新增 Streamlit `Research` tab，保留既有 `Dashboard`、`Watchlist`、`Comparison` 功能。
+- 新增 `src/research_service.py` 作為 deterministic research interpretation boundary。
+- Research 頁面依序呈現 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps。
+- Risk Signals 與 Research Next Steps 使用可測試的 deterministic rules，不使用 AI / LLM。
+- 新增簡單資料結構：`ResearchObservation`、`ResearchNextStep`、`ResearchReport`。
+- Valuation observation 支援 Forward P/E 明顯低於 Trailing P/E 的中性提示。
+- Market Position 重用 `calculate_52_week_position()`，並保留 below `0` / above `1` 的資料語意，不在 research logic 強制 clamp。
+- 擴充 dashboard formatter：percentage、ratio、price、currency-aware large numbers、N/A。
+
+### Display Notes
+
+- Research page 主要語言為繁體中文，保留英文投資術語。
+- Growth 明確標示目前是 Yahoo Finance snapshot，不是本系統自行計算的多年 CAGR。
+- Cash / Debt / Cash Flow 顯示保留 currency context，例如 `TWD 1.25T`、`USD 85.40B`。
+- Yahoo `debtToEquity` 以 raw ratio-style number 顯示，例如 `35.20`，不轉成百分比。
+- Observations 是 research prompts，不是投資建議、評分或 recommendation。
+
+### Testing Notes
+
+- 新增 `tests/test_research_service.py`。
+- 覆蓋 profitability missing data、growth 正值 / 負值 / 缺值、valuation observation、market position 正常 / below 0 / above 1 / missing、risk signals、next steps deterministic 與 no recommendation language、partial Stock summary。
+- 完整測試：`.venv/bin/python -m unittest discover -s tests`，80 tests passed。
+
+### Manual Validation Notes
+
+- 以 `2330.TW`、`2454.TW`、`NVDA`、`AAPL` 建立 Research report，四支股票皆可完成 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps。
+- 授權網路驗證後，台股 localized display name 正常：`2330.TW` 顯示 `台積電`，`2454.TW` 顯示 `聯發科`。
+- Sandbox restricted network 下，TWSE / TPEx localization 會 fallback Yahoo English name；授權網路或 fresh runtime cache 可恢復中文顯示。
+
+### Modified / Added Files
+
+- 新增 `src/research_service.py`
+- 新增 `tests/test_research_service.py`
+- 新增 `docs/RESEARCH_FRAMEWORK.md`
+- 修改 `app.py`
+- 修改 `src/dashboard.py`
+- 修改 `tests/test_dashboard.py`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- Growth 仍是 Yahoo snapshot，不是 historical CAGR。
+- Research Dashboard 尚未有 historical fundamental table，因此無法自行計算多年趨勢。
+- 52-week progress bar 為簡單視覺輔助，research logic 保留原始 position 語意。
+- Current validation 依賴 Yahoo snapshot 與 local 24-hour cache。
+
+### Code Review Focus
+
+- `src/research_service.py` deterministic observations 與 next steps 是否維持中性語氣。
+- `app.py` Research tab 是否只做 UI / display，不直接實作研究規則。
+- `src/dashboard.py` formatter 是否正確保留 currency context 與 Yahoo ratio 語意。
+- `tests/test_research_service.py` 是否覆蓋 partial data 與 no recommendation language。
+- `docs/RESEARCH_FRAMEWORK.md` 是否清楚界定非投資建議與 methodology。
+
 ## 2026-08-01 — Sprint 02 Batch A Fundamental Data Foundation
 
 ### Completed Features

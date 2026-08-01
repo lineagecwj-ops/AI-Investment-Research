@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.6
+v0.7
 
 ---
 
@@ -32,6 +32,9 @@ watchlist_service.py
 
 dashboard.py
     └── Dashboard presentation helpers
+
+research_service.py
+    └── Deterministic research interpretation and observations
 
 company_name_service.py
     └── Taiwan official company name localization + JSON cache
@@ -83,6 +86,20 @@ Responsibilities:
 - Run batch stock lookup with partial failure handling
 - Keep dashboard presentation logic testable outside Streamlit widget callbacks
 - Use `company_name_service.py` for presentation-only company display names
+- Provide reusable display formatters for percentage, ratio, price, currency-aware large numbers, and N/A
+
+---
+
+### research_service.py
+
+Responsibilities:
+
+- Build a deterministic `ResearchReport` from a `Stock`
+- Keep research interpretation rules outside `app.py` and Streamlit widget callbacks
+- Provide simple data structures: `ResearchObservation`, `ResearchNextStep`, and `ResearchReport`
+- Generate valuation observations, risk signals, missing-data observations, and research next steps
+- Reuse `research_metrics.calculate_52_week_position()` for 52-week position
+- Avoid AI, LLM, buy / sell / hold recommendations, target prices, overall scores, and rating systems
 
 ---
 
@@ -248,6 +265,39 @@ Display / Query selected symbols through stock_service.py
 ```
 
 ---
+
+## Streamlit Research Flow
+
+```
+User
+   │
+   ▼
+app.py Research tab
+   │
+   ├── symbol_utils.py
+   │
+   ├── dashboard.py query_stock_batch()
+   │
+   ▼
+stock_service.py
+   │
+   ├── database.py / SQLite cache
+   └── Yahoo Finance API
+   │
+   ▼
+Stock
+   │
+   ├── dashboard.py display formatters and company localization helper
+   └── research_service.py
+          │
+          ├── research_metrics.py calculate_52_week_position()
+          └── ResearchReport
+   │
+   ▼
+app.py display only
+```
+
+Research Dashboard is a presentation / interpretation layer. `app.py` does not implement Yahoo raw field interpretation rules and does not directly generate research observations.
 
 # Future Modules
 

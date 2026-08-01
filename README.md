@@ -96,13 +96,19 @@ Watchlist 可新增、移除、列出股票，資料儲存在 `data/watchlist.js
 Dashboard 目前提供：
 
 - `Dashboard`：股票搜尋，可輸入單一股票或逗號分隔多股票，顯示公司、價格、市值、PE、EPS、ROE、Sector、Industry。
+- `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
+
+Research 頁面使用 deterministic / explainable rules 產生 observations 與 next steps，不使用 OpenAI API、ChatGPT API 或其他 LLM。系統不提供 Buy / Sell / Hold recommendation、target price 或 overall stock score；頁面上的 observations 是 research prompts，不是投資建議。
 
 Dashboard 與 console application 共用既有 service layer：
 
 - 股票代號 normalization 與 parsing：`src/symbol_utils.py`
 - Yahoo Finance 查詢與 SQLite cache：`src/stock_service.py`、`src/database.py`
 - Watchlist persistence：`src/watchlist_service.py`
+- Research interpretation：`src/research_service.py`
+
+Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
