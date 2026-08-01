@@ -138,6 +138,33 @@ USD 85.40B
 
 No FX conversion is performed. The page does not rank or compare values across stocks or currencies.
 
+## Chart Readability Policy
+
+Charts use compact period labels on the visible X-axis:
+
+```text
+FY 2025
+```
+
+The exact table label remains:
+
+```text
+FY ending YYYY-MM-DD
+```
+
+Chart tooltip data keeps the exact `Period End`, which is important for non-calendar fiscal periods such as `NVDA` ending `2026-01-31` and `AAPL` ending `2025-09-30`.
+
+Earnings charts are separated:
+
+- Net Income Trend
+- EPS Trend
+
+The dashboard does not plot Net Income and EPS on the same numeric y-axis and does not use a dual-axis chart. Missing EPS values remain missing and are not converted to zero.
+
+Margin charts keep the underlying decimal values, such as `0.2` and `0.4`, but render the visible y-axis as percentages, such as `20%` and `40%`.
+
+Monetary charts keep the raw numeric values and show compact y-axis units where supported, such as `B` / `T`. The axis title preserves currency context.
+
 ## No Trend Classification Policy
 
 This Batch only presents historical values, YoY values, visible period labels, and missing-data context.
@@ -157,7 +184,7 @@ It also does not produce Buy / Sell / Hold, target price, overall score, or reco
 
 ## Implementation Boundaries
 
-`app.py` owns Streamlit widgets, layout, native charts, and session state.
+`app.py` owns Streamlit widgets, layout, Altair chart rendering through Streamlit, and session state.
 
 `src/dashboard.py` owns Historical Trends presentation helpers:
 
@@ -167,6 +194,7 @@ It also does not produce Buy / Sell / Hold, target price, overall score, or reco
 - Formatted section rows
 - Formatted complete table rows
 - Chart-ready numeric rows
+- Compact chart period labels and exact Period End tooltip values
 - Period End / currency / EPS / YoY formatting
 
 `src/historical_financial_service.py` owns Yahoo annual statement retrieval, row aliases, margin calculation, FCF source / derivation, period normalization, and 7-day historical cache integration.
@@ -178,6 +206,6 @@ It also does not produce Buy / Sell / Hold, target price, overall score, or reco
 - Yahoo Finance row availability can change.
 - Annual data only; quarterly, TTM, and fiscal-calendar metadata are not modeled.
 - `period_year` is derived from `period_end` and is not a provider-supplied formal fiscal year label.
-- Streamlit native charts are intentionally simple and use raw numeric values; formatted labels are provided in tables.
+- Streamlit renders charts through its Altair chart surface so visible axes can use compact period labels, percentage margin axes, and compact monetary units while preserving raw numeric values.
 - Historical cache freshness is exposed at series level, based on the latest cached row timestamp.
 - The page does not interpret whether a visible trend is favorable or unfavorable.

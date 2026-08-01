@@ -1,5 +1,22 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 03 Batch B Historical Trend Dashboard UX Polish
+
+### Completed Features
+
+- Historical charts 改用 compact X-axis period labels，例如 `FY 2025`，避免完整 `FY ending YYYY-MM-DD` 造成圖表擁擠。
+- Chart tooltip/detail data 保留完整 `Period End`，tables 仍維持 `FY ending YYYY-MM-DD`。
+- Earnings 區塊拆成 `Net Income Trend` 與 `EPS Trend` 兩張圖，避免不同尺度共用同一 numeric y-axis；沒有使用 dual-axis chart。
+- Missing EPS 在 chart data 中保持 missing，不轉為 `0`。
+- Margin charts 維持 raw decimal values，但 visible y-axis 以 percentage 顯示。
+- Revenue、Net Income、Cash Flow、Financial Position charts 的 visible y-axis 使用 compact monetary units，並在 axis title 保留 currency context。
+- 本 Polish 只改 presentation layer，未修改 historical data fetching、persistence、models、cache semantics、YoY calculation rules、research logic 或 historical financial calculations。
+
+### Testing Notes
+
+- 擴充 `tests/test_dashboard.py`，覆蓋 compact chart period labels、table exact FY-ending labels、Net Income / EPS separate chart datasets、missing EPS remains missing、margin percentage axis formatting、monetary chart raw value preservation。
+- Targeted dashboard tests：`.venv/bin/python -m unittest tests.test_dashboard`，36 tests passed。
+
 ## 2026-08-02 — Sprint 03 Batch B Historical Trend Dashboard
 
 ### Completed Features

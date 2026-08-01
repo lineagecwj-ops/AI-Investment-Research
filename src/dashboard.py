@@ -330,6 +330,16 @@ def format_period_end(value: date | None) -> str:
     return f"FY ending {value.isoformat()}"
 
 
+def format_chart_period_label(value: date | None, period_year: int | None = None) -> str:
+    if period_year is not None:
+        return f"FY {period_year}"
+
+    if value is None:
+        return "N/A"
+
+    return f"FY {value.year}"
+
+
 def historical_metric_help(metric: str) -> str | None:
     return HISTORICAL_METRIC_HELP_TEXT.get(metric)
 
@@ -549,7 +559,10 @@ def build_historical_chart_rows(
 ) -> list[dict[str, float | str | None]]:
     rows = []
     for period in series.periods or []:
-        row: dict[str, float | str | None] = {"Period End": format_period_end(period.period_end)}
+        row: dict[str, float | str | None] = {
+            "Period": format_chart_period_label(period.period_end, period.period_year),
+            "Period End": format_period_end(period.period_end),
+        }
         for field in fields:
             row[HISTORICAL_CHART_LABELS.get(field, field)] = getattr(period, field)
         rows.append(row)

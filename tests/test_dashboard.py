@@ -22,6 +22,7 @@ from dashboard import format_currency_value
 from dashboard import format_debt_to_equity
 from dashboard import format_decimal
 from dashboard import format_eps
+from dashboard import format_chart_period_label
 from dashboard import format_integer
 from dashboard import format_industry
 from dashboard import format_market_cap
@@ -125,6 +126,8 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(format_yoy(None), "N/A")
         self.assertEqual(format_period_end(date(2026, 1, 31)), "FY ending 2026-01-31")
         self.assertEqual(format_period_end(date(2025, 9, 30)), "FY ending 2025-09-30")
+        self.assertEqual(format_chart_period_label(date(2026, 1, 31), 2026), "FY 2026")
+        self.assertEqual(format_chart_period_label(date(2025, 9, 30), 2025), "FY 2025")
 
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
@@ -452,12 +455,40 @@ class HistoricalTrendDashboardTestCase(unittest.TestCase):
         self.assertNotIn("nan", [value.lower() for value in all_values])
         self.assertIn("N/A", all_values)
 
-    def test_chart_rows_keep_numeric_none_for_streamlit_charts(self):
+    def test_chart_rows_use_compact_period_labels_and_keep_exact_period_end(self):
         rows = build_historical_chart_rows(self.sample_series(), ["revenue", "eps"])
 
+        self.assertEqual(rows[0]["Period"], "FY 2022")
         self.assertEqual(rows[0]["Period End"], "FY ending 2022-12-31")
+        self.assertEqual(rows[2]["Period"], "FY 2025")
+        self.assertEqual(rows[2]["Period End"], "FY ending 2025-12-31")
+
+    def test_chart_rows_keep_raw_numeric_values_and_missing_eps(self):
+        rows = build_historical_chart_rows(self.sample_series(), ["revenue", "eps"])
+
         self.assertEqual(rows[0]["Revenue"], 100.0)
+        self.assertEqual(rows[2]["Revenue"], 210.0)
         self.assertIsNone(rows[2]["EPS"])
+        self.assertNotEqual(rows[2]["Revenue"], "USD 210")
+        self.assertNotEqual(rows[2]["EPS"], 0)
+
+    def test_tables_keep_exact_fy_ending_labels(self):
+        display = build_historical_trend_display(self.sample_series())
+
+        self.assertEqual(display.revenue_rows[0]["Period End"], "FY ending 2022-12-31")
+        self.assertEqual(display.historical_table_rows[2]["Period End"], "FY ending 2025-12-31")
+
+    def test_historical_renderer_uses_separate_earnings_charts_and_formats_axes(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn('st.markdown("#### Net Income Trend")', app_source)
+        self.assertIn('render_historical_chart(series, ["net_income"], value_format="currency")', app_source)
+        self.assertIn('st.markdown("#### EPS Trend")', app_source)
+        self.assertIn('render_historical_chart(series, ["eps"], value_format="eps")', app_source)
+        self.assertNotIn('render_historical_chart(series, ["net_income", "eps"])', app_source)
+        self.assertIn('value_format="percentage"', app_source)
+        self.assertIn('alt.Axis(format=".0%", title="Percentage")', app_source)
+        self.assertIn('alt.Axis(format="~s"', app_source)
 
     def test_insufficient_series_detection(self):
         series = HistoricalFinancialSeries(

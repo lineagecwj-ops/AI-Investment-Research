@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -12,6 +13,7 @@ if str(SRC_PATH) not in sys.path:
 from dashboard import build_comparison_rows
 from dashboard import build_historical_chart_rows
 from dashboard import build_historical_trend_display
+from dashboard import format_currency_amount
 from dashboard import format_currency_value
 from dashboard import format_debt_to_equity
 from dashboard import indicator_help
@@ -192,16 +194,94 @@ def render_next_steps(next_steps) -> None:
             st.write(f"□ {item}")
 
 
-def render_historical_chart(series, fields: list[str], chart_type: str = "line") -> None:
+def render_historical_chart(
+    series,
+    fields: list[str],
+    chart_type: str = "line",
+    value_format: str = "number",
+) -> None:
     rows = build_historical_chart_rows(series, fields)
     if not rows:
         return
 
-    chart_data = pd.DataFrame(rows).set_index("Period End")
+    chart_data = pd.DataFrame(build_historical_chart_long_rows(rows, fields, value_format, series.currency))
+    if chart_data.empty:
+        return
+
+    y_axis = alt.Axis(title=historical_chart_y_axis_title(value_format, series.currency))
+    if value_format == "percentage":
+        y_axis = alt.Axis(format=".0%", title="Percentage")
+    elif value_format == "currency":
+        y_axis = alt.Axis(format="~s", title=f"Amount ({series.currency or 'currency'})")
+
+    base = alt.Chart(chart_data).encode(
+        x=alt.X("Period:N", sort=None, title="Fiscal period"),
+        y=alt.Y("Value:Q", axis=y_axis),
+        color=alt.Color("Metric:N", title="Metric"),
+        tooltip=[
+            alt.Tooltip("Period:N", title="Period"),
+            alt.Tooltip("Period End:N", title="Period End"),
+            alt.Tooltip("Metric:N", title="Metric"),
+            alt.Tooltip("Display Value:N", title="Value"),
+        ],
+    )
+
     if chart_type == "bar":
-        st.bar_chart(chart_data, use_container_width=True)
+        chart = base.mark_bar()
     else:
-        st.line_chart(chart_data, use_container_width=True)
+        chart = base.mark_line(point=True)
+
+    st.altair_chart(chart, use_container_width=True)
+
+
+def build_historical_chart_long_rows(
+    rows: list[dict[str, float | str | None]],
+    fields: list[str],
+    value_format: str,
+    currency: str | None,
+) -> list[dict[str, float | str]]:
+    metric_labels = [key for key in rows[0] if key not in {"Period", "Period End"}] if rows else []
+    selected_labels = metric_labels[:len(fields)]
+    long_rows = []
+
+    for row in rows:
+        for metric in selected_labels:
+            value = row.get(metric)
+            if value is None:
+                continue
+            long_rows.append(
+                {
+                    "Period": row["Period"],
+                    "Period End": row["Period End"],
+                    "Metric": metric,
+                    "Value": value,
+                    "Display Value": historical_chart_display_value(value, value_format, currency),
+                }
+            )
+
+    return long_rows
+
+
+def historical_chart_display_value(
+    value: float,
+    value_format: str,
+    currency: str | None,
+) -> str:
+    if value_format == "percentage":
+        return f"{value * 100:.2f}%"
+    if value_format == "currency":
+        return format_currency_amount(value, currency)
+
+    return f"{value:,.2f}"
+
+
+def historical_chart_y_axis_title(value_format: str, currency: str | None) -> str:
+    if value_format == "percentage":
+        return "Percentage"
+    if value_format == "currency":
+        return f"Amount ({currency or 'currency'})"
+
+    return "Value"
 
 
 def render_research_glossary() -> None:
@@ -435,7 +515,7 @@ def render_historical_trends() -> None:
     st.markdown("### Revenue（營收）Trend")
     st.caption(historical_metric_help("revenue"))
     if has_enough_historical_data(series, ["revenue"]):
-        render_historical_chart(series, ["revenue"], chart_type="bar")
+        render_historical_chart(series, ["revenue"], chart_type="bar", value_format="currency")
     else:
         st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
     st.dataframe(display.revenue_rows, width="stretch", hide_index=True)
@@ -443,10 +523,16 @@ def render_historical_trends() -> None:
     st.markdown("### Earnings（獲利）Trend")
     st.caption(historical_metric_help("net_income"))
     st.caption(historical_metric_help("eps"))
-    if has_enough_historical_data(series, ["net_income", "eps"]):
-        render_historical_chart(series, ["net_income", "eps"])
+    st.markdown("#### Net Income Trend")
+    if has_enough_historical_data(series, ["net_income"]):
+        render_historical_chart(series, ["net_income"], value_format="currency")
     else:
-        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+        st.info("目前可取得的 Net Income 歷史資料不足，暫不顯示趨勢。")
+    st.markdown("#### EPS Trend")
+    if has_enough_historical_data(series, ["eps"]):
+        render_historical_chart(series, ["eps"], value_format="eps")
+    else:
+        st.info("目前可取得的 EPS 歷史資料不足，暫不顯示趨勢。")
     st.dataframe(display.earnings_rows, width="stretch", hide_index=True)
 
     st.markdown("### Margins（利潤率趨勢）")
@@ -456,7 +542,11 @@ def render_historical_trends() -> None:
         st.write(historical_metric_help("net_margin"))
         st.write("Margin 上升或下降都需要搭配產品組合、費用結構、產業循環與一次性項目理解，不能單獨判斷好壞。")
     if has_enough_historical_data(series, ["gross_margin", "operating_margin", "net_margin"]):
-        render_historical_chart(series, ["gross_margin", "operating_margin", "net_margin"])
+        render_historical_chart(
+            series,
+            ["gross_margin", "operating_margin", "net_margin"],
+            value_format="percentage",
+        )
     else:
         st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
     st.dataframe(display.margin_rows, width="stretch", hide_index=True)
@@ -472,6 +562,7 @@ def render_historical_trends() -> None:
         render_historical_chart(
             series,
             ["operating_cash_flow", "capital_expenditure", "free_cash_flow"],
+            value_format="currency",
         )
     else:
         st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
@@ -488,6 +579,7 @@ def render_historical_trends() -> None:
         render_historical_chart(
             series,
             ["total_assets", "total_debt", "total_equity", "cash_and_cash_equivalents"],
+            value_format="currency",
         )
     else:
         st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
