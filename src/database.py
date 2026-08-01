@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS stocks (
 HISTORICAL_FINANCIAL_COLUMNS = {
     "symbol": "TEXT NOT NULL",
     "period_end": "TEXT NOT NULL",
-    "fiscal_year": "INTEGER",
+    "period_year": "INTEGER",
     "currency": "TEXT",
     "revenue": "REAL",
     "gross_profit": "REAL",
@@ -113,7 +113,7 @@ CREATE_HISTORICAL_FINANCIALS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS historical_financials (
     symbol TEXT NOT NULL,
     period_end TEXT NOT NULL,
-    fiscal_year INTEGER,
+    period_year INTEGER,
     currency TEXT,
     revenue REAL,
     gross_profit REAL,
@@ -185,6 +185,16 @@ def migrate_historical_financials_table(connection: sqlite3.Connection) -> None:
         connection.execute(
             f"ALTER TABLE historical_financials ADD COLUMN {column} {column_type}"
         )
+
+    connection.execute(
+        """
+        UPDATE historical_financials
+        SET period_year = CAST(substr(period_end, 1, 4) AS INTEGER)
+        WHERE period_year IS NULL
+          AND period_end IS NOT NULL
+          AND length(period_end) >= 4
+        """
+    )
 
 
 def invalidate_stock_cache_after_schema_migration(
@@ -406,7 +416,7 @@ def save_historical_financials(
                 INSERT INTO historical_financials (
                     symbol,
                     period_end,
-                    fiscal_year,
+                    period_year,
                     currency,
                     revenue,
                     gross_profit,
@@ -427,7 +437,7 @@ def save_historical_financials(
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(symbol, period_end) DO UPDATE SET
-                    fiscal_year = excluded.fiscal_year,
+                    period_year = excluded.period_year,
                     currency = excluded.currency,
                     revenue = excluded.revenue,
                     gross_profit = excluded.gross_profit,
@@ -511,7 +521,7 @@ def historical_period_to_row_values(
     return (
         period.symbol,
         period.period_end.isoformat(),
-        period.fiscal_year,
+        period.period_year,
         period.currency,
         period.revenue,
         period.gross_profit,
@@ -536,7 +546,7 @@ def historical_period_from_row(row: sqlite3.Row) -> HistoricalFinancialPeriod:
     return HistoricalFinancialPeriod(
         symbol=row["symbol"],
         period_end=datetime.fromisoformat(row["period_end"]).date(),
-        fiscal_year=row["fiscal_year"],
+        period_year=row["period_year"],
         currency=row["currency"],
         revenue=row["revenue"],
         gross_profit=row["gross_profit"],

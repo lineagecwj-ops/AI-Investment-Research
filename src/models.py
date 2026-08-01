@@ -68,7 +68,7 @@ class HistoricalFinancialPeriod:
 
     period_end: date
 
-    fiscal_year: int | None = None
+    period_year: int | None = None
 
     currency: str | None = None
 

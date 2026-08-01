@@ -104,7 +104,7 @@ class HistoricalFinancialParsingTestCase(unittest.TestCase):
             balance_sheet=self.balance_sheet(),
         )
 
-        self.assertEqual([period.fiscal_year for period in series.periods], [2024, 2025])
+        self.assertEqual([period.period_year for period in series.periods], [2024, 2025])
 
         latest = series.periods[-1]
         self.assertEqual(latest.revenue, 1200.0)
@@ -218,6 +218,27 @@ class HistoricalFinancialParsingTestCase(unittest.TestCase):
 
         self.assertEqual(len(series.periods), 1)
 
+    def test_period_year_is_derived_from_period_end_year(self):
+        nvda_like = build_historical_financial_series(
+            symbol="NVDA",
+            currency="USD",
+            income_stmt=pd.DataFrame(
+                {pd.Timestamp("2026-01-31"): [100.0]},
+                index=["Total Revenue"],
+            ),
+        )
+        aapl_like = build_historical_financial_series(
+            symbol="AAPL",
+            currency="USD",
+            income_stmt=pd.DataFrame(
+                {pd.Timestamp("2025-09-30"): [100.0]},
+                index=["Total Revenue"],
+            ),
+        )
+
+        self.assertEqual(nvda_like.periods[0].period_year, 2026)
+        self.assertEqual(aapl_like.periods[0].period_year, 2025)
+
     def test_partial_data_keeps_period_when_cashflow_or_balance_sheet_missing(self):
         series = build_historical_financial_series(
             symbol="PARTIAL",
@@ -297,7 +318,7 @@ class HistoricalFinancialServiceCacheTestCase(unittest.TestCase):
                 HistoricalFinancialPeriod(
                     symbol="TEST",
                     period_end=date(2025, 12, 31),
-                    fiscal_year=2025,
+                    period_year=2025,
                     currency="USD",
                     revenue=revenue,
                 )

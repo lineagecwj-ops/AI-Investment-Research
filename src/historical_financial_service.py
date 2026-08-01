@@ -194,7 +194,7 @@ def build_historical_financial_period(
     return HistoricalFinancialPeriod(
         symbol=symbol,
         period_end=period_end,
-        fiscal_year=period_end.year,
+        period_year=period_end.year,
         currency=currency,
         revenue=income_values["revenue"],
         gross_profit=income_values["gross_profit"],

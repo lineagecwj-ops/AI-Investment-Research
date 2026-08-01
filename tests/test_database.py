@@ -213,7 +213,7 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertIsNotNone(cached)
         self.assertFalse(cached.is_stale)
         self.assertEqual(cached.currency, "USD")
-        self.assertEqual([period.fiscal_year for period in cached.periods], [2024, 2025])
+        self.assertEqual([period.period_year for period in cached.periods], [2024, 2025])
         self.assertEqual(cached.periods[-1].revenue, 1200.0)
         self.assertEqual(cached.periods[-1].free_cash_flow, 220.0)
 
@@ -286,7 +286,7 @@ class DatabaseTestCase(unittest.TestCase):
                     HistoricalFinancialPeriod(
                         symbol="NVDA",
                         period_end=datetime(2025, 1, 31, tzinfo=UTC).date(),
-                        fiscal_year=2025,
+                        period_year=2025,
                         currency="USD",
                         revenue=1300.0,
                     )
@@ -298,8 +298,19 @@ class DatabaseTestCase(unittest.TestCase):
 
         cached = get_cached_historical_financials("NVDA", self.db_path, now=self.now)
 
-        self.assertEqual([period.fiscal_year for period in cached.periods], [2024, 2025])
+        self.assertEqual([period.period_year for period in cached.periods], [2024, 2025])
         self.assertEqual(cached.periods[-1].revenue, 1300.0)
+
+    def test_old_historical_table_migration_adds_period_year(self):
+        self.create_old_historical_financials_table()
+
+        initialize_database(self.db_path)
+
+        cached = get_cached_historical_financials("NVDA", self.db_path, now=self.now)
+
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached.periods[0].period_end.isoformat(), "2026-01-31")
+        self.assertEqual(cached.periods[0].period_year, 2026)
 
     def test_stock_cache_unaffected_by_historical_table(self):
         save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
@@ -383,6 +394,47 @@ class DatabaseTestCase(unittest.TestCase):
         finally:
             connection.close()
 
+    def create_old_historical_financials_table(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE historical_financials (
+                    symbol TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    fiscal_year INTEGER,
+                    currency TEXT,
+                    revenue REAL,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY(symbol, period_end)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO historical_financials (
+                    symbol,
+                    period_end,
+                    fiscal_year,
+                    currency,
+                    revenue,
+                    fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "NVDA",
+                    "2026-01-31",
+                    2026,
+                    "USD",
+                    100.0,
+                    self.now.isoformat(),
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
     def sample_historical_series(self, revenue_2025=1200.0):
         return HistoricalFinancialSeries(
             symbol="NVDA",
@@ -391,7 +443,7 @@ class DatabaseTestCase(unittest.TestCase):
                 HistoricalFinancialPeriod(
                     symbol="NVDA",
                     period_end=datetime(2024, 1, 31, tzinfo=UTC).date(),
-                    fiscal_year=2024,
+                    period_year=2024,
                     currency="USD",
                     revenue=1000.0,
                     net_income=180.0,
@@ -401,7 +453,7 @@ class DatabaseTestCase(unittest.TestCase):
                 HistoricalFinancialPeriod(
                     symbol="NVDA",
                     period_end=datetime(2025, 1, 31, tzinfo=UTC).date(),
-                    fiscal_year=2025,
+                    period_year=2025,
                     currency="USD",
                     revenue=revenue_2025,
                     net_income=240.0,
