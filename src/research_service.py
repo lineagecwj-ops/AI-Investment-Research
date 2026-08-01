@@ -11,9 +11,13 @@ class ResearchObservation:
 
     title: str
 
-    message: str
-
     metric: str
+
+    what_happened: str
+
+    why_it_matters: str
+
+    what_to_check: list[str]
 
     observation_type: str = "attention"
 
@@ -25,9 +29,9 @@ class ResearchNextStep:
 
     title: str
 
-    question: str
-
     metric: str
+
+    items: list[str]
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,14 @@ CRITICAL_RESEARCH_FIELDS = {
 
 FORWARD_PE_LOWER_RATIO = 0.85
 SIGNIFICANTLY_ABOVE_52_WEEK_POSITION = 1.05
+
+
+def format_percent_snapshot(value: float) -> str:
+    return f"{value:+.2%}"
+
+
+def format_number_snapshot(value: float) -> str:
+    return f"{value:,.2f}"
 
 
 def build_research_report(stock: Stock) -> ResearchReport:
@@ -125,11 +137,21 @@ def build_valuation_observations(stock: Stock) -> list[ResearchObservation]:
             ResearchObservation(
                 category="Valuation（估值）",
                 title="Forward P/E 明顯低於 Trailing P/E",
-                message=(
-                    "Forward P/E 明顯低於 Trailing P/E，可能反映市場預期未來盈餘較過去改善，"
-                    "仍需進一步確認盈利預估與產業循環。"
-                ),
                 metric="forward_pe",
+                what_happened=(
+                    "Forward P/E（預估本益比）目前低於 Trailing P/E（歷史本益比）"
+                    f"至少 {int((1 - FORWARD_PE_LOWER_RATIO) * 100)}%。"
+                ),
+                why_it_matters=(
+                    "這表示目前估值 snapshot 中，市場預估盈餘與過去盈餘使用的估值倍數不同，"
+                    "值得進一步確認預估來源與假設。這不是單獨的便宜或昂貴判定。"
+                ),
+                what_to_check=[
+                    "Forward EPS estimates（未來 EPS 預估）",
+                    "同業 P/E 區間",
+                    "公司歷史估值區間",
+                    "產業循環與獲利假設",
+                ],
                 observation_type="info",
             )
         )
@@ -172,24 +194,58 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Revenue Growth（營收成長率）為負值",
-                message=(
-                    "Revenue Growth（營收成長率）目前為負值。這不一定代表公司長期競爭力下降，"
-                    "建議進一步檢查營收下降是否來自產業週期、產品轉換或公司特定因素。"
-                ),
                 metric="revenue_growth",
+                what_happened=(
+                    "Revenue Growth（營收成長率）目前為 "
+                    f"{format_percent_snapshot(stock.revenue_growth)}。"
+                ),
+                why_it_matters=(
+                    "營收是觀察需求、價格與出貨變化的起點。單一 snapshot 為負值時，"
+                    "值得進一步研究這是短期波動、產業週期，或公司產品組合變化。"
+                ),
+                what_to_check=[
+                    "近年 Revenue（營收）變化",
+                    "Segment revenue（部門營收）",
+                    "產品組合與平均售價",
+                    "產業需求與客戶庫存",
+                ],
             )
         )
 
     if stock.earnings_growth is not None and stock.earnings_growth < 0:
+        what_happened = (
+            "Earnings Growth（盈餘成長率）目前為 "
+            f"{format_percent_snapshot(stock.earnings_growth)}。"
+        )
+        if stock.revenue_growth is not None:
+            what_happened += (
+                " Revenue Growth（營收成長率）目前為 "
+                f"{format_percent_snapshot(stock.revenue_growth)}。"
+            )
+
         signals.append(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Earnings Growth（盈餘成長率）為負值",
-                message=(
-                    "Earnings Growth（盈餘成長率）目前為負值。這不一定代表公司品質惡化，"
-                    "建議進一步查看毛利率、營業利益率與一次性費用是否影響近期獲利。"
-                ),
                 metric="earnings_growth",
+                what_happened=what_happened,
+                why_it_matters=(
+                    "若目前 snapshot 中營收仍為正成長、但盈餘成長為負，"
+                    "值得進一步研究收入如何轉化為獲利。"
+                    "這不代表公司品質惡化，也不能直接判定原因。"
+                )
+                if stock.revenue_growth is not None and stock.revenue_growth >= 0
+                else (
+                    "盈餘成長率為負值時，值得進一步研究獲利率、費用結構與非經常性項目。"
+                    "這不代表公司品質惡化，也不能直接判定原因。"
+                ),
+                what_to_check=[
+                    "Gross Margin（毛利率）",
+                    "Operating Margin（營業利益率）",
+                    "Net Margin（淨利率）",
+                    "費用結構",
+                    "一次性 / 非經常性項目",
+                ],
             )
         )
 
@@ -198,11 +254,21 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Free Cash Flow（自由現金流）為負值",
-                message=(
-                    "Free Cash Flow（自由現金流）目前為負值。這不一定代表公司財務惡化，"
-                    "可能與資本支出、擴產或營運週期有關。建議進一步查看近年自由現金流趨勢與資本支出。"
-                ),
                 metric="free_cash_flow",
+                what_happened=(
+                    "Free Cash Flow（自由現金流）目前為 "
+                    f"{format_number_snapshot(stock.free_cash_flow)}。"
+                ),
+                why_it_matters=(
+                    "自由現金流可協助研究公司在營運與資本支出後留下多少現金。"
+                    "負值值得追查，但不等同財務品質結論。"
+                ),
+                what_to_check=[
+                    "Operating Cash Flow（營業現金流）",
+                    "Capital Expenditure（資本支出）",
+                    "近年 Free Cash Flow 變化",
+                    "擴產或大型投資計畫",
+                ],
             )
         )
 
@@ -211,11 +277,20 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Operating Cash Flow（營業現金流）為負值",
-                message=(
-                    "Operating Cash Flow（營業現金流）目前為負值。建議進一步確認是否為營運資金變動、"
-                    "季節性因素或核心營運現金創造能力的變化。"
-                ),
                 metric="operating_cash_flow",
+                what_happened=(
+                    "Operating Cash Flow（營業現金流）目前為 "
+                    f"{format_number_snapshot(stock.operating_cash_flow)}。"
+                ),
+                why_it_matters=(
+                    "營業現金流用來觀察核心營運是否產生現金。負值值得研究營運資金、收付款節奏與季節性因素。"
+                ),
+                what_to_check=[
+                    "應收帳款與存貨變化",
+                    "應付帳款與付款條件",
+                    "季節性營運資金需求",
+                    "Net Income 與 Operating Cash Flow 差異",
+                ],
             )
         )
 
@@ -228,11 +303,22 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Total Debt（總負債）高於 Total Cash（現金）",
-                message=(
-                    "Total Debt（總負債）高於 Total Cash（現金）。這需要放在同一幣別與公司資本結構下理解，"
-                    "建議進一步查看債務到期結構、利息費用與營業現金流覆蓋能力。"
-                ),
                 metric="total_debt",
+                what_happened=(
+                    "Total Debt（總負債）目前為 "
+                    f"{format_number_snapshot(stock.total_debt)}；Total Cash（現金）目前為 "
+                    f"{format_number_snapshot(stock.total_cash)}。"
+                ),
+                why_it_matters=(
+                    "負債高於現金時，值得放在公司資本結構、產業特性與現金流能力下研究。"
+                    "這不是單獨的財務健康結論。"
+                ),
+                what_to_check=[
+                    "Debt maturity（債務到期結構）",
+                    "Interest expense（利息費用）",
+                    "Operating Cash Flow 覆蓋能力",
+                    "產業常見槓桿水準",
+                ],
             )
         )
 
@@ -245,11 +331,22 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Current Price（目前股價）低於 200-day Average（200 日均價）",
-                message=(
-                    "Current Price（目前股價）低於 200-day Average（200 日均價）。"
-                    "這只是價格位置觀察，不是趨勢或投資結論；建議進一步確認近期價格變動原因與基本面是否同步改變。"
-                ),
                 metric="two_hundred_day_average",
+                what_happened=(
+                    "Current Price（目前股價）目前為 "
+                    f"{format_number_snapshot(stock.current_price)}；200-day Average（200 日均價）目前為 "
+                    f"{format_number_snapshot(stock.two_hundred_day_average)}。"
+                ),
+                why_it_matters=(
+                    "價格低於 200 日均價是價格位置觀察，值得確認市場價格變化是否已有基本面或事件脈絡。"
+                    "這不是投資結論。"
+                ),
+                what_to_check=[
+                    "近期公司公告",
+                    "最新財報重點",
+                    "產業或同業價格表現",
+                    "基本面指標是否同步變化",
+                ],
             )
         )
 
@@ -258,11 +355,21 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="Current Price（目前股價）明顯高於 52 週區間",
-                message=(
-                    "Current Price（目前股價）明顯高於目前資料中的 52-week range。"
-                    "建議確認資料時間差、近期重大事件，以及市場對未來成長預期是否已有充分依據。"
-                ),
                 metric="fifty_two_week_position",
+                what_happened=(
+                    "52-week Position（52 週區間位置）目前為 "
+                    f"{format_percent_snapshot(position)}，高於目前資料中的 52-week range。"
+                ),
+                why_it_matters=(
+                    "價格高於既有 52 週區間時，值得先確認資料時間是否一致，再研究近期事件與預期變化。"
+                    "這不是高估或低估判定。"
+                ),
+                what_to_check=[
+                    "價格與 52 週區間資料時間",
+                    "近期重大公告或財報",
+                    "Forward estimates 是否更新",
+                    "同業估值與價格變化",
+                ],
             )
         )
 
@@ -271,13 +378,18 @@ def build_risk_signals(
             ResearchObservation(
                 category="Risk Signals（風險提示）",
                 title="缺少關鍵研究欄位",
-                message=(
-                    "目前缺少部分關鍵研究欄位，因此部分判讀只能作為初步觀察。"
-                    "建議補齊或交叉確認這些欄位："
-                    + "、".join(missing_fields)
-                    + "。"
-                ),
                 metric="missing_fields",
+                what_happened="目前缺少部分關鍵研究欄位：" + "、".join(missing_fields) + "。",
+                why_it_matters=(
+                    "資料不完整時，Research Dashboard 只能建立初步問題，"
+                    "不應把缺資料情境下的 observation 當成完整研究結論。"
+                ),
+                what_to_check=[
+                    "補齊缺漏欄位",
+                    "交叉確認資料來源",
+                    "確認 Yahoo snapshot 更新時間",
+                    "保留 N/A 欄位的研究限制",
+                ],
                 observation_type="info",
             )
         )
@@ -302,9 +414,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Valuation（估值）",
-                title="確認 forward earnings 假設",
-                question="確認市場對未來 EPS 的預估來源，並比較未來 1-2 年 earnings estimates。",
                 metric="forward_pe",
+                title="整理估值研究清單",
+                items=[
+                    "確認未來 EPS estimates 的來源與期間",
+                    "比較同業 P/E 與 Forward P/E",
+                    "比較公司歷史估值區間",
+                ],
             )
         )
 
@@ -312,9 +428,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Growth（成長性）",
-                title="拆解營收下降原因",
-                question="檢查營收下降是否為產業週期、產品轉換或公司特定因素。",
                 metric="revenue_growth",
+                title="整理營收研究清單",
+                items=[
+                    "比較近年 Revenue 變化",
+                    "檢查部門或產品線營收分布",
+                    "查詢產業需求與客戶庫存背景",
+                ],
             )
         )
 
@@ -322,9 +442,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Growth（成長性）",
-                title="比對盈餘與利潤率",
-                question="檢查盈餘下降是否與毛利率、營業利益率、費用結構或一次性項目有關。",
                 metric="earnings_growth",
+                title="整理獲利轉化研究清單",
+                items=[
+                    "比較近年 Revenue / EPS 變化",
+                    "檢查 Gross / Operating / Net Margin 變化",
+                    "確認是否存在非經常性損益",
+                ],
             )
         )
 
@@ -332,9 +456,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Financial Health（財務健康）",
-                title="追蹤自由現金流來源",
-                question="查看近年自由現金流趨勢、資本支出與營運現金流，判斷負值是否為短期投資或營運壓力。",
                 metric="free_cash_flow",
+                title="整理現金流研究清單",
+                items=[
+                    "比較近年 Operating Cash Flow 與 Free Cash Flow",
+                    "檢查資本支出與擴產計畫",
+                    "比對淨利與現金流方向",
+                ],
             )
         )
 
@@ -342,9 +470,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Data Quality（資料完整性）",
-                title="補齊缺漏欄位",
-                question="優先交叉確認缺漏欄位，避免只根據不完整 snapshot 形成研究結論。",
                 metric="missing_fields",
+                title="整理資料補查清單",
+                items=[
+                    "優先補齊缺漏欄位",
+                    "使用公司財報或交易所資料交叉確認",
+                    "標記仍為 N/A 的研究限制",
+                ],
             )
         )
 
@@ -352,9 +484,13 @@ def build_research_next_steps(
         next_steps.append(
             ResearchNextStep(
                 category="Research Next Steps（下一步研究）",
-                title="建立同業與歷史脈絡",
-                question="比較同業的獲利能力、成長性、估值與現金流，並檢查公司近年趨勢是否支持目前 snapshot。",
                 metric="baseline_research",
+                title="建立基礎研究清單",
+                items=[
+                    "比較同業獲利能力與成長性",
+                    "檢查公司近年財報與管理層說明",
+                    "整理估值、現金流與產業脈絡",
+                ],
             )
         )
 
