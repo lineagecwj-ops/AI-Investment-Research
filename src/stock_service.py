@@ -1,5 +1,8 @@
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+import math
+from numbers import Integral
+from numbers import Real
 from pathlib import Path
 
 import yfinance as yf
@@ -19,21 +22,68 @@ class StockDataError(StockServiceError):
     """Raised when Yahoo Finance returns incomplete stock data."""
 
 
+def optional_float(value) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        return None
+
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value):
+        return None
+
+    return numeric_value
+
+
+def optional_int(value) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        return None
+
+    return int(value)
+
+
+def optional_text(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+
+    return text
+
+
 def stock_from_yahoo_info(info: dict, requested_symbol: str) -> Stock:
-    current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+    current_price = optional_float(info.get("currentPrice"))
+    if current_price is None:
+        current_price = optional_float(info.get("regularMarketPrice"))
 
     return Stock(
-        symbol=info.get("symbol") or requested_symbol,
-        company_name=info.get("longName") or info.get("shortName"),
+        symbol=optional_text(info.get("symbol")) or requested_symbol,
+        company_name=optional_text(info.get("longName")) or optional_text(info.get("shortName")),
         current_price=current_price,
-        currency=info.get("currency"),
-        market_cap=info.get("marketCap"),
-        trailing_pe=info.get("trailingPE"),
-        forward_pe=info.get("forwardPE"),
-        trailing_eps=info.get("trailingEps"),
-        return_on_equity=info.get("returnOnEquity"),
-        sector=info.get("sector"),
-        industry=info.get("industry"),
+        currency=optional_text(info.get("currency")),
+        market_cap=optional_int(info.get("marketCap")),
+        trailing_pe=optional_float(info.get("trailingPE")),
+        forward_pe=optional_float(info.get("forwardPE")),
+        trailing_eps=optional_float(info.get("trailingEps")),
+        return_on_equity=optional_float(info.get("returnOnEquity")),
+        company_summary=optional_text(info.get("longBusinessSummary")),
+        gross_margin=optional_float(info.get("grossMargins")),
+        operating_margin=optional_float(info.get("operatingMargins")),
+        net_margin=optional_float(info.get("profitMargins")),
+        revenue_growth=optional_float(info.get("revenueGrowth")),
+        earnings_growth=optional_float(info.get("earningsGrowth")),
+        total_cash=optional_int(info.get("totalCash")),
+        total_debt=optional_int(info.get("totalDebt")),
+        debt_to_equity=optional_float(info.get("debtToEquity")),
+        operating_cash_flow=optional_int(info.get("operatingCashflow")),
+        free_cash_flow=optional_int(info.get("freeCashflow")),
+        price_to_book=optional_float(info.get("priceToBook")),
+        fifty_two_week_high=optional_float(info.get("fiftyTwoWeekHigh")),
+        fifty_two_week_low=optional_float(info.get("fiftyTwoWeekLow")),
+        fifty_day_average=optional_float(info.get("fiftyDayAverage")),
+        two_hundred_day_average=optional_float(info.get("twoHundredDayAverage")),
+        sector=optional_text(info.get("sector")),
+        industry=optional_text(info.get("industry")),
     )
 
 
