@@ -9,6 +9,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WATCHLIST_PATH = PROJECT_ROOT / "data" / "watchlist.json"
 
 
+class WatchlistDataError(Exception):
+    """Raised when existing watchlist data is corrupted or unsafe to overwrite."""
+
+
 def list_watchlist(path: Path | str = DEFAULT_WATCHLIST_PATH) -> list[str]:
     return read_watchlist(path)
 
@@ -46,11 +50,13 @@ def read_watchlist(path: Path | str = DEFAULT_WATCHLIST_PATH) -> list[str]:
 
     try:
         data = json.loads(watchlist_path.read_text(encoding="utf-8"))
-    except (OSError, JSONDecodeError):
-        return []
+    except OSError as exc:
+        raise WatchlistDataError("Watchlist 檔案讀取失敗。") from exc
+    except JSONDecodeError as exc:
+        raise WatchlistDataError("Watchlist 檔案格式錯誤，請先檢查 data/watchlist.json。") from exc
 
     if not isinstance(data, list):
-        return []
+        raise WatchlistDataError("Watchlist 檔案內容格式錯誤，最外層應為 list。")
 
     return normalize_watchlist_items(data)
 

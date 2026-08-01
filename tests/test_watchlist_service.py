@@ -13,6 +13,7 @@ if str(SRC_PATH) not in sys.path:
 from watchlist_service import add_stock
 from watchlist_service import list_watchlist
 from watchlist_service import remove_stock
+from watchlist_service import WatchlistDataError
 
 
 class WatchlistServiceTestCase(unittest.TestCase):
@@ -55,15 +56,53 @@ class WatchlistServiceTestCase(unittest.TestCase):
 
         self.assertEqual(list_watchlist(self.watchlist_path), [])
 
-    def test_invalid_json_is_handled_as_empty_watchlist(self):
+    def test_invalid_json_raises_data_error(self):
         self.watchlist_path.write_text("{invalid", encoding="utf-8")
 
-        self.assertEqual(list_watchlist(self.watchlist_path), [])
+        with self.assertRaises(WatchlistDataError):
+            list_watchlist(self.watchlist_path)
 
-    def test_non_list_json_is_handled_as_empty_watchlist(self):
+    def test_invalid_json_is_not_overwritten_by_add(self):
+        original_content = "{invalid"
+        self.watchlist_path.write_text(original_content, encoding="utf-8")
+
+        with self.assertRaises(WatchlistDataError):
+            add_stock("NVDA", self.watchlist_path)
+
+        self.assertEqual(
+            self.watchlist_path.read_text(encoding="utf-8"),
+            original_content,
+        )
+
+    def test_invalid_json_is_not_overwritten_by_remove(self):
+        original_content = "{invalid"
+        self.watchlist_path.write_text(original_content, encoding="utf-8")
+
+        with self.assertRaises(WatchlistDataError):
+            remove_stock("NVDA", self.watchlist_path)
+
+        self.assertEqual(
+            self.watchlist_path.read_text(encoding="utf-8"),
+            original_content,
+        )
+
+    def test_non_list_json_raises_data_error(self):
         self.watchlist_path.write_text('{"symbol": "NVDA"}', encoding="utf-8")
 
-        self.assertEqual(list_watchlist(self.watchlist_path), [])
+        with self.assertRaises(WatchlistDataError):
+            list_watchlist(self.watchlist_path)
+
+    def test_non_list_json_is_not_overwritten_by_add(self):
+        original_content = '{"symbol": "NVDA"}'
+        self.watchlist_path.write_text(original_content, encoding="utf-8")
+
+        with self.assertRaises(WatchlistDataError):
+            add_stock("AAPL", self.watchlist_path)
+
+        self.assertEqual(
+            self.watchlist_path.read_text(encoding="utf-8"),
+            original_content,
+        )
 
 
 if __name__ == "__main__":

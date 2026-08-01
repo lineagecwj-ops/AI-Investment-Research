@@ -4,6 +4,7 @@ from symbol_utils import parse_stock_symbols
 from watchlist_service import add_stock
 from watchlist_service import list_watchlist
 from watchlist_service import remove_stock
+from watchlist_service import WatchlistDataError
 
 
 def get_stock_symbols() -> list[str]:
@@ -88,7 +89,11 @@ def display_watchlist_menu() -> None:
 
 
 def show_watchlist() -> list[str]:
-    symbols = list_watchlist()
+    try:
+        symbols = list_watchlist()
+    except WatchlistDataError as error:
+        display_watchlist_error(error)
+        return []
 
     if not symbols:
         print("Watchlist 目前沒有股票。")
@@ -108,10 +113,17 @@ def add_watchlist_stock() -> None:
         print("請輸入有效的股票代號。")
         return
 
-    if add_stock(symbol):
+    try:
+        added = add_stock(symbol)
+    except WatchlistDataError as error:
+        display_watchlist_error(error)
+        return
+
+    if added:
         print(f"已新增：{symbol}")
-    else:
-        print(f"Watchlist 已存在：{symbol}")
+        return
+
+    print(f"Watchlist 已存在：{symbol}")
 
 
 def remove_watchlist_stock() -> None:
@@ -121,10 +133,22 @@ def remove_watchlist_stock() -> None:
         print("請輸入有效的股票代號。")
         return
 
-    if remove_stock(symbol):
+    try:
+        removed = remove_stock(symbol)
+    except WatchlistDataError as error:
+        display_watchlist_error(error)
+        return
+
+    if removed:
         print(f"已移除：{symbol}")
-    else:
-        print(f"Watchlist 找不到：{symbol}")
+        return
+
+    print(f"Watchlist 找不到：{symbol}")
+
+
+def display_watchlist_error(error: WatchlistDataError) -> None:
+    print("Watchlist 讀取失敗：", error)
+    print("為了保護既有資料，本次操作未寫入 watchlist.json。")
 
 
 def query_watchlist_stocks() -> None:

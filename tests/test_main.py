@@ -13,7 +13,9 @@ if str(SRC_PATH) not in sys.path:
 from main import parse_stock_symbols
 from main import main
 from main import query_stocks
+from main import show_watchlist
 from stock_service import StockDataError
+from watchlist_service import WatchlistDataError
 
 
 class ParseStockSymbolsTestCase(unittest.TestCase):
@@ -84,6 +86,15 @@ class MainFlowTestCase(unittest.TestCase):
             main()
 
         mock_print.assert_any_call("再見。")
+
+    @patch("main.list_watchlist", side_effect=WatchlistDataError("corrupted"))
+    def test_watchlist_data_error_prints_friendly_message(self, _mock_list_watchlist):
+        with patch("builtins.print") as mock_print:
+            symbols = show_watchlist()
+
+        self.assertEqual(symbols, [])
+        mock_print.assert_any_call("Watchlist 讀取失敗：", _mock_list_watchlist.side_effect)
+        mock_print.assert_any_call("為了保護既有資料，本次操作未寫入 watchlist.json。")
 
 
 if __name__ == "__main__":
