@@ -38,3 +38,29 @@ AI-Investment-Research 是一個結合 AI 與投資研究的個人專案。
 ## 專案狀態
 
 目前版本：v0.1
+
+---
+
+## MVP 使用方式
+
+使用專案虛擬環境執行主程式：
+
+```bash
+.venv/bin/python src/main.py
+```
+
+可輸入單一股票代號：
+
+```text
+2330
+NVDA
+```
+
+也可用逗號一次查詢多支股票：
+
+```text
+2330,NVDA,AAPL
+2330, NVDA, AAPL
+```
+
+純數字股票代號會自動加上 `.TW`，英文股票代號會自動轉為大寫。
