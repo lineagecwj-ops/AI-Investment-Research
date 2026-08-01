@@ -73,7 +73,7 @@ Market Position（市場位置）：
 - Percent fields such as margin, ROE, and growth are displayed as percentages.
 - Cash, debt, market cap, and cash flow keep currency context, for example `TWD 1.25T` or `USD 85.40B`.
 - Cross-market cash, debt, and cash flow values should not be directly ranked without currency conversion and accounting context.
-- Yahoo `debtToEquity` is displayed as a raw ratio-style number, not converted to percent. For example, `35.2` is shown as `35.20`.
+- Yahoo `debtToEquity` raw numeric value is already provided on a percent scale for user-facing interpretation. The Research Dashboard displays the same numeric value with a `%` suffix and does not multiply by `100`. For example, `15.174` is shown as `15.17%`.
 - 52-week Position is calculated as `(current_price - fifty_two_week_low) / (fifty_two_week_high - fifty_two_week_low)`.
 - 52-week Position is not clamped in research logic. Values below `0` or above `1` are shown as data observations because the current price may sit outside the available 52-week range.
 

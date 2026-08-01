@@ -10,6 +10,7 @@ if str(SRC_PATH) not in sys.path:
 
 from dashboard import build_comparison_rows
 from dashboard import format_currency_value
+from dashboard import format_debt_to_equity
 from dashboard import indicator_help
 from dashboard import indicator_label
 from dashboard import format_decimal
@@ -253,7 +254,7 @@ def render_research() -> None:
         [
             (indicator_label("total_cash"), format_currency_value(stock.total_cash, stock.currency), indicator_help("total_cash")),
             (indicator_label("total_debt"), format_currency_value(stock.total_debt, stock.currency), indicator_help("total_debt")),
-            (indicator_label("debt_to_equity"), format_ratio(stock.debt_to_equity), indicator_help("debt_to_equity")),
+            (indicator_label("debt_to_equity"), format_debt_to_equity(stock.debt_to_equity), indicator_help("debt_to_equity")),
             (indicator_label("operating_cash_flow"), format_currency_value(stock.operating_cash_flow, stock.currency), indicator_help("operating_cash_flow")),
             (indicator_label("free_cash_flow"), format_currency_value(stock.free_cash_flow, stock.currency), indicator_help("free_cash_flow")),
         ],

@@ -12,6 +12,7 @@ if str(SRC_PATH) not in sys.path:
 
 from dashboard import build_comparison_rows
 from dashboard import format_currency_value
+from dashboard import format_debt_to_equity
 from dashboard import format_decimal
 from dashboard import format_integer
 from dashboard import format_industry
@@ -79,6 +80,21 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(format_price(None, "USD"), "N/A")
         self.assertEqual(format_ratio(35.2), "35.20")
         self.assertEqual(format_ratio(None), "N/A")
+
+    def test_debt_to_equity_display_uses_yahoo_percent_scale(self):
+        self.assertEqual(format_debt_to_equity(15.174), "15.17%")
+        self.assertEqual(format_debt_to_equity(3.952), "3.95%")
+        self.assertEqual(format_debt_to_equity(None), "N/A")
+        self.assertNotEqual(format_debt_to_equity(15.174), "1,517.40%")
+
+    def test_research_page_uses_debt_to_equity_formatter(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn("from dashboard import format_debt_to_equity", app_source)
+        self.assertIn(
+            '(indicator_label("debt_to_equity"), format_debt_to_equity(stock.debt_to_equity), indicator_help("debt_to_equity"))',
+            app_source,
+        )
 
     def test_roe_percentage_formatting(self):
         self.assertEqual(format_percentage(0.285), "28.50%")

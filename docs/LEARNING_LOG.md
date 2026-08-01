@@ -18,7 +18,7 @@
 - Research page 主要語言為繁體中文，保留英文投資術語。
 - Growth 明確標示目前是 Yahoo Finance snapshot，不是本系統自行計算的多年 CAGR。
 - Cash / Debt / Cash Flow 顯示保留 currency context，例如 `TWD 1.25T`、`USD 85.40B`。
-- Yahoo `debtToEquity` 以 raw ratio-style number 顯示，例如 `35.20`，不轉成百分比。
+- Yahoo `debtToEquity` raw numeric value 以百分比尺度解讀，Research page 顯示同一數值加 `%`，例如 `15.174` 顯示為 `15.17%`，不乘以 `100`。
 - Observations 是 research prompts，不是投資建議、評分或 recommendation。
 
 ### Testing Notes

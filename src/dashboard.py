@@ -61,7 +61,11 @@ INDICATOR_HELP_TEXT = {
     "earnings_growth": "盈餘成長率，觀察近期盈餘變化；本頁使用 Yahoo snapshot，需搭配利潤率與一次性項目判讀。",
     "total_cash": "公司持有的現金與約當現金；顯示時保留 Yahoo 提供的幣別脈絡。",
     "total_debt": "公司總負債；需搭配現金、現金流、利息費用與到期結構一起看。",
-    "debt_to_equity": "負債權益比，Yahoo raw value 以比值數字顯示，不在本頁轉成百分比。",
+    "debt_to_equity": (
+        "Yahoo Finance 此欄位以百分比尺度提供，表示總負債相對股東權益的比例。"
+        "例如 15.17 代表約 15.17%，不是 15.17 倍。"
+        "此指標需搭配產業特性、現金、現金流與債務結構理解，不能單獨判定公司財務好壞。"
+    ),
     "operating_cash_flow": "營業現金流，觀察本業產生現金的能力；單期數值需搭配營運週期與歷史趨勢。",
     "free_cash_flow": "自由現金流，通常為營業現金流扣除資本支出後的概念；負值需進一步檢查投資與營運背景。",
     "price_to_book": "股價淨值比，觀察價格相對帳面淨值的倍數；不同產業適用性不同。",
@@ -187,6 +191,13 @@ def format_price(value: int | float | None, currency: str | None = None) -> str:
 
 def format_ratio(value: float | None) -> str:
     return format_decimal(value)
+
+
+def format_debt_to_equity(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+
+    return f"{value:.2f}%"
 
 
 def format_percentage(value: float | None) -> str:
