@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+from datetime import date
 from typing import Callable
 
 from company_name_service import get_display_company_name
+from models import HistoricalFinancialSeries
 from models import Stock
+from research_metrics import historical_yoy_growth_by_field
 from stock_service import get_stock
 from stock_service import StockServiceError
 
@@ -13,6 +16,46 @@ class StockQueryFailure:
     symbol: str
 
     message: str
+
+
+@dataclass(frozen=True)
+class HistoricalOverviewDisplay:
+
+    symbol: str
+
+    company_name: str
+
+    currency: str
+
+    annual_periods: str
+
+    period_range: str
+
+    available_periods: str
+
+    cache_status: str
+
+    stale_warning: str | None
+
+
+@dataclass(frozen=True)
+class HistoricalTrendDisplay:
+
+    overview: HistoricalOverviewDisplay
+
+    revenue_rows: list[dict[str, str]]
+
+    earnings_rows: list[dict[str, str]]
+
+    margin_rows: list[dict[str, str]]
+
+    cash_flow_rows: list[dict[str, str]]
+
+    financial_position_rows: list[dict[str, str]]
+
+    historical_table_rows: list[dict[str, str]]
+
+    missing_data_notes: list[str]
 
 
 INDICATOR_LABELS = {
@@ -79,6 +122,63 @@ INDICATOR_HELP_TEXT = {
 }
 
 
+HISTORICAL_METRIC_HELP_TEXT = {
+    "revenue": "Revenue（營收）：公司在該年度認列的收入，是觀察規模與需求變化的起點。",
+    "net_income": "Net Income（淨利）：扣除成本、費用、稅與其他影響後的獲利，不等於現金流。",
+    "eps": "EPS（每股盈餘）：每股可分攤的獲利。若 Yahoo Finance 未提供，本頁不自行計算。",
+    "gross_margin": "Gross Margin（毛利率）：看產品 / 服務本身的毛利結構。",
+    "operating_margin": "Operating Margin（營業利益率）：加入營業費用後的本業獲利能力。",
+    "net_margin": "Net Margin（淨利率）：包含更多非營業與稅後影響後的最終獲利率。",
+    "operating_cash_flow": "Operating Cash Flow（營業現金流）：公司本業活動產生的現金流入或流出。",
+    "free_cash_flow": "Free Cash Flow（自由現金流）：通常用來觀察營運現金流扣除資本支出後留下的現金。",
+    "capital_expenditure": (
+        "Capital Expenditure（資本支出）：通常代表公司投入廠房、設備等長期資產的現金支出。"
+        "Yahoo Finance 此資料常以負數表示 cash outflow。"
+    ),
+    "total_debt": "Total Debt（總負債）：公司債務規模，需搭配現金、現金流與債務到期結構理解。",
+    "total_equity": "Total Equity（股東權益）：資產扣除負債後歸屬股東的帳面權益。",
+}
+
+
+HISTORICAL_TABLE_COLUMNS = {
+    "period_end": "Period End",
+    "revenue": "Revenue",
+    "revenue_yoy": "Revenue YoY",
+    "gross_profit": "Gross Profit",
+    "operating_income": "Operating Income",
+    "net_income": "Net Income",
+    "eps": "EPS",
+    "eps_yoy": "EPS YoY",
+    "gross_margin": "Gross Margin",
+    "operating_margin": "Operating Margin",
+    "net_margin": "Net Margin",
+    "operating_cash_flow": "Operating Cash Flow",
+    "capital_expenditure": "Capital Expenditure",
+    "free_cash_flow": "Free Cash Flow",
+    "total_assets": "Total Assets",
+    "total_debt": "Total Debt",
+    "total_equity": "Total Equity",
+    "cash_and_cash_equivalents": "Cash",
+}
+
+
+HISTORICAL_CHART_LABELS = {
+    "revenue": "Revenue",
+    "net_income": "Net Income",
+    "eps": "EPS",
+    "gross_margin": "Gross Margin",
+    "operating_margin": "Operating Margin",
+    "net_margin": "Net Margin",
+    "operating_cash_flow": "Operating Cash Flow",
+    "capital_expenditure": "Capital Expenditure",
+    "free_cash_flow": "Free Cash Flow",
+    "total_assets": "Total Assets",
+    "total_debt": "Total Debt",
+    "total_equity": "Total Equity",
+    "cash_and_cash_equivalents": "Cash",
+}
+
+
 SECTOR_TRANSLATIONS = {
     "Technology": "科技",
     "Healthcare": "醫療保健",
@@ -122,6 +222,10 @@ def format_na(value) -> str:
         return "N/A"
 
     return str(value)
+
+
+def format_missing(value) -> str:
+    return format_na(value)
 
 
 def format_integer(value) -> str:
@@ -171,11 +275,19 @@ def format_currency_value(value: int | float | None, currency: str | None = None
     return compact_value
 
 
+def format_currency_amount(value: int | float | None, currency: str | None = None) -> str:
+    return format_currency_value(value, currency)
+
+
 def format_decimal(value) -> str:
     if value is None:
         return "N/A"
 
     return f"{value:.2f}"
+
+
+def format_eps(value: float | None) -> str:
+    return format_decimal(value)
 
 
 def format_price(value: int | float | None, currency: str | None = None) -> str:
@@ -205,6 +317,21 @@ def format_percentage(value: float | None) -> str:
         return "N/A"
 
     return f"{value * 100:.2f}%"
+
+
+def format_yoy(value: float | None) -> str:
+    return format_percentage(value)
+
+
+def format_period_end(value: date | None) -> str:
+    if value is None:
+        return "N/A"
+
+    return f"FY ending {value.isoformat()}"
+
+
+def historical_metric_help(metric: str) -> str | None:
+    return HISTORICAL_METRIC_HELP_TEXT.get(metric)
 
 
 def format_localized_classification(
@@ -243,6 +370,261 @@ def stock_display_data(stock: Stock) -> dict[str, str]:
         "Sector": format_sector(stock.sector),
         "Industry": format_industry(stock.industry),
     }
+
+
+def build_historical_trend_display(
+    series: HistoricalFinancialSeries,
+    stock: Stock | None = None,
+) -> HistoricalTrendDisplay:
+    periods = list(series.periods or [])
+    revenue_yoy = historical_yoy_lookup(series, "revenue")
+    eps_yoy = historical_yoy_lookup(series, "eps")
+
+    return HistoricalTrendDisplay(
+        overview=build_historical_overview(series, stock),
+        revenue_rows=[
+            {
+                "Period End": format_period_end(period.period_end),
+                "Revenue": format_currency_amount(period.revenue, period.currency or series.currency),
+                "YoY": format_yoy(revenue_yoy.get(period.period_end)),
+            }
+            for period in periods
+        ],
+        earnings_rows=[
+            {
+                "Period End": format_period_end(period.period_end),
+                "Net Income": format_currency_amount(period.net_income, period.currency or series.currency),
+                "EPS": format_eps(period.eps),
+                "EPS YoY": format_yoy(eps_yoy.get(period.period_end)),
+            }
+            for period in periods
+        ],
+        margin_rows=[
+            {
+                "Period End": format_period_end(period.period_end),
+                "Gross Margin": format_percentage(period.gross_margin),
+                "Operating Margin": format_percentage(period.operating_margin),
+                "Net Margin": format_percentage(period.net_margin),
+            }
+            for period in periods
+        ],
+        cash_flow_rows=[
+            {
+                "Period End": format_period_end(period.period_end),
+                "Operating Cash Flow": format_currency_amount(
+                    period.operating_cash_flow,
+                    period.currency or series.currency,
+                ),
+                "Capital Expenditure": format_currency_amount(
+                    period.capital_expenditure,
+                    period.currency or series.currency,
+                ),
+                "Free Cash Flow": format_currency_amount(
+                    period.free_cash_flow,
+                    period.currency or series.currency,
+                ),
+            }
+            for period in periods
+        ],
+        financial_position_rows=[
+            {
+                "Period End": format_period_end(period.period_end),
+                "Total Assets": format_currency_amount(period.total_assets, period.currency or series.currency),
+                "Total Debt": format_currency_amount(period.total_debt, period.currency or series.currency),
+                "Total Equity": format_currency_amount(period.total_equity, period.currency or series.currency),
+                "Cash": format_currency_amount(
+                    period.cash_and_cash_equivalents,
+                    period.currency or series.currency,
+                ),
+            }
+            for period in periods
+        ],
+        historical_table_rows=build_historical_table_rows(series),
+        missing_data_notes=build_historical_missing_data_notes(series),
+    )
+
+
+def build_historical_overview(
+    series: HistoricalFinancialSeries,
+    stock: Stock | None = None,
+) -> HistoricalOverviewDisplay:
+    periods = list(series.periods or [])
+    company_name = get_display_company_name(stock) if stock is not None else None
+    currency = series.currency or (stock.currency if stock is not None else None)
+
+    if periods:
+        first_period = periods[0]
+        last_period = periods[-1]
+        year_values = [period.period_year for period in periods if period.period_year is not None]
+        annual_periods = (
+            f"{min(year_values)}–{max(year_values)}"
+            if year_values
+            else "N/A"
+        )
+        period_range = (
+            f"{format_period_end(first_period.period_end)} – "
+            f"{format_period_end(last_period.period_end)}"
+        )
+    else:
+        annual_periods = "N/A"
+        period_range = "N/A"
+
+    return HistoricalOverviewDisplay(
+        symbol=format_na(series.symbol or (stock.symbol if stock is not None else None)),
+        company_name=format_na(company_name),
+        currency=format_na(currency),
+        annual_periods=annual_periods,
+        period_range=period_range,
+        available_periods=str(len(periods)),
+        cache_status=historical_cache_status_text(series),
+        stale_warning=historical_stale_warning_text(series),
+    )
+
+
+def historical_cache_status_text(series: HistoricalFinancialSeries) -> str:
+    if series.is_stale:
+        return "歷史資料：顯示本機較舊快取"
+
+    return "歷史資料：已使用 7 天內快取或剛更新資料"
+
+
+def historical_stale_warning_text(series: HistoricalFinancialSeries) -> str | None:
+    if not series.is_stale:
+        return None
+
+    return "目前 Yahoo Finance 查詢失敗，顯示本機較舊的歷史資料。"
+
+
+def build_historical_table_rows(series: HistoricalFinancialSeries) -> list[dict[str, str]]:
+    revenue_yoy = historical_yoy_lookup(series, "revenue")
+    eps_yoy = historical_yoy_lookup(series, "eps")
+    rows = []
+
+    for period in series.periods or []:
+        currency = period.currency or series.currency
+        rows.append(
+            {
+                HISTORICAL_TABLE_COLUMNS["period_end"]: format_period_end(period.period_end),
+                HISTORICAL_TABLE_COLUMNS["revenue"]: format_currency_amount(period.revenue, currency),
+                HISTORICAL_TABLE_COLUMNS["revenue_yoy"]: format_yoy(revenue_yoy.get(period.period_end)),
+                HISTORICAL_TABLE_COLUMNS["gross_profit"]: format_currency_amount(period.gross_profit, currency),
+                HISTORICAL_TABLE_COLUMNS["operating_income"]: format_currency_amount(
+                    period.operating_income,
+                    currency,
+                ),
+                HISTORICAL_TABLE_COLUMNS["net_income"]: format_currency_amount(period.net_income, currency),
+                HISTORICAL_TABLE_COLUMNS["eps"]: format_eps(period.eps),
+                HISTORICAL_TABLE_COLUMNS["eps_yoy"]: format_yoy(eps_yoy.get(period.period_end)),
+                HISTORICAL_TABLE_COLUMNS["gross_margin"]: format_percentage(period.gross_margin),
+                HISTORICAL_TABLE_COLUMNS["operating_margin"]: format_percentage(period.operating_margin),
+                HISTORICAL_TABLE_COLUMNS["net_margin"]: format_percentage(period.net_margin),
+                HISTORICAL_TABLE_COLUMNS["operating_cash_flow"]: format_currency_amount(
+                    period.operating_cash_flow,
+                    currency,
+                ),
+                HISTORICAL_TABLE_COLUMNS["capital_expenditure"]: format_currency_amount(
+                    period.capital_expenditure,
+                    currency,
+                ),
+                HISTORICAL_TABLE_COLUMNS["free_cash_flow"]: format_currency_amount(
+                    period.free_cash_flow,
+                    currency,
+                ),
+                HISTORICAL_TABLE_COLUMNS["total_assets"]: format_currency_amount(period.total_assets, currency),
+                HISTORICAL_TABLE_COLUMNS["total_debt"]: format_currency_amount(period.total_debt, currency),
+                HISTORICAL_TABLE_COLUMNS["total_equity"]: format_currency_amount(period.total_equity, currency),
+                HISTORICAL_TABLE_COLUMNS["cash_and_cash_equivalents"]: format_currency_amount(
+                    period.cash_and_cash_equivalents,
+                    currency,
+                ),
+            }
+        )
+
+    return rows
+
+
+def build_historical_chart_rows(
+    series: HistoricalFinancialSeries,
+    fields: list[str],
+) -> list[dict[str, float | str | None]]:
+    rows = []
+    for period in series.periods or []:
+        row: dict[str, float | str | None] = {"Period End": format_period_end(period.period_end)}
+        for field in fields:
+            row[HISTORICAL_CHART_LABELS.get(field, field)] = getattr(period, field)
+        rows.append(row)
+
+    return rows
+
+
+def has_enough_historical_data(
+    series: HistoricalFinancialSeries,
+    fields: list[str],
+    minimum_points: int = 2,
+) -> bool:
+    for field in fields:
+        count = sum(
+            1
+            for period in series.periods or []
+            if getattr(period, field) is not None
+        )
+        if count >= minimum_points:
+            return True
+
+    return False
+
+
+def build_historical_missing_data_notes(series: HistoricalFinancialSeries) -> list[str]:
+    notes = []
+    periods = list(series.periods or [])
+
+    if not periods:
+        return ["目前可取得的歷史資料不足，暫不顯示趨勢。"]
+
+    eps_missing_periods = [
+        format_period_end(period.period_end)
+        for period in periods
+        if period.eps is None
+    ]
+    if eps_missing_periods:
+        notes.append(
+            "Yahoo Finance 目前未提供此期 EPS："
+            + "、".join(eps_missing_periods)
+            + "。"
+        )
+
+    missing_groups = [
+        (
+            "Cash Flow（現金流）",
+            ["operating_cash_flow", "capital_expenditure", "free_cash_flow"],
+        ),
+        (
+            "Financial Position（財務結構）",
+            ["total_assets", "total_debt", "total_equity", "cash_and_cash_equivalents"],
+        ),
+    ]
+    for title, fields in missing_groups:
+        if not any(
+            getattr(period, field) is not None
+            for period in periods
+            for field in fields
+        ):
+            notes.append(f"{title} 目前可取得的歷史資料不足，暫不顯示趨勢。")
+
+    return notes
+
+
+def historical_yoy_lookup(
+    series: HistoricalFinancialSeries,
+    field_name: str,
+) -> dict[date, float | None]:
+    yoy_values = historical_yoy_growth_by_field(series, field_name)
+    lookup = {}
+
+    for period, (_period_year, growth) in zip(series.periods or [], yoy_values):
+        lookup[period.period_end] = growth
+
+    return lookup
 
 
 def stock_comparison_row(stock: Stock) -> dict[str, str]:

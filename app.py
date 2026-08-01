@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 
@@ -9,6 +10,8 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from dashboard import build_comparison_rows
+from dashboard import build_historical_chart_rows
+from dashboard import build_historical_trend_display
 from dashboard import format_currency_value
 from dashboard import format_debt_to_equity
 from dashboard import indicator_help
@@ -19,9 +22,14 @@ from dashboard import format_percentage
 from dashboard import format_price
 from dashboard import format_ratio
 from dashboard import format_sector
+from dashboard import has_enough_historical_data
+from dashboard import historical_metric_help
 from dashboard import query_stock_batch
+from dashboard import StockQueryFailure
 from dashboard import stock_display_data
 from company_summary_service import build_company_summary_display
+from historical_financial_service import get_historical_financials
+from historical_financial_service import HistoricalFinancialServiceError
 from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
@@ -43,6 +51,9 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("stock_search_failures", [])
     st.session_state.setdefault("research_stock", None)
     st.session_state.setdefault("research_failures", [])
+    st.session_state.setdefault("historical_stock", None)
+    st.session_state.setdefault("historical_series", None)
+    st.session_state.setdefault("historical_failures", [])
     st.session_state.setdefault("watchlist_query_stocks", [])
     st.session_state.setdefault("watchlist_query_failures", [])
     st.session_state.setdefault("comparison_stocks", [])
@@ -179,6 +190,18 @@ def render_next_steps(next_steps) -> None:
         st.write(f"**{step.category} · {step.title}**")
         for item in step.items:
             st.write(f"□ {item}")
+
+
+def render_historical_chart(series, fields: list[str], chart_type: str = "line") -> None:
+    rows = build_historical_chart_rows(series, fields)
+    if not rows:
+        return
+
+    chart_data = pd.DataFrame(rows).set_index("Period End")
+    if chart_type == "bar":
+        st.bar_chart(chart_data, use_container_width=True)
+    else:
+        st.line_chart(chart_data, use_container_width=True)
 
 
 def render_research_glossary() -> None:
@@ -330,6 +353,150 @@ def render_research() -> None:
     render_next_steps(report.next_steps)
 
 
+def render_historical_trends() -> None:
+    st.header("Historical Trends（歷史趨勢）")
+    st.caption(
+        "使用 Yahoo Finance annual financial statements 呈現歷史基本面資料；"
+        "本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。"
+    )
+
+    with st.form("historical_trends_form"):
+        input_text = st.text_input(
+            "單一股票歷史趨勢",
+            placeholder="2330 或 NVDA",
+            key="historical_trends_input",
+        )
+        submitted = st.form_submit_button("建立歷史趨勢")
+
+    if submitted:
+        symbols = parse_stock_symbols(input_text)
+        if not symbols:
+            st.warning("請輸入至少一個股票代號。")
+            st.session_state["historical_stock"] = None
+            st.session_state["historical_series"] = None
+            st.session_state["historical_failures"] = []
+        else:
+            if len(symbols) > 1:
+                st.info(f"Historical Trends 頁面目前顯示第一支股票：{symbols[0]}")
+            stocks, failures = query_stock_batch([symbols[0]])
+            stock = stocks[0] if stocks else None
+            series = None
+            historical_failures = failures.copy()
+            if stock is not None:
+                try:
+                    series = get_historical_financials(stock.symbol or symbols[0])
+                except HistoricalFinancialServiceError as error:
+                    historical_failures.append(
+                        StockQueryFailure(
+                            symbol=stock.symbol or symbols[0],
+                            message=str(error),
+                        )
+                    )
+            st.session_state["historical_stock"] = stock
+            st.session_state["historical_series"] = series
+            st.session_state["historical_failures"] = historical_failures
+
+    render_query_failures(st.session_state["historical_failures"])
+
+    stock = st.session_state["historical_stock"]
+    series = st.session_state["historical_series"]
+    if stock is None or series is None:
+        st.info("輸入股票代號後，系統會顯示年度營收、獲利、利潤率、現金流與財務結構趨勢。")
+        return
+
+    display = build_historical_trend_display(series, stock)
+    overview = display.overview
+
+    st.subheader(f"{overview.symbol} · {overview.company_name}")
+    if overview.stale_warning:
+        st.warning(overview.stale_warning)
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Currency", overview.currency)
+    metric_cols[1].metric("Annual periods", overview.annual_periods)
+    metric_cols[2].metric("Available periods", overview.available_periods)
+    metric_cols[3].metric("Historical data cache", overview.cache_status)
+    st.caption(f"Period range: {overview.period_range}")
+
+    with st.expander("資料來源與 Period End 說明"):
+        st.write(
+            "歷史財務資料來自 Yahoo Finance annual financial statements。"
+            "Period End 是財務資料期間結束日；例如 NVDA 或 AAPL 的年度結束日可能不是 12/31。"
+            "因此本頁優先顯示 FY ending YYYY-MM-DD，避免把期間結束日誤讀為完整曆年。"
+        )
+        st.write(
+            "YoY 只在相鄰資料的 year component 連續時顯示；若中間缺年度，該期 YoY 會顯示 N/A。"
+            "本頁只呈現歷史數值與可見變化，不自動判斷 improving、deteriorating、strong 或 weak。"
+        )
+
+    for note in display.missing_data_notes:
+        st.info(note)
+
+    st.markdown("### Revenue（營收）Trend")
+    st.caption(historical_metric_help("revenue"))
+    if has_enough_historical_data(series, ["revenue"]):
+        render_historical_chart(series, ["revenue"], chart_type="bar")
+    else:
+        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+    st.dataframe(display.revenue_rows, width="stretch", hide_index=True)
+
+    st.markdown("### Earnings（獲利）Trend")
+    st.caption(historical_metric_help("net_income"))
+    st.caption(historical_metric_help("eps"))
+    if has_enough_historical_data(series, ["net_income", "eps"]):
+        render_historical_chart(series, ["net_income", "eps"])
+    else:
+        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+    st.dataframe(display.earnings_rows, width="stretch", hide_index=True)
+
+    st.markdown("### Margins（利潤率趨勢）")
+    with st.expander("利潤率怎麼看？"):
+        st.write(historical_metric_help("gross_margin"))
+        st.write(historical_metric_help("operating_margin"))
+        st.write(historical_metric_help("net_margin"))
+        st.write("Margin 上升或下降都需要搭配產品組合、費用結構、產業循環與一次性項目理解，不能單獨判斷好壞。")
+    if has_enough_historical_data(series, ["gross_margin", "operating_margin", "net_margin"]):
+        render_historical_chart(series, ["gross_margin", "operating_margin", "net_margin"])
+    else:
+        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+    st.dataframe(display.margin_rows, width="stretch", hide_index=True)
+
+    st.markdown("### Cash Flow（現金流趨勢）")
+    st.caption(historical_metric_help("operating_cash_flow"))
+    st.caption(historical_metric_help("free_cash_flow"))
+    st.info(historical_metric_help("capital_expenditure"))
+    if has_enough_historical_data(
+        series,
+        ["operating_cash_flow", "capital_expenditure", "free_cash_flow"],
+    ):
+        render_historical_chart(
+            series,
+            ["operating_cash_flow", "capital_expenditure", "free_cash_flow"],
+        )
+    else:
+        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+    st.dataframe(display.cash_flow_rows, width="stretch", hide_index=True)
+
+    st.markdown("### Financial Position（財務結構）")
+    st.caption("Financial Position 保留 currency context；不同股票或不同幣別不要直接排名。")
+    st.caption(historical_metric_help("total_debt"))
+    st.caption(historical_metric_help("total_equity"))
+    if has_enough_historical_data(
+        series,
+        ["total_assets", "total_debt", "total_equity", "cash_and_cash_equivalents"],
+    ):
+        render_historical_chart(
+            series,
+            ["total_assets", "total_debt", "total_equity", "cash_and_cash_equivalents"],
+        )
+    else:
+        st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
+    st.dataframe(display.financial_position_rows, width="stretch", hide_index=True)
+
+    st.markdown("### Historical Table（完整年度資料）")
+    st.dataframe(display.historical_table_rows, width="stretch", hide_index=True)
+
+
 def read_watchlist_for_ui() -> list[str]:
     try:
         return list_watchlist()
@@ -446,8 +613,8 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, historical_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Historical Trends", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
@@ -455,6 +622,9 @@ def main() -> None:
 
     with research_tab:
         render_research()
+
+    with historical_tab:
+        render_historical_trends()
 
     with watchlist_tab:
         render_watchlist()
