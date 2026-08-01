@@ -1,5 +1,74 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 01 Batch B
+
+### Completed Features
+
+- Feature 1 — SQLite Stock Cache
+  - 新增 `src/database.py`，使用 Python standard library `sqlite3` 建立 `data/stocks.db`。
+  - Cache TTL 設為 24 hours，以 `fetched_at` 判斷 fresh cache / expired cache。
+  - `stock_service.py` 先讀 SQLite cache；cache miss 或 expired 才查詢 Yahoo Finance。
+  - Yahoo Finance 成功後會將 `Stock` model 欄位寫入 SQLite，不直接保存 Yahoo raw dictionary。
+  - Cache read failure 會 fallback Yahoo Finance；cache write failure 不會阻止成功的 Yahoo query 回傳 `Stock`。
+
+- Feature 2 — Watchlist
+  - 新增 `src/watchlist_service.py`，使用 `data/watchlist.json` 保存個人 Watchlist。
+  - 支援新增、移除、列出股票。
+  - Watchlist 使用既有股票代號 normalize 規則，不允許重複並保留加入順序。
+  - 缺檔、空檔與基本 JSON 格式錯誤會友善視為空 Watchlist。
+
+- Feature 3 — Console Menu
+  - `src/main.py` 改為簡單 MVP menu。
+  - 主選單支援查詢股票、Watchlist 與離開。
+  - Watchlist 子選單支援顯示、新增、移除、查詢 Watchlist 股票與返回。
+  - Watchlist query 重用既有 `query_stocks()` flow，因此同樣優先使用 SQLite cache。
+
+### Modified / Added Files
+
+- 新增 `src/database.py`
+- 新增 `src/watchlist_service.py`
+- 新增 `src/symbol_utils.py`
+- 新增 `tests/test_database.py`
+- 新增 `tests/test_watchlist_service.py`
+- 修改 `src/stock_service.py`
+- 修改 `src/main.py`
+- 修改 `tests/test_main.py`
+- 修改 `tests/test_stock_service.py`
+- 修改 `.gitignore`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+
+### Data Flow Notes
+
+- Cache hit：`main.py` → `stock_service.py` → `database.py` → `Stock` → display。
+- Cache miss / expired：`main.py` → `stock_service.py` → Yahoo Finance → `Stock` → `database.py` upsert → display。
+- Watchlist：`main.py` → `watchlist_service.py` → `data/watchlist.json`。
+
+### Software Engineering Concepts
+
+- Cache TTL
+- SQLite upsert
+- Parameterized SQL
+- Runtime data vs versioned source
+- Persistence boundary
+- Cache failure fallback
+- Unit testing with temp files and mocks
+
+### Code Review Focus
+
+- `src/database.py` 的 schema、TTL 判斷與 timezone handling 是否足夠簡單且可測。
+- `src/stock_service.py` 的 cache read/write failure fallback 是否符合 MVP 可用性需求。
+- `src/watchlist_service.py` 對缺檔、空檔與 invalid JSON 的處理是否符合「友善」預期。
+- `src/main.py` 的 menu flow 是否仍保持簡單，沒有混入 SQL / JSON persistence。
+- `tests/test_stock_service.py` 的 cache hit / miss / expired mock 是否準確保護不依賴真實 Yahoo Finance。
+
+### Known Limits
+
+- Cache 目前只保存最新一次 snapshot，尚未建立歷史價格表。
+- Cache failure 目前以 logging warning 記錄，尚未提供使用者可見的 cache 狀態提示。
+- Watchlist 目前是單一 JSON list，未保存加入時間、備註或分類。
+- Console menu 還是 MVP 互動，尚未進入 Streamlit Dashboard。
+
 ## 2026-08-01 — Sprint 01 Batch A
 
 ### Completed Features

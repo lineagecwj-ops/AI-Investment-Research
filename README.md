@@ -49,7 +49,15 @@ AI-Investment-Research 是一個結合 AI 與投資研究的個人專案。
 .venv/bin/python src/main.py
 ```
 
-可輸入單一股票代號：
+主選單目前提供：
+
+```text
+1. 查詢股票
+2. Watchlist
+3. 離開
+```
+
+選擇 `1. 查詢股票` 後，可輸入單一股票代號：
 
 ```text
 2330
@@ -64,3 +72,7 @@ NVDA
 ```
 
 純數字股票代號會自動加上 `.TW`，英文股票代號會自動轉為大寫。
+
+股票查詢會先檢查本機 SQLite cache。若 24 小時內已有 fresh cache，會直接使用本機資料；若沒有資料或 cache 已過期，才查詢 Yahoo Finance 並更新 cache。
+
+Watchlist 可新增、移除、列出股票，資料儲存在 `data/watchlist.json`。SQLite cache 儲存在 `data/stocks.db`。這兩個檔案屬於 runtime / personal data，不提交到 Git。
