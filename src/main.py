@@ -1,4 +1,4 @@
-from stock_service import get_stock
+from stock_service import StockServiceError, get_stock
 
 
 def normalize_stock_symbol(symbol: str) -> str:
@@ -47,6 +47,12 @@ def display_stock(stock):
     print("Industry：", format_value(stock.industry))
 
 
+def display_stock_error(symbol: str, error: StockServiceError) -> None:
+    print()
+    print("股票代號：", symbol)
+    print("查詢失敗：", error)
+
+
 def format_value(value) -> str:
     if value is None or value == "":
         return "N/A"
@@ -64,8 +70,16 @@ def format_percentage(value: float | None) -> str:
 def main():
     symbols = get_stock_symbols()
 
+    if not symbols:
+        print("請輸入至少一個股票代號。")
+        return
+
     for symbol in symbols:
-        stock = get_stock(symbol)
+        try:
+            stock = get_stock(symbol)
+        except StockServiceError as error:
+            display_stock_error(symbol, error)
+            continue
 
         display_stock(stock)
 

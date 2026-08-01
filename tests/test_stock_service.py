@@ -1,6 +1,8 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -9,7 +11,11 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+from stock_service import StockDataError
+from stock_service import StockServiceError
+from stock_service import get_stock
 from stock_service import stock_from_yahoo_info
+from stock_service import validate_stock
 
 
 class StockFromYahooInfoTestCase(unittest.TestCase):
@@ -52,6 +58,21 @@ class StockFromYahooInfoTestCase(unittest.TestCase):
         self.assertIsNone(stock.company_name)
         self.assertIsNone(stock.current_price)
         self.assertIsNone(stock.currency)
+
+    def test_validate_stock_rejects_missing_current_price(self):
+        stock = stock_from_yahoo_info({"symbol": "MISSING"}, "MISSING")
+
+        with self.assertRaises(StockDataError):
+            validate_stock(stock)
+
+    @patch("stock_service.yf.Ticker")
+    def test_get_stock_wraps_network_error(self, mock_ticker):
+        mock_yahoo_stock = Mock()
+        type(mock_yahoo_stock).info = property(Mock(side_effect=OSError("network error")))
+        mock_ticker.return_value = mock_yahoo_stock
+
+        with self.assertRaises(StockServiceError):
+            get_stock("NVDA")
 
 
 if __name__ == "__main__":
