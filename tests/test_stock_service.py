@@ -41,7 +41,6 @@ class StockFromYahooInfoTestCase(unittest.TestCase):
         self.assertEqual(stock.symbol, "NVDA")
         self.assertEqual(stock.company_name, "NVIDIA Corporation")
         self.assertEqual(stock.current_price, 200.75)
-        self.assertEqual(stock.price, 200.75)
         self.assertEqual(stock.currency, "USD")
         self.assertEqual(stock.market_cap, 4879000000000)
         self.assertEqual(stock.trailing_pe, 57.68)

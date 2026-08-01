@@ -8,8 +8,6 @@ class Stock:
 
     company_name: str | None = None
 
-    price: float | None = None
-
     currency: str | None = None
 
     current_price: float | None = None

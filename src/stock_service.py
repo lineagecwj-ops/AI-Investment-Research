@@ -20,7 +20,6 @@ def stock_from_yahoo_info(info: dict, requested_symbol: str) -> Stock:
     return Stock(
         symbol=info.get("symbol") or requested_symbol,
         company_name=info.get("longName") or info.get("shortName"),
-        price=current_price,
         current_price=current_price,
         currency=info.get("currency"),
         market_cap=info.get("marketCap"),
