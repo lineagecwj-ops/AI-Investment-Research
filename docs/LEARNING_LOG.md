@@ -1,5 +1,56 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 02 Batch A Fundamental Data Foundation
+
+### Completed Features
+
+- Audited Yahoo Finance / `yfinance.Ticker.info` fundamental field availability for `2330.TW`, `2454.TW`, `NVDA`, and `AAPL`.
+- Expanded `Stock` with nullable fundamental fields for company overview, profitability, growth, financial health, valuation, and market position.
+- Kept Yahoo raw key mapping inside `src/stock_service.py`; Dashboard still receives only `Stock` project fields.
+- Added optional field normalization so missing, `None`, non-numeric, and malformed optional Yahoo values become `None` instead of causing query failure.
+- Added additive SQLite migration for existing `stocks` cache tables with `ALTER TABLE ADD COLUMN`.
+- Added `src/research_metrics.py` with deterministic 52-week position calculation.
+
+### Cache Strategy
+
+- Existing `data/stocks.db` is preserved.
+- `initialize_database()` still creates the `stocks` table when missing.
+- Existing tables are upgraded in place by adding missing nullable columns.
+- Old cache rows remain readable; newly added fields are `None` until the row is refreshed from Yahoo Finance.
+- Fundamental snapshot data currently shares the existing 24-hour stock cache TTL.
+
+### Modified / Added Files
+
+- 新增 `docs/FUNDAMENTAL_DATA_AUDIT.md`
+- 新增 `src/research_metrics.py`
+- 新增 `tests/test_research_metrics.py`
+- 修改 `src/models.py`
+- 修改 `src/stock_service.py`
+- 修改 `src/database.py`
+- 修改 `tests/test_stock_service.py`
+- 修改 `tests/test_database.py`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Data Quality Notes
+
+- `current_price` remains the minimum required validation boundary.
+- Optional fundamental fields are nullable and do not raise `StockServiceError` when missing or malformed.
+- `earningsQuarterlyGrowth` was audited and available for the representative symbols, but was not stored in this Batch because `earnings_growth` is sufficient for the current foundation scope.
+
+### Technical Debt
+
+- Price data and fundamental data may need separate freshness policies in a later Batch.
+- SQLite currently stores the latest stock snapshot only; there is no historical fundamental table yet.
+- Cross-market comparison of cash, debt, and cash flow requires currency-aware presentation in a future Research Dashboard.
+
+### Code Review Focus
+
+- `src/stock_service.py` optional field normalization and Yahoo raw key mapping.
+- `src/database.py` additive migration behavior for existing `stocks` tables.
+- `src/research_metrics.py` boundary handling for 52-week position.
+- `docs/FUNDAMENTAL_DATA_AUDIT.md` field dictionary and known limitations.
+
 ## 2026-08-01 — Taiwan Company Name Localization Patch
 
 ### Completed Features

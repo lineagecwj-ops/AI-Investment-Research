@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.5
+v0.6
 
 ---
 
@@ -38,6 +38,9 @@ company_name_service.py
 
 models.py
     └── Stock
+
+research_metrics.py
+    └── Deterministic research metric helpers
 
 symbol_utils.py
     └── Stock symbol normalization
@@ -103,6 +106,7 @@ Responsibilities:
 - Connect to Yahoo Finance
 - Retrieve stock information
 - Convert raw data into Stock model
+- Normalize optional Yahoo fundamental fields into nullable project fields
 - Read fresh stock cache before Yahoo Finance lookup
 - Write Yahoo Finance result to stock cache when lookup succeeds
 
@@ -114,6 +118,7 @@ Responsibilities:
 
 - Initialize SQLite database automatically
 - Persist Stock model fields in `data/stocks.db`
+- Apply simple additive SQLite schema migrations for new Stock snapshot fields
 - Return fresh cached Stock data when `fetched_at` is within 24 hours
 - Keep SQL persistence details outside `main.py` and `models.py`
 
@@ -146,6 +151,14 @@ Responsibilities:
 - Currently contains:
 
     - Stock
+
+### research_metrics.py
+
+Responsibilities:
+
+- Provide deterministic helper metrics for future research presentation
+- Keep derived metrics separate from Yahoo raw mapping and SQLite persistence
+- Avoid AI analysis, scoring, or buy / sell judgement
 
 ---
 
