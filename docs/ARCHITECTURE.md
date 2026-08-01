@@ -36,6 +36,9 @@ dashboard.py
 research_service.py
     └── Deterministic research interpretation and observations
 
+research_glossary.py
+    └── Beginner research term glossary for Research UI
+
 company_name_service.py
     └── Taiwan official company name localization + JSON cache
 
@@ -97,9 +100,21 @@ Responsibilities:
 - Build a deterministic `ResearchReport` from a `Stock`
 - Keep research interpretation rules outside `app.py` and Streamlit widget callbacks
 - Provide simple data structures: `ResearchObservation`, `ResearchNextStep`, and `ResearchReport`
-- Generate valuation observations, risk signals, missing-data observations, and research next steps
+- Generate structured valuation observations, risk signals, missing-data observations, and research checklist next steps
+- Keep each observation split into `what_happened`, `why_it_matters`, and `what_to_check`
 - Reuse `research_metrics.calculate_52_week_position()` for 52-week position
 - Avoid AI, LLM, buy / sell / hold recommendations, target prices, overall scores, and rating systems
+
+---
+
+### research_glossary.py
+
+Responsibilities:
+
+- Provide deterministic beginner glossary content for the Research page
+- Keep glossary wording outside `research_service.py`
+- Cover one-time items, margin, cash flow, debt, and valuation terminology
+- Use Traditional Chinese with key English finance terms preserved
 
 ---
 
@@ -292,6 +307,8 @@ Stock
           │
           ├── research_metrics.py calculate_52_week_position()
           └── ResearchReport
+   │
+   └── research_glossary.py glossary dictionary
    │
    ▼
 app.py display only

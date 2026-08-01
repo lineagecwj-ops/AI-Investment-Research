@@ -81,9 +81,9 @@ Market Position（市場位置）：
 
 Risk Signals are not a score, rating, or recommendation. They are deterministic observations that must:
 
-- State the trigger condition clearly.
-- Use neutral language.
-- Suggest what to research next.
+- State what happened using only facts supported by the current snapshot.
+- Explain why the fact is worth researching.
+- Suggest what to check next as a checklist.
 - Avoid directly judging whether the stock is good or bad.
 
 Current MVP signals include:
@@ -97,18 +97,79 @@ Current MVP signals include:
 - `fifty_two_week_position > 1.05`
 - Missing critical research fields
 
+Each `ResearchObservation` uses one structure:
+
+- `category`
+- `title`
+- `metric`
+- `what_happened`
+- `why_it_matters`
+- `what_to_check`
+- `observation_type`
+
+`what_happened` is for facts. `why_it_matters` is for research relevance. `what_to_check` is a list of follow-up research areas. The same content is not stored again as a separate message string.
+
 ## Research Next Steps Philosophy
 
 Research Next Steps are questions for follow-up research, not actions to take in the market.
 
-Current MVP next-step rules include:
+Research Next Steps do not repeat Risk Signal explanations. Their responsibility is to consolidate triggered observations into a research checklist, for example:
 
-- If Forward P/E is at least 15% lower than Trailing P/E, confirm the source and assumptions behind future EPS estimates.
-- If Revenue Growth is negative, inspect whether the decline comes from industry cycle, product transition, or company-specific factors.
-- If Earnings Growth is negative, compare earnings decline with margins, expense structure, and one-time items.
-- If Free Cash Flow is negative, inspect cash flow history, capital expenditure, and operating cash flow.
-- If critical fields are missing, prioritize data completeness before forming research conclusions.
-- If no specific signal is triggered, compare peers and historical trends to build context around the current snapshot.
+- Growth（成長性）：compare Revenue / EPS changes, margins, expense structure, and non-recurring items.
+- Valuation（估值）：confirm EPS estimates, compare peer P/E, and compare company historical valuation range.
+- Financial Health（財務健康）：compare Operating Cash Flow, Free Cash Flow, capital expenditure, and net income.
+- Data Quality（資料完整性）：complete missing fields and record remaining N/A limits.
+
+The current app does not have a historical fundamental database. Checklist items describe what the user should check; they do not imply the system has already answered those questions.
+
+## Explainability Language Contract
+
+Deterministic research wording must separate:
+
+- Facts: values and conditions directly supported by the current snapshot.
+- Research hypotheses: possible explanations that require further evidence.
+
+Facts can say, for example, `Earnings Growth = -12.50%`. If `Revenue Growth` is available, the same observation can include it as current snapshot context.
+
+Research hypotheses must be framed as topics to verify. Deterministic rules must not present possible explanations as facts about the company.
+
+The following causal conclusion wording is not allowed in deterministic company observations or next steps:
+
+- 造成
+- 導致
+- 證明
+- 顯示公司變差
+- 顯示公司變好
+- 一定
+- 必然
+
+These terms are only acceptable when explaining a data definition, not when making a company conclusion.
+
+The following recommendation or rating language is not allowed in observations or next steps:
+
+- Buy
+- Sell
+- Hold
+- 買
+- 賣
+- 持有
+- score
+- rating
+- target price
+
+## Beginner Glossary
+
+The Research page includes a compact `st.expander()` glossary backed by `src/research_glossary.py`.
+
+Current glossary topics:
+
+- `one_time_items`
+- `margin`
+- `cash_flow`
+- `debt`
+- `valuation`
+
+Glossary content uses Traditional Chinese and keeps important English finance terms, such as Gross Margin, Operating Margin, Net Margin, Operating Cash Flow, Free Cash Flow, Total Debt, Debt to Equity, P/E, Forward P/E, and P/B.
 
 ## Missing Data Behavior
 

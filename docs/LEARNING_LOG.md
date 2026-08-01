@@ -1,5 +1,51 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 02 Batch C Research Explainability
+
+### Completed Features
+
+- 將 `ResearchObservation` 從單一 `message` 改為三段式結構：`what_happened`、`why_it_matters`、`what_to_check`。
+- Valuation observation 與 Risk Signals 使用同一個 structured observation contract。
+- Risk Signals 負責說明目前 snapshot 發現什麼、為什麼值得研究、下一步查什麼。
+- Research Next Steps 改為彙整式 checklist，不再重複 Risk Signal 的完整說明文字。
+- 改善 negative earnings growth：若 `revenue_growth` 有值，Observation 會一起顯示 Revenue Growth 作為 snapshot context；若缺值則不補寫營收 context。
+- 新增 `src/research_glossary.py`，提供固定 deterministic glossary。
+- Research UI 新增「研究名詞說明」expander，涵蓋一次性 / 非經常性項目、Margin、Cash Flow、Debt、Valuation。
+
+### Safety Notes
+
+- `what_happened` 只描述目前資料直接支持的 snapshot 事實。
+- `why_it_matters` 只說明研究價值，不把可能原因寫成公司事實。
+- Tests 覆蓋 causal wording protection、no recommendation language、snapshot safety、Risk Signal / Next Step 去重。
+- 本 Batch 未新增 AI / LLM、News、historical fundamental database、technical indicators、portfolio 或 SQLite schema 變更。
+
+### Testing Notes
+
+- 新增 / 更新 `tests/test_research_service.py`，涵蓋 structured observation、negative earnings context、glossary、partial data 與 renderer source checks。
+
+### Modified / Added Files
+
+- 新增 `src/research_glossary.py`
+- 修改 `src/research_service.py`
+- 修改 `app.py`
+- 修改 `tests/test_research_service.py`
+- 修改 `docs/RESEARCH_FRAMEWORK.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- Checklist 仍是研究待辦，系統尚未有 historical fundamental table 可直接回答歷史趨勢問題。
+- Glossary 是固定內容，沒有搜尋、分類樹或使用者自訂條目。
+- Snapshot context 仍依賴 Yahoo Finance 欄位可用性；缺值時會保留 N/A 與資料限制。
+
+### Code Review Focus
+
+- `src/research_service.py` 的 deterministic wording 是否仍符合 explainability contract。
+- `tests/test_research_service.py` 的 safety tests 是否覆蓋足夠的 forbidden wording 與 recommendation terms。
+- `app.py` renderer 是否只顯示 structured observation，不回到 free-form message。
+- `src/research_glossary.py` 是否維持 beginner-friendly 且不過度延伸。
+
 ## 2026-08-01 — Sprint 02 Batch B Research Dashboard
 
 ### Completed Features
