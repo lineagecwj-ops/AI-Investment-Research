@@ -15,9 +15,14 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from database import get_cached_stock
+from database import get_cached_historical_financials
+from database import HISTORICAL_CACHE_TTL
 from database import initialize_database
 from database import SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP
+from database import save_historical_financials
 from database import save_stock
+from models import HistoricalFinancialPeriod
+from models import HistoricalFinancialSeries
 from models import Stock
 
 
@@ -70,6 +75,20 @@ class DatabaseTestCase(unittest.TestCase):
             table = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
                 ("table", "stocks"),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertIsNotNone(table)
+
+    def test_initialize_database_creates_historical_financials_table(self):
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+                ("table", "historical_financials"),
             ).fetchone()
         finally:
             connection.close()
@@ -181,6 +200,124 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertIn("gross_margin", columns)
         self.assertEqual(row[0], SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP)
 
+    def test_save_and_read_historical_financials_from_fresh_cache(self):
+        series = self.sample_historical_series()
+        save_historical_financials(series, self.db_path, fetched_at=self.now)
+
+        cached = get_cached_historical_financials(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(days=1),
+        )
+
+        self.assertIsNotNone(cached)
+        self.assertFalse(cached.is_stale)
+        self.assertEqual(cached.currency, "USD")
+        self.assertEqual([period.fiscal_year for period in cached.periods], [2024, 2025])
+        self.assertEqual(cached.periods[-1].revenue, 1200.0)
+        self.assertEqual(cached.periods[-1].free_cash_flow, 220.0)
+
+    def test_historical_financial_cache_uses_independent_seven_day_ttl(self):
+        save_historical_financials(
+            self.sample_historical_series(),
+            self.db_path,
+            fetched_at=self.now,
+        )
+
+        fresh_after_stock_ttl = get_cached_historical_financials(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(days=6, hours=23),
+        )
+        expired = get_cached_historical_financials(
+            "NVDA",
+            self.db_path,
+            now=self.now + HISTORICAL_CACHE_TTL,
+        )
+
+        self.assertIsNotNone(fresh_after_stock_ttl)
+        self.assertIsNone(expired)
+
+    def test_expired_historical_cache_can_be_returned_as_stale(self):
+        save_historical_financials(
+            self.sample_historical_series(),
+            self.db_path,
+            fetched_at=self.now,
+        )
+
+        stale = get_cached_historical_financials(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(days=8),
+            include_expired=True,
+        )
+
+        self.assertIsNotNone(stale)
+        self.assertTrue(stale.is_stale)
+
+    def test_historical_upsert_updates_same_symbol_and_period(self):
+        save_historical_financials(
+            self.sample_historical_series(revenue_2025=1200.0),
+            self.db_path,
+            fetched_at=self.now,
+        )
+        save_historical_financials(
+            self.sample_historical_series(revenue_2025=1300.0),
+            self.db_path,
+            fetched_at=self.now,
+        )
+
+        cached = get_cached_historical_financials("NVDA", self.db_path, now=self.now)
+
+        self.assertEqual(len(cached.periods), 2)
+        self.assertEqual(cached.periods[-1].revenue, 1300.0)
+
+    def test_historical_upsert_does_not_delete_omitted_old_period(self):
+        save_historical_financials(
+            self.sample_historical_series(revenue_2025=1200.0),
+            self.db_path,
+            fetched_at=self.now - timedelta(days=30),
+        )
+        save_historical_financials(
+            HistoricalFinancialSeries(
+                symbol="NVDA",
+                currency="USD",
+                periods=[
+                    HistoricalFinancialPeriod(
+                        symbol="NVDA",
+                        period_end=datetime(2025, 1, 31, tzinfo=UTC).date(),
+                        fiscal_year=2025,
+                        currency="USD",
+                        revenue=1300.0,
+                    )
+                ],
+            ),
+            self.db_path,
+            fetched_at=self.now,
+        )
+
+        cached = get_cached_historical_financials("NVDA", self.db_path, now=self.now)
+
+        self.assertEqual([period.fiscal_year for period in cached.periods], [2024, 2025])
+        self.assertEqual(cached.periods[-1].revenue, 1300.0)
+
+    def test_stock_cache_unaffected_by_historical_table(self):
+        save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
+        save_historical_financials(
+            self.sample_historical_series(),
+            self.db_path,
+            fetched_at=self.now - timedelta(days=8),
+        )
+
+        stock = get_cached_stock(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(hours=1),
+        )
+
+        self.assertIsNotNone(stock)
+        self.assertEqual(stock.current_price, 200.75)
+
     def insert_old_cache_row(self, fetched_at: str) -> None:
         connection = sqlite3.connect(self.db_path)
         try:
@@ -245,6 +382,34 @@ class DatabaseTestCase(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
+
+    def sample_historical_series(self, revenue_2025=1200.0):
+        return HistoricalFinancialSeries(
+            symbol="NVDA",
+            currency="USD",
+            periods=[
+                HistoricalFinancialPeriod(
+                    symbol="NVDA",
+                    period_end=datetime(2024, 1, 31, tzinfo=UTC).date(),
+                    fiscal_year=2024,
+                    currency="USD",
+                    revenue=1000.0,
+                    net_income=180.0,
+                    free_cash_flow=150.0,
+                    total_debt=450.0,
+                ),
+                HistoricalFinancialPeriod(
+                    symbol="NVDA",
+                    period_end=datetime(2025, 1, 31, tzinfo=UTC).date(),
+                    fiscal_year=2025,
+                    currency="USD",
+                    revenue=revenue_2025,
+                    net_income=240.0,
+                    free_cash_flow=220.0,
+                    total_debt=500.0,
+                ),
+            ],
+        )
 
 
 if __name__ == "__main__":
