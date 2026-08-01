@@ -11,12 +11,15 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from dashboard import build_comparison_rows
+from dashboard import format_currency_value
 from dashboard import format_decimal
 from dashboard import format_integer
 from dashboard import format_industry
 from dashboard import format_market_cap
 from dashboard import format_na
 from dashboard import format_percentage
+from dashboard import format_price
+from dashboard import format_ratio
 from dashboard import format_sector
 from dashboard import indicator_help
 from dashboard import indicator_label
@@ -58,6 +61,11 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(format_market_cap(850_200_000, None), "850.20M")
         self.assertEqual(format_market_cap(None, "USD"), "N/A")
 
+    def test_currency_value_formatting_keeps_currency_context(self):
+        self.assertEqual(format_currency_value(1_250_000_000_000, "TWD"), "TWD 1.25T")
+        self.assertEqual(format_currency_value(85_400_000_000, "USD"), "USD 85.40B")
+        self.assertEqual(format_currency_value(None, "USD"), "N/A")
+
     def test_integer_formatting_remains_available(self):
         self.assertEqual(format_integer(2500000000), "2,500,000,000")
         self.assertEqual(format_integer(None), "N/A")
@@ -65,6 +73,12 @@ class DashboardFormattingTestCase(unittest.TestCase):
     def test_decimal_formatting(self):
         self.assertEqual(format_decimal(25.345), "25.34")
         self.assertEqual(format_decimal(None), "N/A")
+
+    def test_price_and_ratio_formatting(self):
+        self.assertEqual(format_price(123.456, "USD"), "USD 123.46")
+        self.assertEqual(format_price(None, "USD"), "N/A")
+        self.assertEqual(format_ratio(35.2), "35.20")
+        self.assertEqual(format_ratio(None), "N/A")
 
     def test_roe_percentage_formatting(self):
         self.assertEqual(format_percentage(0.285), "28.50%")

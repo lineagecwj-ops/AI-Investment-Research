@@ -9,10 +9,18 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from dashboard import build_comparison_rows
+from dashboard import format_currency_value
 from dashboard import indicator_help
 from dashboard import indicator_label
+from dashboard import format_decimal
+from dashboard import format_industry
+from dashboard import format_percentage
+from dashboard import format_price
+from dashboard import format_ratio
+from dashboard import format_sector
 from dashboard import query_stock_batch
 from dashboard import stock_display_data
+from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
 from symbol_utils import parse_stock_symbols
 from watchlist_service import add_stock
@@ -30,6 +38,8 @@ st.set_page_config(
 def initialize_session_state() -> None:
     st.session_state.setdefault("stock_search_stocks", [])
     st.session_state.setdefault("stock_search_failures", [])
+    st.session_state.setdefault("research_stock", None)
+    st.session_state.setdefault("research_failures", [])
     st.session_state.setdefault("watchlist_query_stocks", [])
     st.session_state.setdefault("watchlist_query_failures", [])
     st.session_state.setdefault("comparison_stocks", [])
@@ -126,6 +136,164 @@ def render_stock_search() -> None:
 
     render_query_failures(st.session_state["stock_search_failures"])
     render_stock_cards(st.session_state["stock_search_stocks"])
+
+
+def render_research_metric_grid(metrics: list[tuple[str, str, str | None]], columns: int = 3) -> None:
+    if not metrics:
+        st.info("此區塊目前沒有可顯示的資料。")
+        return
+
+    for index in range(0, len(metrics), columns):
+        cols = st.columns(columns)
+        for col, metric in zip(cols, metrics[index:index + columns]):
+            label, value, help_text = metric
+            col.metric(label, value, help=help_text)
+
+
+def render_observations(observations) -> None:
+    if not observations:
+        st.info("目前沒有觸發額外 observation。")
+        return
+
+    for observation in observations:
+        if observation.observation_type == "info":
+            st.info(f"**{observation.title}**\n\n{observation.message}")
+        else:
+            st.warning(f"**{observation.title}**\n\n{observation.message}")
+
+
+def render_next_steps(next_steps) -> None:
+    for step in next_steps:
+        st.write(f"**{step.category} · {step.title}**")
+        st.write(step.question)
+
+
+def render_research() -> None:
+    st.header("Research（研究）")
+    st.caption("以固定研究流程整理 fundamental snapshot；本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。")
+
+    with st.form("research_form"):
+        input_text = st.text_input(
+            "單一股票研究",
+            placeholder="2330 或 NVDA",
+            key="research_input",
+        )
+        submitted = st.form_submit_button("建立研究摘要")
+
+    if submitted:
+        symbols = parse_stock_symbols(input_text)
+        if not symbols:
+            st.warning("請輸入至少一個股票代號。")
+            st.session_state["research_stock"] = None
+            st.session_state["research_failures"] = []
+        else:
+            if len(symbols) > 1:
+                st.info(f"Research 頁面目前顯示第一支股票：{symbols[0]}")
+            stocks, failures = query_stock_batch([symbols[0]])
+            st.session_state["research_stock"] = stocks[0] if stocks else None
+            st.session_state["research_failures"] = failures
+
+    render_query_failures(st.session_state["research_failures"])
+
+    stock = st.session_state["research_stock"]
+    if stock is None:
+        st.info("輸入股票代號後，系統會依照 8 個研究問題建立 deterministic research summary。")
+        return
+
+    report = build_research_report(stock)
+    display_data = stock_display_data(stock)
+
+    st.subheader(f"{display_data['Symbol']} · {display_data['Company Name']}")
+
+    with st.expander("如何理解這些指標？"):
+        st.write(
+            "本頁使用 Yahoo Finance 提供的單一 fundamental snapshot，協助建立研究問題與觀察方向。"
+            "所有 observations 都是 deterministic research prompts，不是投資建議，也不是整體評分。"
+        )
+
+    st.markdown("### Company Overview（公司概況）")
+    render_research_metric_grid(
+        [
+            (indicator_label("symbol"), display_data["Symbol"], None),
+            (indicator_label("company_name"), display_data["Company Name"], None),
+            (indicator_label("sector"), format_sector(stock.sector), indicator_help("sector")),
+            (indicator_label("industry"), format_industry(stock.industry), indicator_help("industry")),
+            (indicator_label("market_cap"), format_currency_value(stock.market_cap, stock.currency), indicator_help("market_cap")),
+        ],
+        columns=3,
+    )
+    if stock.company_summary:
+        st.write(stock.company_summary)
+    else:
+        st.info("Company Summary（公司業務摘要）目前為 N/A。")
+
+    st.markdown("### Profitability（獲利能力）")
+    render_research_metric_grid(
+        [
+            (indicator_label("return_on_equity"), format_percentage(stock.return_on_equity), indicator_help("return_on_equity")),
+            (indicator_label("gross_margin"), format_percentage(stock.gross_margin), indicator_help("gross_margin")),
+            (indicator_label("operating_margin"), format_percentage(stock.operating_margin), indicator_help("operating_margin")),
+            (indicator_label("net_margin"), format_percentage(stock.net_margin), indicator_help("net_margin")),
+            (indicator_label("trailing_eps"), format_decimal(stock.trailing_eps), indicator_help("trailing_eps")),
+        ],
+        columns=3,
+    )
+
+    st.markdown("### Growth（成長性）")
+    st.info("目前為 Yahoo Finance 提供的當期/近期 growth snapshot，不是本系統自行計算的多年 CAGR。")
+    growth_metrics = [
+        (indicator_label("revenue_growth"), format_percentage(stock.revenue_growth), indicator_help("revenue_growth")),
+        (indicator_label("earnings_growth"), format_percentage(stock.earnings_growth), indicator_help("earnings_growth")),
+    ]
+    render_research_metric_grid(growth_metrics, columns=2)
+
+    st.markdown("### Financial Health（財務健康）")
+    st.caption("Cash / Debt / Cash Flow 保留原始 currency context；不要跨幣別直接比較大小。")
+    render_research_metric_grid(
+        [
+            (indicator_label("total_cash"), format_currency_value(stock.total_cash, stock.currency), indicator_help("total_cash")),
+            (indicator_label("total_debt"), format_currency_value(stock.total_debt, stock.currency), indicator_help("total_debt")),
+            (indicator_label("debt_to_equity"), format_ratio(stock.debt_to_equity), indicator_help("debt_to_equity")),
+            (indicator_label("operating_cash_flow"), format_currency_value(stock.operating_cash_flow, stock.currency), indicator_help("operating_cash_flow")),
+            (indicator_label("free_cash_flow"), format_currency_value(stock.free_cash_flow, stock.currency), indicator_help("free_cash_flow")),
+        ],
+        columns=3,
+    )
+
+    st.markdown("### Valuation（估值）")
+    render_research_metric_grid(
+        [
+            (indicator_label("trailing_pe"), format_ratio(stock.trailing_pe), indicator_help("trailing_pe")),
+            (indicator_label("forward_pe"), format_ratio(stock.forward_pe), indicator_help("forward_pe")),
+            (indicator_label("price_to_book"), format_ratio(stock.price_to_book), indicator_help("price_to_book")),
+        ],
+        columns=3,
+    )
+    render_observations(report.valuation_observations)
+
+    st.markdown("### Market Position（市場位置）")
+    position_text = format_percentage(report.fifty_two_week_position)
+    render_research_metric_grid(
+        [
+            (indicator_label("current_price"), format_price(stock.current_price, stock.currency), indicator_help("current_price")),
+            (indicator_label("fifty_two_week_high"), format_price(stock.fifty_two_week_high, stock.currency), indicator_help("fifty_two_week_high")),
+            (indicator_label("fifty_two_week_low"), format_price(stock.fifty_two_week_low, stock.currency), indicator_help("fifty_two_week_low")),
+            (indicator_label("fifty_two_week_position"), position_text, indicator_help("fifty_two_week_position")),
+            (indicator_label("fifty_day_average"), format_price(stock.fifty_day_average, stock.currency), indicator_help("fifty_day_average")),
+            (indicator_label("two_hundred_day_average"), format_price(stock.two_hundred_day_average, stock.currency), indicator_help("two_hundred_day_average")),
+        ],
+        columns=3,
+    )
+    if report.fifty_two_week_position is not None:
+        st.progress(max(0.0, min(1.0, report.fifty_two_week_position)))
+    st.caption(report.market_position_note)
+
+    st.markdown("### Risk Signals（風險提示）")
+    st.caption("Risk Signals 是可解釋觀察，不是風險評分。")
+    render_observations(report.risk_signals)
+
+    st.markdown("### Research Next Steps（下一步研究）")
+    render_next_steps(report.next_steps)
 
 
 def read_watchlist_for_ui() -> list[str]:
@@ -244,12 +412,15 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
         render_stock_search()
+
+    with research_tab:
+        render_research()
 
     with watchlist_tab:
         render_watchlist()

@@ -18,6 +18,7 @@ class StockQueryFailure:
 INDICATOR_LABELS = {
     "company_name": "Company Name（公司名稱）",
     "symbol": "Symbol（股票代號）",
+    "company_summary": "Company Summary（公司業務摘要）",
     "current_price": "Current Price（目前股價）",
     "currency": "Currency（交易幣別）",
     "market_cap": "Market Cap（市值）",
@@ -25,6 +26,22 @@ INDICATOR_LABELS = {
     "forward_pe": "Forward P/E（預估本益比）",
     "trailing_eps": "EPS（每股盈餘）",
     "return_on_equity": "ROE（股東權益報酬率）",
+    "gross_margin": "Gross Margin（毛利率）",
+    "operating_margin": "Operating Margin（營業利益率）",
+    "net_margin": "Net Margin（淨利率）",
+    "revenue_growth": "Revenue Growth（營收成長率）",
+    "earnings_growth": "Earnings Growth（盈餘成長率）",
+    "total_cash": "Total Cash（現金）",
+    "total_debt": "Total Debt（總負債）",
+    "debt_to_equity": "Debt to Equity（負債權益比）",
+    "operating_cash_flow": "Operating Cash Flow（營業現金流）",
+    "free_cash_flow": "Free Cash Flow（自由現金流）",
+    "price_to_book": "Price to Book（股價淨值比）",
+    "fifty_two_week_high": "52-week High（52 週高點）",
+    "fifty_two_week_low": "52-week Low（52 週低點）",
+    "fifty_two_week_position": "52-week Position（52 週區間位置）",
+    "fifty_day_average": "50-day Average（50 日均價）",
+    "two_hundred_day_average": "200-day Average（200 日均價）",
     "sector": "Sector（產業類別）",
     "industry": "Industry（細分產業）",
 }
@@ -36,7 +53,23 @@ INDICATOR_HELP_TEXT = {
     "trailing_pe": "以過去獲利計算的本益比，可觀察市場願意為歷史盈餘付出的價格倍數。",
     "forward_pe": "以預估獲利計算的本益比，反映市場對未來盈餘的期待，但預估可能修正。",
     "trailing_eps": "每股盈餘，代表每股可分攤的獲利能力，需搭配成長性與品質判斷。",
-    "return_on_equity": "股東權益報酬率，衡量公司運用股東資本創造獲利的效率。",
+    "return_on_equity": "股東權益報酬率，衡量公司運用股東資本創造獲利的效率；需搭配槓桿、產業與獲利品質一起看。",
+    "gross_margin": "毛利率，衡量營收扣除銷貨成本後的比例；常用來觀察產品組合與定價能力，但不能單獨判斷好壞。",
+    "operating_margin": "營業利益率，衡量本業營運產生利潤的比例；常用來觀察營運效率，但需搭配成長與產業模式。",
+    "net_margin": "淨利率，衡量營收最後轉為淨利的比例；常用來看整體獲利品質，但可能受一次性項目影響。",
+    "revenue_growth": "營收成長率，觀察近期營收變化；本頁使用 Yahoo snapshot，不能直接視為多年 CAGR。",
+    "earnings_growth": "盈餘成長率，觀察近期盈餘變化；本頁使用 Yahoo snapshot，需搭配利潤率與一次性項目判讀。",
+    "total_cash": "公司持有的現金與約當現金；顯示時保留 Yahoo 提供的幣別脈絡。",
+    "total_debt": "公司總負債；需搭配現金、現金流、利息費用與到期結構一起看。",
+    "debt_to_equity": "負債權益比，Yahoo raw value 以比值數字顯示，不在本頁轉成百分比。",
+    "operating_cash_flow": "營業現金流，觀察本業產生現金的能力；單期數值需搭配營運週期與歷史趨勢。",
+    "free_cash_flow": "自由現金流，通常為營業現金流扣除資本支出後的概念；負值需進一步檢查投資與營運背景。",
+    "price_to_book": "股價淨值比，觀察價格相對帳面淨值的倍數；不同產業適用性不同。",
+    "fifty_two_week_high": "近 52 週高點，用來理解目前價格所在區間；不是買賣訊號。",
+    "fifty_two_week_low": "近 52 週低點，用來理解目前價格所在區間；需確認資料時間一致性。",
+    "fifty_two_week_position": "目前價格在 52 週高低區間的位置；不是強弱評分，也不是買賣訊號。",
+    "fifty_day_average": "50 日均價，提供近期價格位置參考；不是完整技術分析結論。",
+    "two_hundred_day_average": "200 日均價，提供較長期價格位置參考；需搭配基本面與事件脈絡。",
     "sector": "公司所屬主要產業類別，可用來理解景氣循環與同業比較背景。",
     "industry": "公司更細分的產業分類，適合用於較精準的同業比較。",
 }
@@ -123,11 +156,37 @@ def format_market_cap(value: int | None, currency: str | None = None) -> str:
     return compact_value
 
 
+def format_currency_value(value: int | float | None, currency: str | None = None) -> str:
+    compact_value = format_compact_number(value)
+    if compact_value == "N/A":
+        return "N/A"
+
+    if currency:
+        return f"{currency} {compact_value}"
+
+    return compact_value
+
+
 def format_decimal(value) -> str:
     if value is None:
         return "N/A"
 
     return f"{value:.2f}"
+
+
+def format_price(value: int | float | None, currency: str | None = None) -> str:
+    formatted_value = format_decimal(value)
+    if formatted_value == "N/A":
+        return "N/A"
+
+    if currency:
+        return f"{currency} {formatted_value}"
+
+    return formatted_value
+
+
+def format_ratio(value: float | None) -> str:
+    return format_decimal(value)
 
 
 def format_percentage(value: float | None) -> str:
