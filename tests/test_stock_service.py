@@ -39,6 +39,22 @@ class StockFromYahooInfoTestCase(unittest.TestCase):
                 "forwardPE": 44.3,
                 "trailingEps": 3.48,
                 "returnOnEquity": 0.25,
+                "longBusinessSummary": "NVIDIA builds accelerated computing platforms.",
+                "grossMargins": 0.741,
+                "operatingMargins": 0.656,
+                "profitMargins": 0.63,
+                "revenueGrowth": 0.852,
+                "earningsGrowth": 2.145,
+                "totalCash": 53171998720,
+                "totalDebt": 12814000128,
+                "debtToEquity": 6.555,
+                "operatingCashflow": 125648003072,
+                "freeCashflow": 46335873024,
+                "priceToBook": 24.876,
+                "fiftyTwoWeekHigh": 236.54,
+                "fiftyTwoWeekLow": 164.07,
+                "fiftyDayAverage": 206.17,
+                "twoHundredDayAverage": 193.11,
                 "sector": "Technology",
                 "industry": "Semiconductors",
             },
@@ -54,6 +70,22 @@ class StockFromYahooInfoTestCase(unittest.TestCase):
         self.assertEqual(stock.forward_pe, 44.3)
         self.assertEqual(stock.trailing_eps, 3.48)
         self.assertEqual(stock.return_on_equity, 0.25)
+        self.assertEqual(stock.company_summary, "NVIDIA builds accelerated computing platforms.")
+        self.assertEqual(stock.gross_margin, 0.741)
+        self.assertEqual(stock.operating_margin, 0.656)
+        self.assertEqual(stock.net_margin, 0.63)
+        self.assertEqual(stock.revenue_growth, 0.852)
+        self.assertEqual(stock.earnings_growth, 2.145)
+        self.assertEqual(stock.total_cash, 53171998720)
+        self.assertEqual(stock.total_debt, 12814000128)
+        self.assertEqual(stock.debt_to_equity, 6.555)
+        self.assertEqual(stock.operating_cash_flow, 125648003072)
+        self.assertEqual(stock.free_cash_flow, 46335873024)
+        self.assertEqual(stock.price_to_book, 24.876)
+        self.assertEqual(stock.fifty_two_week_high, 236.54)
+        self.assertEqual(stock.fifty_two_week_low, 164.07)
+        self.assertEqual(stock.fifty_day_average, 206.17)
+        self.assertEqual(stock.two_hundred_day_average, 193.11)
         self.assertEqual(stock.sector, "Technology")
         self.assertEqual(stock.industry, "Semiconductors")
 
@@ -64,6 +96,31 @@ class StockFromYahooInfoTestCase(unittest.TestCase):
         self.assertIsNone(stock.company_name)
         self.assertIsNone(stock.current_price)
         self.assertIsNone(stock.currency)
+
+    def test_malformed_optional_yahoo_values_use_none_without_crashing(self):
+        stock = stock_from_yahoo_info(
+            {
+                "symbol": "NVDA",
+                "currentPrice": 200.75,
+                "marketCap": "too large",
+                "returnOnEquity": "unknown",
+                "grossMargins": object(),
+                "totalCash": 1.5,
+                "priceToBook": float("nan"),
+                "longBusinessSummary": 123,
+                "sector": ["Technology"],
+            },
+            "NVDA",
+        )
+
+        self.assertEqual(stock.current_price, 200.75)
+        self.assertIsNone(stock.market_cap)
+        self.assertIsNone(stock.return_on_equity)
+        self.assertIsNone(stock.gross_margin)
+        self.assertIsNone(stock.total_cash)
+        self.assertIsNone(stock.price_to_book)
+        self.assertIsNone(stock.company_summary)
+        self.assertIsNone(stock.sector)
 
     def test_validate_stock_rejects_missing_current_price(self):
         stock = stock_from_yahoo_info({"symbol": "MISSING"}, "MISSING")

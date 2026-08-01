@@ -41,6 +41,22 @@ class DatabaseTestCase(unittest.TestCase):
             forward_pe=44.3,
             trailing_eps=3.48,
             return_on_equity=0.25,
+            company_summary="NVIDIA builds accelerated computing platforms.",
+            gross_margin=0.741,
+            operating_margin=0.656,
+            net_margin=0.63,
+            revenue_growth=0.852,
+            earnings_growth=2.145,
+            total_cash=53171998720,
+            total_debt=12814000128,
+            debt_to_equity=6.555,
+            operating_cash_flow=125648003072,
+            free_cash_flow=46335873024,
+            price_to_book=24.876,
+            fifty_two_week_high=236.54,
+            fifty_two_week_low=164.07,
+            fifty_day_average=206.17,
+            two_hundred_day_average=193.11,
             sector="Technology",
             industry="Semiconductors",
         )
@@ -69,6 +85,9 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertEqual(stock.company_name, "NVIDIA Corporation")
         self.assertEqual(stock.current_price, 200.75)
         self.assertEqual(stock.currency, "USD")
+        self.assertEqual(stock.gross_margin, 0.741)
+        self.assertEqual(stock.free_cash_flow, 46335873024)
+        self.assertEqual(stock.fifty_two_week_high, 236.54)
 
     def test_expired_cache_returns_none(self):
         save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
@@ -84,6 +103,99 @@ class DatabaseTestCase(unittest.TestCase):
         stock = get_cached_stock("NVDA", self.db_path, now=self.now)
 
         self.assertEqual(stock.current_price, 210.5)
+
+    def test_initialize_database_adds_new_columns_to_existing_table(self):
+        self.create_old_stocks_table()
+
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(stocks)").fetchall()
+            }
+        finally:
+            connection.close()
+
+        self.assertIn("gross_margin", columns)
+        self.assertIn("free_cash_flow", columns)
+        self.assertIn("fifty_two_week_high", columns)
+
+    def test_old_cache_row_reads_new_fields_as_none_after_migration(self):
+        self.create_old_stocks_table()
+        fetched_at = self.now.isoformat()
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                INSERT INTO stocks (
+                    symbol,
+                    company_name,
+                    current_price,
+                    currency,
+                    market_cap,
+                    trailing_pe,
+                    forward_pe,
+                    trailing_eps,
+                    return_on_equity,
+                    sector,
+                    industry,
+                    fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "NVDA",
+                    "NVIDIA Corporation",
+                    200.75,
+                    "USD",
+                    4879000000000,
+                    57.68,
+                    44.3,
+                    3.48,
+                    0.25,
+                    "Technology",
+                    "Semiconductors",
+                    fetched_at,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        stock = get_cached_stock("NVDA", self.db_path, now=self.now)
+
+        self.assertIsNotNone(stock)
+        self.assertEqual(stock.current_price, 200.75)
+        self.assertIsNone(stock.gross_margin)
+        self.assertIsNone(stock.free_cash_flow)
+        self.assertIsNone(stock.fifty_two_week_high)
+
+    def create_old_stocks_table(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE stocks (
+                    symbol TEXT PRIMARY KEY,
+                    company_name TEXT,
+                    current_price REAL,
+                    currency TEXT,
+                    market_cap INTEGER,
+                    trailing_pe REAL,
+                    forward_pe REAL,
+                    trailing_eps REAL,
+                    return_on_equity REAL,
+                    sector TEXT,
+                    industry TEXT,
+                    fetched_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":
