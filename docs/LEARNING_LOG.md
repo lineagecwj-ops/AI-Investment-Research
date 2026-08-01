@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 03 Batch B Historical Trend Dashboard
+
+### Completed Features
+
+- 新增 Streamlit `Historical Trends` tab，保留既有 `Dashboard`、`Research`、`Watchlist`、`Comparison`。
+- Historical Trends 支援單一股票研究，查詢 current stock snapshot 與 annual historical fundamentals，並將結果保存在 `st.session_state`。
+- 頁面頂部顯示 Symbol、localized company name、historical currency、available annual periods、period range、available periods 與 cache / stale status。
+- Revenue 區塊顯示 annual revenue 與 Revenue YoY；YoY 沿用 `research_metrics.py`，只比較連續年度。
+- Earnings 區塊顯示 Net Income、EPS 與 EPS YoY；EPS 缺值顯示 `N/A` 與 Yahoo Finance 未提供資料提示，不自行計算。
+- Margins 區塊顯示 Gross Margin、Operating Margin、Net Margin，並加入 beginner-friendly 說明與 no direct good / bad judgement wording。
+- Cash Flow 區塊顯示 Operating Cash Flow、Capital Expenditure、Free Cash Flow，並明確說明 Yahoo CapEx 負值常代表 cash outflow。
+- Financial Position 區塊顯示 Total Assets、Total Debt、Total Equity、Cash，保留 currency context。
+- 新增完整 historical table，格式化 Period End、currency amount、percentage、EPS、YoY 與 `N/A`，避免 raw `None` / `NaN` 出現在使用者可見表格。
+- `src/dashboard.py` 新增 Historical Trends presentation builders，讓 `app.py` 不解析 Yahoo DataFrame、不處理 row aliases、不執行 SQL、不計算 FCF / margins / YoY。
+
+### Testing Notes
+
+- 擴充 `tests/test_dashboard.py`，覆蓋 overview、currency、stale status、Revenue / EPS YoY、non-consecutive gap YoY `N/A`、missing EPS、partial margin data、negative CapEx display、financial position missing values、NVDA / AAPL-like period labels、full table ordering、no `None` / `NaN` visible、insufficient series。
+- Automated tests 不依賴 live Yahoo network。
+
+### Documentation
+
+- 新增 `docs/HISTORICAL_TREND_DASHBOARD.md`。
+- 更新 `README.md` 與 `docs/ARCHITECTURE.md`，記錄 Historical Trends scope、data flow、Period End、YoY、missing-data、currency、CapEx 與 no trend classification policy。
+
+### Known Limits
+
+- 本 Batch 不新增 AI / LLM、automatic trend interpretation、recommendation、overall score、target price、quarterly analysis、TTM、FX conversion、technical indicators 或 competitor benchmarking。
+- Streamlit native charts 以清楚可讀為主，格式化值由 table 呈現。
+- Historical cache freshness 仍是 series-level 狀態。
+- Yahoo Finance annual statement coverage 與 row availability 由 provider 控制。
+
 ## 2026-08-02 — Sprint 03 Batch A Historical Fundamental Data Foundation
 
 ### Completed Features

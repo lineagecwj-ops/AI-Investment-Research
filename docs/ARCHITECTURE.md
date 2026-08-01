@@ -32,6 +32,7 @@ watchlist_service.py
 
 dashboard.py
     └── Dashboard presentation helpers
+    └── Historical Trends presentation builders and display formatters
 
 research_service.py
     └── Deterministic research interpretation and observations
@@ -98,6 +99,8 @@ Responsibilities:
 - Keep dashboard presentation logic testable outside Streamlit widget callbacks
 - Use `company_name_service.py` for presentation-only company display names
 - Provide reusable display formatters for percentage, ratio, price, currency-aware large numbers, and N/A
+- Build Historical Trends overview, section rows, chart rows, complete historical table rows, missing-data notes, and cache status text from `HistoricalFinancialSeries`
+- Reuse `research_metrics.py` historical YoY helpers instead of recalculating YoY in `app.py`
 
 ---
 
@@ -444,6 +447,47 @@ app.py display only
 ```
 
 Research Dashboard is a presentation / interpretation layer. `app.py` does not implement Yahoo raw field interpretation rules and does not directly generate research observations.
+
+## Streamlit Historical Trends Flow
+
+```
+User
+   │
+   ▼
+app.py Historical Trends tab
+   │
+   ├── symbol_utils.py
+   ├── dashboard.py query_stock_batch()
+   └── historical_financial_service.py get_historical_financials()
+          │
+          ├── database.py / 7-day SQLite historical cache
+          └── Yahoo Finance annual statements when cache is missing or expired
+   │
+   ▼
+Stock + HistoricalFinancialSeries
+   │
+   ▼
+dashboard.py
+   │
+   ├── Historical overview display
+   ├── Revenue / Earnings / Margins / Cash Flow / Financial Position rows
+   ├── Complete formatted historical table
+   ├── Chart-ready numeric rows
+   └── Missing-data and stale-cache presentation text
+   │
+   ▼
+app.py Streamlit layout and native charts
+```
+
+Historical Trends is a presentation layer. `app.py` does not parse Yahoo financial statement DataFrames, handle row aliases, execute SQL, calculate margins, derive Free Cash Flow, or calculate YoY itself.
+
+Historical Trends keeps these presentation semantics:
+
+- Period labels use `FY ending YYYY-MM-DD`.
+- YoY is delegated to `research_metrics.py` and only appears when adjacent period years are consecutive.
+- Missing values display as `N/A`; missing EPS is not self-calculated.
+- Currency context is preserved and no FX conversion or cross-currency ranking is performed.
+- The page displays values and visible trends only; it does not classify a company or metric as improving, deteriorating, strong, weak, good, bad, healthy, or unhealthy.
 
 # Future Modules
 
