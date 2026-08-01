@@ -1,5 +1,44 @@
 # Learning Log
 
+## 2026-08-01 — Taiwan Company Name Localization Patch
+
+### Completed Features
+
+- 新增 `src/company_name_service.py` 作為 presentation-only company name localization boundary。
+- 台股 display name 優先使用官方繁體中文名稱，不覆寫 Yahoo raw `Stock.company_name`。
+- Dashboard stock card、Watchlist query result 與 Comparison Company Name 欄位都透過 `dashboard.py` 的同一套 formatter 使用 localized display helper。
+- 上市資料來源使用 TWSE official OpenAPI `opendata/t187ap03_L`。
+- 上櫃資料來源使用 TPEx official OpenAPI `mopsfin_t187ap03_O`。
+- 若官方資料來源失敗、cache 不存在、或 symbol 找不到中文名稱，fallback 到既有 Yahoo English company name。
+
+### Cache Strategy
+
+- 使用 runtime JSON cache：`data/taiwan_company_names.json`。
+- Cache TTL 為 7 days，避免 Streamlit Dashboard 每次 rerun 都重新下載完整台股名稱資料。
+- Cache file 已加入 `.gitignore`，不進版本控制。
+- 若 cache 過期但官方來源暫時失敗，會嘗試使用既有 stale cache；若沒有可用 cache，回到 Yahoo English company name。
+
+### Modified / Added Files
+
+- 新增 `src/company_name_service.py`
+- 新增 `tests/test_company_name_service.py`
+- 修改 `src/dashboard.py`
+- 修改 `tests/test_dashboard.py`
+- 修改 `.gitignore`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Testing Notes
+
+- Tests 使用 mock / fixture 模擬 TWSE 與 TPEx official API response，不依賴 live internet。
+- 覆蓋 known TWSE stock、known TPEx stock、unknown Taiwan symbol fallback、US stock English、official source failure fallback、Dashboard helper reuse、Comparison helper reuse。
+
+### Known Limits
+
+- 現有 `symbol_utils.py` 仍保留純數字自動轉 `.TW` 的既有規則；上櫃 localization 會在 stock symbol 已是 `.TWO` 時生效。
+- Official API 欄位解析目前支援常見中文欄位名稱與少數英文欄位名稱；若官方 schema 未來改名，需要更新 `company_name_service.py` 的 key list。
+- Runtime cache 不保存每個市場的 individual refresh 狀態，只保存合併後的 symbol-name map 與 sources metadata。
+
 ## 2026-08-01 — Sprint 01 Batch C
 
 ### Completed Features

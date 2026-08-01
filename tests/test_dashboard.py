@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -105,9 +106,11 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn("Semiconductors", INDUSTRY_TRANSLATIONS)
 
     def test_stock_display_data_formats_all_fields(self):
-        display_data = stock_display_data(self.sample_stock())
+        with patch("dashboard.get_display_company_name", return_value="NVIDIA Corporation") as mock_name:
+            display_data = stock_display_data(self.sample_stock())
 
         self.assertEqual(display_data["Company Name"], "NVIDIA Corporation")
+        mock_name.assert_called_once()
         self.assertEqual(display_data["Symbol"], "NVDA")
         self.assertEqual(display_data["Current Price"], "200.76")
         self.assertEqual(display_data["Market Cap"], "USD 4.88T")
@@ -142,7 +145,8 @@ class DashboardFormattingTestCase(unittest.TestCase):
             self.assertTrue(indicator_help(indicator))
 
     def test_comparison_rows_use_display_ready_values(self):
-        rows = build_comparison_rows([self.sample_stock()])
+        with patch("dashboard.get_display_company_name", return_value="NVIDIA Corporation"):
+            rows = build_comparison_rows([self.sample_stock()])
 
         self.assertEqual(
             rows,
@@ -162,6 +166,30 @@ class DashboardFormattingTestCase(unittest.TestCase):
                 }
             ],
         )
+
+    def test_dashboard_uses_localized_name_helper(self):
+        stock = Stock(
+            symbol="2330.TW",
+            company_name="Taiwan Semiconductor Manufacturing Company Limited",
+        )
+
+        with patch("dashboard.get_display_company_name", return_value="台積電") as mock_name:
+            display_data = stock_display_data(stock)
+
+        mock_name.assert_called_once_with(stock)
+        self.assertEqual(display_data["Company Name"], "台積電")
+
+    def test_comparison_uses_localized_name_helper(self):
+        stock = Stock(
+            symbol="2330.TW",
+            company_name="Taiwan Semiconductor Manufacturing Company Limited",
+        )
+
+        with patch("dashboard.get_display_company_name", return_value="台積電") as mock_name:
+            rows = build_comparison_rows([stock])
+
+        mock_name.assert_called_once_with(stock)
+        self.assertEqual(rows[0]["Company Name（公司名稱）"], "台積電")
 
 
 class DashboardQueryTestCase(unittest.TestCase):

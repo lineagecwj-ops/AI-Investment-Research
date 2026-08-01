@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from company_name_service import get_display_company_name
 from models import Stock
 from stock_service import get_stock
 from stock_service import StockServiceError
@@ -160,7 +161,7 @@ def format_industry(value: str | None) -> str:
 
 def stock_display_data(stock: Stock) -> dict[str, str]:
     return {
-        "Company Name": format_na(stock.company_name),
+        "Company Name": format_na(get_display_company_name(stock)),
         "Symbol": format_na(stock.symbol),
         "Current Price": format_decimal(stock.current_price),
         "Currency": format_na(stock.currency),
@@ -177,7 +178,7 @@ def stock_display_data(stock: Stock) -> dict[str, str]:
 def stock_comparison_row(stock: Stock) -> dict[str, str]:
     return {
         indicator_label("symbol"): format_na(stock.symbol),
-        indicator_label("company_name"): format_na(stock.company_name),
+        indicator_label("company_name"): format_na(get_display_company_name(stock)),
         indicator_label("current_price"): format_decimal(stock.current_price),
         indicator_label("currency"): format_na(stock.currency),
         indicator_label("market_cap"): format_market_cap(stock.market_cap, stock.currency),

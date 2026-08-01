@@ -33,6 +33,9 @@ watchlist_service.py
 dashboard.py
     └── Dashboard presentation helpers
 
+company_name_service.py
+    └── Taiwan official company name localization + JSON cache
+
 models.py
     └── Stock
 
@@ -76,6 +79,20 @@ Responsibilities:
 - Build comparison table rows
 - Run batch stock lookup with partial failure handling
 - Keep dashboard presentation logic testable outside Streamlit widget callbacks
+- Use `company_name_service.py` for presentation-only company display names
+
+---
+
+### company_name_service.py
+
+Responsibilities:
+
+- Keep Taiwan company name localization outside `app.py` and `stock_service.py`
+- Fetch official listed stock names from TWSE OpenAPI `opendata/t187ap03_L`
+- Fetch official OTC stock names from TPEx OpenAPI `mopsfin_t187ap03_O`
+- Store a lightweight runtime JSON cache in `data/taiwan_company_names.json`
+- Return localized display names without overwriting Yahoo `Stock.company_name`
+- Fall back to Yahoo company name when official data is unavailable or a symbol is unknown
 
 ---
 
@@ -169,6 +186,32 @@ main.py or app.py
    ▼
 Display
 ```
+
+## Taiwan Company Name Localization Flow
+
+```
+Stock
+  │
+  ├── Yahoo company_name remains unchanged
+  │
+  ▼
+dashboard.py
+  │
+  ▼
+company_name_service.py
+  │
+  ├── Fresh JSON cache hit
+  │      ▼
+  │   Localized display name
+  │
+  └── Cache miss / expired
+         │
+         ├── TWSE OpenAPI listed company names
+         ├── TPEx OpenAPI OTC company names
+         └── data/taiwan_company_names.json
+```
+
+Localization is presentation-only. `Stock.company_name` continues to represent the Yahoo Finance raw company name used by the stock data service and SQLite stock cache.
 
 ## Streamlit Watchlist Flow
 

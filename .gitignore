@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 data/stocks.db
 data/watchlist.json
+data/taiwan_company_names.json
