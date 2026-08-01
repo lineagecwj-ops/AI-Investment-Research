@@ -11,6 +11,7 @@ from models import Stock
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "stocks.db"
 CACHE_TTL = timedelta(hours=24)
+SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 
 
 STOCK_COLUMNS = {
@@ -94,22 +95,37 @@ def initialize_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
     connection = sqlite3.connect(path)
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
-        migrate_stocks_table(connection)
+        schema_changed = migrate_stocks_table(connection)
+        if schema_changed:
+            invalidate_stock_cache_after_schema_migration(connection)
         connection.commit()
     finally:
         connection.close()
 
 
-def migrate_stocks_table(connection: sqlite3.Connection) -> None:
+def migrate_stocks_table(connection: sqlite3.Connection) -> bool:
     existing_columns = {
         row[1]
         for row in connection.execute("PRAGMA table_info(stocks)").fetchall()
     }
+    schema_changed = False
 
     for column, column_type in STOCK_COLUMNS.items():
         if column in existing_columns:
             continue
         connection.execute(f"ALTER TABLE stocks ADD COLUMN {column} {column_type}")
+        schema_changed = True
+
+    return schema_changed
+
+
+def invalidate_stock_cache_after_schema_migration(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.execute(
+        "UPDATE stocks SET fetched_at = ?",
+        (SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP,),
+    )
 
 
 def save_stock(
@@ -127,7 +143,9 @@ def save_stock(
     connection = sqlite3.connect(path)
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
-        migrate_stocks_table(connection)
+        schema_changed = migrate_stocks_table(connection)
+        if schema_changed:
+            invalidate_stock_cache_after_schema_migration(connection)
         connection.execute(
             """
             INSERT INTO stocks (

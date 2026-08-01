@@ -16,6 +16,7 @@ if str(SRC_PATH) not in sys.path:
 
 from database import get_cached_stock
 from database import initialize_database
+from database import SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP
 from database import save_stock
 from models import Stock
 
@@ -122,9 +123,65 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertIn("free_cash_flow", columns)
         self.assertIn("fifty_two_week_high", columns)
 
-    def test_old_cache_row_reads_new_fields_as_none_after_migration(self):
+    def test_old_schema_migration_expires_existing_cache_row(self):
         self.create_old_stocks_table()
-        fetched_at = self.now.isoformat()
+        self.insert_old_cache_row(fetched_at=self.now.isoformat())
+
+        stock = get_cached_stock("NVDA", self.db_path, now=self.now)
+
+        self.assertIsNone(stock)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            row = connection.execute(
+                "SELECT fetched_at FROM stocks WHERE symbol = ?",
+                ("NVDA",),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertEqual(row[0], SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP)
+
+    def test_initialize_database_does_not_invalidate_when_schema_is_current(self):
+        save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
+
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            row = connection.execute(
+                "SELECT fetched_at FROM stocks WHERE symbol = ?",
+                ("NVDA",),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertEqual(row[0], self.now.isoformat())
+
+    def test_repeated_migration_is_safe(self):
+        self.create_old_stocks_table()
+        self.insert_old_cache_row(fetched_at=self.now.isoformat())
+
+        initialize_database(self.db_path)
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(stocks)").fetchall()
+            }
+            row = connection.execute(
+                "SELECT fetched_at FROM stocks WHERE symbol = ?",
+                ("NVDA",),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertIn("gross_margin", columns)
+        self.assertEqual(row[0], SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP)
+
+    def insert_old_cache_row(self, fetched_at: str) -> None:
         connection = sqlite3.connect(self.db_path)
         try:
             connection.execute(
@@ -163,14 +220,6 @@ class DatabaseTestCase(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
-
-        stock = get_cached_stock("NVDA", self.db_path, now=self.now)
-
-        self.assertIsNotNone(stock)
-        self.assertEqual(stock.current_price, 200.75)
-        self.assertIsNone(stock.gross_margin)
-        self.assertIsNone(stock.free_cash_flow)
-        self.assertIsNone(stock.fifty_two_week_high)
 
     def create_old_stocks_table(self):
         connection = sqlite3.connect(self.db_path)

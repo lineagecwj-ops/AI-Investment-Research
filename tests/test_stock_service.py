@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -194,6 +195,18 @@ class StockServiceCacheTestCase(unittest.TestCase):
         mock_fetch.assert_called_once_with("NVDA")
         self.assertEqual(stock.current_price, 215.0)
 
+    def test_schema_migration_expires_cache_and_queries_yahoo(self):
+        self.create_old_stocks_table()
+        self.insert_old_cache_row(fetched_at=self.now.isoformat())
+        yahoo_stock = self.sample_stock(price=215.0)
+
+        with patch("database.utc_now", return_value=self.now):
+            with patch("stock_service.fetch_stock_from_yahoo", return_value=yahoo_stock) as mock_fetch:
+                stock = get_stock("NVDA", db_path=self.db_path)
+
+        mock_fetch.assert_called_once_with("NVDA")
+        self.assertEqual(stock.current_price, 215.0)
+
     def test_cache_read_failure_falls_back_to_yahoo(self):
         yahoo_stock = self.sample_stock(price=220.0)
 
@@ -213,6 +226,71 @@ class StockServiceCacheTestCase(unittest.TestCase):
                     stock = get_stock("NVDA", db_path=self.db_path)
 
         self.assertEqual(stock.current_price, 225.0)
+
+    def create_old_stocks_table(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE stocks (
+                    symbol TEXT PRIMARY KEY,
+                    company_name TEXT,
+                    current_price REAL,
+                    currency TEXT,
+                    market_cap INTEGER,
+                    trailing_pe REAL,
+                    forward_pe REAL,
+                    trailing_eps REAL,
+                    return_on_equity REAL,
+                    sector TEXT,
+                    industry TEXT,
+                    fetched_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def insert_old_cache_row(self, fetched_at: str) -> None:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                INSERT INTO stocks (
+                    symbol,
+                    company_name,
+                    current_price,
+                    currency,
+                    market_cap,
+                    trailing_pe,
+                    forward_pe,
+                    trailing_eps,
+                    return_on_equity,
+                    sector,
+                    industry,
+                    fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "NVDA",
+                    "NVIDIA Corporation",
+                    200.75,
+                    "USD",
+                    4879000000000,
+                    57.68,
+                    44.3,
+                    3.48,
+                    0.25,
+                    "Technology",
+                    "Semiconductors",
+                    fetched_at,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":
