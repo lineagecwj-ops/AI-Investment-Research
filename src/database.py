@@ -6,11 +6,14 @@ from datetime import timedelta
 from pathlib import Path
 
 from models import Stock
+from models import HistoricalFinancialPeriod
+from models import HistoricalFinancialSeries
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "stocks.db"
 CACHE_TTL = timedelta(hours=24)
+HISTORICAL_CACHE_TTL = timedelta(days=7)
 SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 
 
@@ -83,6 +86,55 @@ CREATE TABLE IF NOT EXISTS stocks (
 )
 """
 
+HISTORICAL_FINANCIAL_COLUMNS = {
+    "symbol": "TEXT NOT NULL",
+    "period_end": "TEXT NOT NULL",
+    "fiscal_year": "INTEGER",
+    "currency": "TEXT",
+    "revenue": "REAL",
+    "gross_profit": "REAL",
+    "operating_income": "REAL",
+    "net_income": "REAL",
+    "eps": "REAL",
+    "gross_margin": "REAL",
+    "operating_margin": "REAL",
+    "net_margin": "REAL",
+    "operating_cash_flow": "REAL",
+    "capital_expenditure": "REAL",
+    "free_cash_flow": "REAL",
+    "total_assets": "REAL",
+    "total_debt": "REAL",
+    "total_equity": "REAL",
+    "cash_and_cash_equivalents": "REAL",
+    "fetched_at": "TEXT NOT NULL",
+}
+
+CREATE_HISTORICAL_FINANCIALS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS historical_financials (
+    symbol TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    fiscal_year INTEGER,
+    currency TEXT,
+    revenue REAL,
+    gross_profit REAL,
+    operating_income REAL,
+    net_income REAL,
+    eps REAL,
+    gross_margin REAL,
+    operating_margin REAL,
+    net_margin REAL,
+    operating_cash_flow REAL,
+    capital_expenditure REAL,
+    free_cash_flow REAL,
+    total_assets REAL,
+    total_debt REAL,
+    total_equity REAL,
+    cash_and_cash_equivalents REAL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY(symbol, period_end)
+)
+"""
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -95,7 +147,9 @@ def initialize_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
     connection = sqlite3.connect(path)
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
+        migrate_historical_financials_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.commit()
@@ -117,6 +171,20 @@ def migrate_stocks_table(connection: sqlite3.Connection) -> bool:
         schema_changed = True
 
     return schema_changed
+
+
+def migrate_historical_financials_table(connection: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(historical_financials)").fetchall()
+    }
+
+    for column, column_type in HISTORICAL_FINANCIAL_COLUMNS.items():
+        if column in existing_columns:
+            continue
+        connection.execute(
+            f"ALTER TABLE historical_financials ADD COLUMN {column} {column_type}"
+        )
 
 
 def invalidate_stock_cache_after_schema_migration(
@@ -143,7 +211,9 @@ def save_stock(
     connection = sqlite3.connect(path)
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
+        migrate_historical_financials_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.execute(
@@ -306,6 +376,183 @@ def stock_from_row(row: sqlite3.Row) -> Stock:
         two_hundred_day_average=row["two_hundred_day_average"],
         sector=row["sector"],
         industry=row["industry"],
+    )
+
+
+def save_historical_financials(
+    series: HistoricalFinancialSeries,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    fetched_at: datetime | None = None,
+) -> None:
+    if not series.symbol:
+        raise ValueError("Historical financial series symbol is required before saving.")
+
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime_to_cache_value(fetched_at or utc_now())
+
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(CREATE_STOCKS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+        schema_changed = migrate_stocks_table(connection)
+        migrate_historical_financials_table(connection)
+        if schema_changed:
+            invalidate_stock_cache_after_schema_migration(connection)
+
+        for period in series.periods or []:
+            connection.execute(
+                """
+                INSERT INTO historical_financials (
+                    symbol,
+                    period_end,
+                    fiscal_year,
+                    currency,
+                    revenue,
+                    gross_profit,
+                    operating_income,
+                    net_income,
+                    eps,
+                    gross_margin,
+                    operating_margin,
+                    net_margin,
+                    operating_cash_flow,
+                    capital_expenditure,
+                    free_cash_flow,
+                    total_assets,
+                    total_debt,
+                    total_equity,
+                    cash_and_cash_equivalents,
+                    fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(symbol, period_end) DO UPDATE SET
+                    fiscal_year = excluded.fiscal_year,
+                    currency = excluded.currency,
+                    revenue = excluded.revenue,
+                    gross_profit = excluded.gross_profit,
+                    operating_income = excluded.operating_income,
+                    net_income = excluded.net_income,
+                    eps = excluded.eps,
+                    gross_margin = excluded.gross_margin,
+                    operating_margin = excluded.operating_margin,
+                    net_margin = excluded.net_margin,
+                    operating_cash_flow = excluded.operating_cash_flow,
+                    capital_expenditure = excluded.capital_expenditure,
+                    free_cash_flow = excluded.free_cash_flow,
+                    total_assets = excluded.total_assets,
+                    total_debt = excluded.total_debt,
+                    total_equity = excluded.total_equity,
+                    cash_and_cash_equivalents = excluded.cash_and_cash_equivalents,
+                    fetched_at = excluded.fetched_at
+                """,
+                historical_period_to_row_values(period, timestamp),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def get_cached_historical_financials(
+    symbol: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    now: datetime | None = None,
+    ttl: timedelta = HISTORICAL_CACHE_TTL,
+    include_expired: bool = False,
+) -> HistoricalFinancialSeries | None:
+    initialize_database(db_path)
+
+    connection = sqlite3.connect(Path(db_path))
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            f"""
+            SELECT
+                {", ".join(HISTORICAL_FINANCIAL_COLUMNS)}
+            FROM historical_financials
+            WHERE symbol = ?
+            ORDER BY period_end ASC
+            """,
+            (symbol,),
+        ).fetchall()
+    finally:
+        connection.close()
+
+    if not rows:
+        return None
+
+    fetched_at_values = [
+        parse_cache_datetime(row["fetched_at"])
+        for row in rows
+        if row["fetched_at"]
+    ]
+    fetched_at = max(fetched_at_values) if fetched_at_values else None
+    is_stale = bool(
+        fetched_at
+        and is_cache_expired(fetched_at, now=now, ttl=ttl)
+    )
+    if is_stale and not include_expired:
+        return None
+
+    currency = next((row["currency"] for row in rows if row["currency"]), None)
+    return HistoricalFinancialSeries(
+        symbol=symbol,
+        currency=currency,
+        periods=[historical_period_from_row(row) for row in rows],
+        fetched_at=fetched_at,
+        is_stale=is_stale,
+    )
+
+
+def historical_period_to_row_values(
+    period: HistoricalFinancialPeriod,
+    fetched_at: str,
+) -> tuple:
+    return (
+        period.symbol,
+        period.period_end.isoformat(),
+        period.fiscal_year,
+        period.currency,
+        period.revenue,
+        period.gross_profit,
+        period.operating_income,
+        period.net_income,
+        period.eps,
+        period.gross_margin,
+        period.operating_margin,
+        period.net_margin,
+        period.operating_cash_flow,
+        period.capital_expenditure,
+        period.free_cash_flow,
+        period.total_assets,
+        period.total_debt,
+        period.total_equity,
+        period.cash_and_cash_equivalents,
+        fetched_at,
+    )
+
+
+def historical_period_from_row(row: sqlite3.Row) -> HistoricalFinancialPeriod:
+    return HistoricalFinancialPeriod(
+        symbol=row["symbol"],
+        period_end=datetime.fromisoformat(row["period_end"]).date(),
+        fiscal_year=row["fiscal_year"],
+        currency=row["currency"],
+        revenue=row["revenue"],
+        gross_profit=row["gross_profit"],
+        operating_income=row["operating_income"],
+        net_income=row["net_income"],
+        eps=row["eps"],
+        gross_margin=row["gross_margin"],
+        operating_margin=row["operating_margin"],
+        net_margin=row["net_margin"],
+        operating_cash_flow=row["operating_cash_flow"],
+        capital_expenditure=row["capital_expenditure"],
+        free_cash_flow=row["free_cash_flow"],
+        total_assets=row["total_assets"],
+        total_debt=row["total_debt"],
+        total_equity=row["total_equity"],
+        cash_and_cash_equivalents=row["cash_and_cash_equivalents"],
     )
 
 
