@@ -80,11 +80,11 @@ FORWARD_PE_LOWER_RATIO = 0.85
 SIGNIFICANTLY_ABOVE_52_WEEK_POSITION = 1.05
 
 
-def format_percent_snapshot(value: float) -> str:
+def format_percent_current_value(value: float) -> str:
     return f"{value:+.2%}"
 
 
-def format_number_snapshot(value: float) -> str:
+def format_number_current_value(value: float) -> str:
     return f"{value:,.2f}"
 
 
@@ -143,7 +143,7 @@ def build_valuation_observations(stock: Stock) -> list[ResearchObservation]:
                     f"至少 {int((1 - FORWARD_PE_LOWER_RATIO) * 100)}%。"
                 ),
                 why_it_matters=(
-                    "這表示目前估值 snapshot 中，市場預估盈餘與過去盈餘使用的估值倍數不同，"
+                    "目前資料顯示，市場預估盈餘與過去盈餘使用的估值倍數不同，"
                     "值得進一步確認預估來源與假設。這不是單獨的便宜或昂貴判定。"
                 ),
                 what_to_check=[
@@ -197,10 +197,10 @@ def build_risk_signals(
                 metric="revenue_growth",
                 what_happened=(
                     "Revenue Growth（營收成長率）目前為 "
-                    f"{format_percent_snapshot(stock.revenue_growth)}。"
+                    f"{format_percent_current_value(stock.revenue_growth)}。"
                 ),
                 why_it_matters=(
-                    "營收是觀察需求、價格與出貨變化的起點。單一 snapshot 為負值時，"
+                    "營收是觀察需求、價格與出貨變化的起點。單一目前可取得資料為負值時，"
                     "值得進一步研究這是短期波動、產業週期，或公司產品組合變化。"
                 ),
                 what_to_check=[
@@ -215,12 +215,12 @@ def build_risk_signals(
     if stock.earnings_growth is not None and stock.earnings_growth < 0:
         what_happened = (
             "Earnings Growth（盈餘成長率）目前為 "
-            f"{format_percent_snapshot(stock.earnings_growth)}。"
+            f"{format_percent_current_value(stock.earnings_growth)}。"
         )
         if stock.revenue_growth is not None:
             what_happened += (
                 " Revenue Growth（營收成長率）目前為 "
-                f"{format_percent_snapshot(stock.revenue_growth)}。"
+                f"{format_percent_current_value(stock.revenue_growth)}。"
             )
 
         signals.append(
@@ -230,7 +230,7 @@ def build_risk_signals(
                 metric="earnings_growth",
                 what_happened=what_happened,
                 why_it_matters=(
-                    "若目前 snapshot 中營收仍為正成長、但盈餘成長為負，"
+                    "若目前資料顯示營收仍為正成長、但盈餘成長為負，"
                     "值得進一步研究收入如何轉化為獲利。"
                     "這不代表公司品質惡化，也不能直接判定原因。"
                 )
@@ -257,7 +257,7 @@ def build_risk_signals(
                 metric="free_cash_flow",
                 what_happened=(
                     "Free Cash Flow（自由現金流）目前為 "
-                    f"{format_number_snapshot(stock.free_cash_flow)}。"
+                    f"{format_number_current_value(stock.free_cash_flow)}。"
                 ),
                 why_it_matters=(
                     "自由現金流可協助研究公司在營運與資本支出後留下多少現金。"
@@ -280,7 +280,7 @@ def build_risk_signals(
                 metric="operating_cash_flow",
                 what_happened=(
                     "Operating Cash Flow（營業現金流）目前為 "
-                    f"{format_number_snapshot(stock.operating_cash_flow)}。"
+                    f"{format_number_current_value(stock.operating_cash_flow)}。"
                 ),
                 why_it_matters=(
                     "營業現金流用來觀察核心營運是否產生現金。負值值得研究營運資金、收付款節奏與季節性因素。"
@@ -306,8 +306,8 @@ def build_risk_signals(
                 metric="total_debt",
                 what_happened=(
                     "Total Debt（總負債）目前為 "
-                    f"{format_number_snapshot(stock.total_debt)}；Total Cash（現金）目前為 "
-                    f"{format_number_snapshot(stock.total_cash)}。"
+                    f"{format_number_current_value(stock.total_debt)}；Total Cash（現金）目前為 "
+                    f"{format_number_current_value(stock.total_cash)}。"
                 ),
                 why_it_matters=(
                     "負債高於現金時，值得放在公司資本結構、產業特性與現金流能力下研究。"
@@ -334,8 +334,8 @@ def build_risk_signals(
                 metric="two_hundred_day_average",
                 what_happened=(
                     "Current Price（目前股價）目前為 "
-                    f"{format_number_snapshot(stock.current_price)}；200-day Average（200 日均價）目前為 "
-                    f"{format_number_snapshot(stock.two_hundred_day_average)}。"
+                    f"{format_number_current_value(stock.current_price)}；200-day Average（200 日均價）目前為 "
+                    f"{format_number_current_value(stock.two_hundred_day_average)}。"
                 ),
                 why_it_matters=(
                     "價格低於 200 日均價是價格位置觀察，值得確認市場價格變化是否已有基本面或事件脈絡。"
@@ -358,7 +358,7 @@ def build_risk_signals(
                 metric="fifty_two_week_position",
                 what_happened=(
                     "52-week Position（52 週區間位置）目前為 "
-                    f"{format_percent_snapshot(position)}，高於目前資料中的 52-week range。"
+                    f"{format_percent_current_value(position)}，高於目前資料中的 52-week range。"
                 ),
                 why_it_matters=(
                     "價格高於既有 52 週區間時，值得先確認資料時間是否一致，再研究近期事件與預期變化。"
@@ -387,7 +387,7 @@ def build_risk_signals(
                 what_to_check=[
                     "補齊缺漏欄位",
                     "交叉確認資料來源",
-                    "確認 Yahoo snapshot 更新時間",
+                    "確認 Yahoo Finance 資料更新時間",
                     "保留 N/A 欄位的研究限制",
                 ],
                 observation_type="info",

@@ -211,7 +211,7 @@ class ResearchServiceTestCase(unittest.TestCase):
         self.assertIn("-12.50%", signal.what_happened)
         self.assertIn("Revenue Growth", signal.what_happened)
         self.assertIn("+1.20%", signal.what_happened)
-        self.assertIn("營收仍為正成長、但盈餘成長為負", signal.why_it_matters)
+        self.assertIn("目前資料顯示營收仍為正成長、但盈餘成長為負", signal.why_it_matters)
 
     def test_negative_earnings_growth_omits_revenue_context_when_unavailable(self):
         stock = self.sample_stock()
@@ -234,6 +234,22 @@ class ResearchServiceTestCase(unittest.TestCase):
         self.assertNotIn("多年趨勢", combined_text)
         self.assertNotIn("歷史趨勢", combined_text)
         self.assertNotIn("長期衰退", combined_text)
+        self.assertIn("不能直接判定原因", combined_text)
+
+    def test_user_facing_research_text_avoids_snapshot_jargon(self):
+        user_facing_sources = [
+            (PROJECT_ROOT / "app.py").read_text(encoding="utf-8"),
+            (PROJECT_ROOT / "src" / "dashboard.py").read_text(encoding="utf-8"),
+            (PROJECT_ROOT / "src" / "research_service.py").read_text(encoding="utf-8"),
+        ]
+        combined_source = " ".join(user_facing_sources).lower()
+
+        self.assertNotIn("snapshot", combined_source)
+        self.assertNotIn("growth snapshot", combined_source)
+        self.assertNotIn("fundamental snapshot", combined_source)
+
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("不代表多年長期趨勢", app_source)
 
     def test_next_steps_are_deterministic_and_not_recommendations(self):
         stock = self.sample_stock()

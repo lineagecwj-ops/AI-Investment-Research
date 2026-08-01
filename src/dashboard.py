@@ -57,8 +57,8 @@ INDICATOR_HELP_TEXT = {
     "gross_margin": "毛利率，衡量營收扣除銷貨成本後的比例；常用來觀察產品組合與定價能力，但不能單獨判斷好壞。",
     "operating_margin": "營業利益率，衡量本業營運產生利潤的比例；常用來觀察營運效率，但需搭配成長與產業模式。",
     "net_margin": "淨利率，衡量營收最後轉為淨利的比例；常用來看整體獲利品質，但可能受一次性項目影響。",
-    "revenue_growth": "營收成長率，觀察近期營收變化；本頁使用 Yahoo snapshot，不能直接視為多年 CAGR。",
-    "earnings_growth": "盈餘成長率，觀察近期盈餘變化；本頁使用 Yahoo snapshot，需搭配利潤率與一次性項目判讀。",
+    "revenue_growth": "營收成長率，觀察近期營收變化；本頁使用 Yahoo Finance 提供的近期數據，不能直接視為多年 CAGR。",
+    "earnings_growth": "盈餘成長率，觀察近期盈餘變化；本頁使用 Yahoo Finance 提供的近期數據，需搭配利潤率與一次性項目判讀。",
     "total_cash": "公司持有的現金與約當現金；顯示時保留 Yahoo 提供的幣別脈絡。",
     "total_debt": "公司總負債；需搭配現金、現金流、利息費用與到期結構一起看。",
     "debt_to_equity": (

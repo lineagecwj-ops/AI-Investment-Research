@@ -42,6 +42,9 @@ research_glossary.py
 company_name_service.py
     └── Taiwan official company name localization + JSON cache
 
+company_summary_service.py
+    └── Presentation-only company summary localization + JSON cache
+
 models.py
     └── Stock
 
@@ -128,6 +131,20 @@ Responsibilities:
 - Store a lightweight runtime JSON cache in `data/taiwan_company_names.json`
 - Return localized display names without overwriting Yahoo `Stock.company_name`
 - Fall back to Yahoo company name when official data is unavailable or a symbol is unknown
+
+---
+
+### company_summary_service.py
+
+Responsibilities:
+
+- Build Research page company summary display data without overwriting `Stock.company_summary`
+- Prefer Taiwan official public data for Taiwan stocks when usable business-item content is available
+- Use TWSE / TPEx company profile data to identify company code, name, industry, and business accounting number
+- Use MOEA company registration business items to assemble a short Chinese company introduction
+- Fall back to Yahoo Finance English `company_summary` when localized official content is unavailable
+- Store a lightweight runtime JSON cache in `data/taiwan_company_summaries.json`
+- Avoid AI, LLM, translation APIs, web scraping, SQLite schema changes, and raw model mutation
 
 ---
 
@@ -258,6 +275,32 @@ company_name_service.py
 
 Localization is presentation-only. `Stock.company_name` continues to represent the Yahoo Finance raw company name used by the stock data service and SQLite stock cache.
 
+## Taiwan Company Summary Localization Flow
+
+```
+Stock
+  │
+  ├── Yahoo company_summary remains unchanged
+  │
+  ▼
+app.py Research tab
+  │
+  ▼
+company_summary_service.py
+  │
+  ├── Fresh JSON cache hit
+  │      ▼
+  │   Localized display summary
+  │
+  └── Cache miss / expired
+         │
+         ├── TWSE / TPEx official company profile
+         ├── MOEA company registration business items
+         └── data/taiwan_company_summaries.json
+```
+
+Company summary localization is presentation-only. `Stock.company_summary` continues to represent the Yahoo Finance `longBusinessSummary` value used by the stock data service and SQLite stock cache.
+
 ## Streamlit Watchlist Flow
 
 ```
@@ -303,6 +346,7 @@ stock_service.py
 Stock
    │
    ├── dashboard.py display formatters and company localization helper
+   ├── company_summary_service.py company summary display helper
    └── research_service.py
           │
           ├── research_metrics.py calculate_52_week_position()

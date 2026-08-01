@@ -21,6 +21,7 @@ from dashboard import format_ratio
 from dashboard import format_sector
 from dashboard import query_stock_batch
 from dashboard import stock_display_data
+from company_summary_service import build_company_summary_display
 from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
@@ -187,9 +188,21 @@ def render_research_glossary() -> None:
             st.write(entry["description"])
 
 
+def render_company_summary(stock) -> None:
+    summary = build_company_summary_display(stock)
+
+    st.markdown("#### 公司簡介")
+    st.write(summary.short_summary)
+    st.caption(summary.source_note)
+
+    if summary.full_summary:
+        with st.expander("查看完整公司介紹"):
+            st.write(summary.full_summary)
+
+
 def render_research() -> None:
     st.header("Research（研究）")
-    st.caption("以固定研究流程整理 fundamental snapshot；本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。")
+    st.caption("以固定研究流程整理目前可取得的基本面資料；本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。")
 
     with st.form("research_form"):
         input_text = st.text_input(
@@ -216,7 +229,7 @@ def render_research() -> None:
 
     stock = st.session_state["research_stock"]
     if stock is None:
-        st.info("輸入股票代號後，系統會依照 8 個研究問題建立 deterministic research summary。")
+        st.info("輸入股票代號後，系統會依照 8 個固定研究問題建立研究摘要。")
         return
 
     report = build_research_report(stock)
@@ -226,8 +239,8 @@ def render_research() -> None:
 
     with st.expander("如何理解這些指標？"):
         st.write(
-            "本頁使用 Yahoo Finance 提供的單一 fundamental snapshot，協助建立研究問題與觀察方向。"
-            "所有 observations 都是 deterministic research prompts，不是投資建議，也不是整體評分。"
+            "本頁使用 Yahoo Finance 提供的目前可取得基本面資料，協助建立研究問題與觀察方向。"
+            "所有觀察都是固定規則產生的研究提示，不是投資建議，也不是整體評分。"
         )
     render_research_glossary()
 
@@ -242,10 +255,7 @@ def render_research() -> None:
         ],
         columns=3,
     )
-    if stock.company_summary:
-        st.write(stock.company_summary)
-    else:
-        st.info("Company Summary（公司業務摘要）目前為 N/A。")
+    render_company_summary(stock)
 
     st.markdown("### Profitability（獲利能力）")
     render_research_metric_grid(
@@ -260,7 +270,7 @@ def render_research() -> None:
     )
 
     st.markdown("### Growth（成長性）")
-    st.info("目前為 Yahoo Finance 提供的當期/近期 growth snapshot，不是本系統自行計算的多年 CAGR。")
+    st.info("資料說明：目前顯示的是 Yahoo Finance 提供的近期成長數據，僅反映目前可取得的資料，不代表多年長期趨勢。")
     growth_metrics = [
         (indicator_label("revenue_growth"), format_percentage(stock.revenue_growth), indicator_help("revenue_growth")),
         (indicator_label("earnings_growth"), format_percentage(stock.earnings_growth), indicator_help("earnings_growth")),

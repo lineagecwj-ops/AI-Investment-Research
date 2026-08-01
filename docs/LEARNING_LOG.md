@@ -1,5 +1,54 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 02 Batch C UX Localization Patch
+
+### Completed Features
+
+- Research 頁面使用者可見文字移除 `snapshot`、`growth snapshot`、`fundamental snapshot` 等偏工程詞彙，改為「目前資料」、「目前可取得的基本面資料」、「Yahoo Finance 提供的近期成長數據」。
+- 保留研究安全語意：近期成長數據不代表多年長期趨勢，negative earnings growth 仍明確說明不能直接判定原因。
+- 新增 `src/company_summary_service.py`，提供 presentation-only company summary display helper。
+- Company Overview 改為預設顯示短版「公司簡介」，完整內容放入 `查看完整公司介紹` expander。
+- 台股公司簡介優先使用官方公開資料整理，不覆寫 `Stock.company_summary`、不修改 SQLite cache、不改 Yahoo Finance mapping。
+
+### Source Audit
+
+- TWSE listed company profile：`https://openapi.twse.com.tw/v1/opendata/t187ap03_L`
+- TPEx OTC company profile：`https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O`
+- MOEA company registration business items：`https://data.gcis.nat.gov.tw/od/data/api/236EE382-4942-41A9-BD03-CA0709025E7C`
+- TWSE / TPEx profile 可提供公司代號、公司名稱、產業別、統編等欄位；MOEA 公司登記資料可用統編取得營業項目。
+- 本 Patch 未做通用英文到繁中機器翻譯；若沒有可靠中文內容，會顯示 Yahoo Finance 英文介紹。
+
+### Testing Notes
+
+- 新增 `tests/test_company_summary_service.py`。
+- 更新 `tests/test_research_service.py`，確認 user-facing source 不再包含 `snapshot`，並保留「不代表多年長期趨勢」與「不能直接判定原因」。
+- Tests 使用 mock official responses，不依賴 live network。
+
+### Modified / Added Files
+
+- 新增 `src/company_summary_service.py`
+- 新增 `tests/test_company_summary_service.py`
+- 新增 `docs/COMPANY_SUMMARY_LOCALIZATION.md`
+- 修改 `.gitignore`
+- 修改 `app.py`
+- 修改 `src/dashboard.py`
+- 修改 `src/research_service.py`
+- 修改 `tests/test_research_service.py`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- 官方營業項目不是完整自然語言公司介紹；目前是 beginner-friendly official business-item summary。
+- 非台股或缺少官方營業項目時，仍 fallback Yahoo Finance 英文原文。
+- Runtime cache `data/taiwan_company_summaries.json` 不進 Git。
+
+### Code Review Focus
+
+- `src/company_summary_service.py` 是否只處理 presentation localization，不改 raw model / cache semantics。
+- `app.py` Company Overview 是否避免長文佔滿首屏。
+- `src/research_service.py` / `src/dashboard.py` 使用者可見文字是否自然且仍保留 data-safety meaning。
+
 ## 2026-08-01 — Sprint 02 Batch C Research Explainability
 
 ### Completed Features
