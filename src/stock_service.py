@@ -1,8 +1,13 @@
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 
 import yfinance as yf
 
+from database import DEFAULT_DB_PATH
+from database import get_cached_stock
+from database import log_cache_warning
+from database import save_stock
 from models import Stock
 
 
@@ -37,7 +42,26 @@ def validate_stock(stock: Stock) -> None:
         raise StockDataError("Yahoo Finance 回傳資料缺少目前價格。")
 
 
-def get_stock(symbol: str) -> Stock:
+def get_stock(symbol: str, db_path: Path | str = DEFAULT_DB_PATH) -> Stock:
+    try:
+        cached_stock = get_cached_stock(symbol, db_path=db_path)
+    except Exception as exc:
+        log_cache_warning("SQLite cache read failed", exc)
+    else:
+        if cached_stock is not None:
+            return cached_stock
+
+    stock = fetch_stock_from_yahoo(symbol)
+
+    try:
+        save_stock(stock, db_path=db_path)
+    except Exception as exc:
+        log_cache_warning("SQLite cache write failed", exc)
+
+    return stock
+
+
+def fetch_stock_from_yahoo(symbol: str) -> Stock:
     try:
         yahoo_stock = yf.Ticker(symbol)
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
