@@ -1,5 +1,29 @@
 # Learning Log
 
+## 2026-08-01 — Sprint 02 Batch C Company Summary Semantics Patch
+
+### Completed Features
+
+- 將台股官方中文 summary 的 UI 標題改為「公司登記業務概覽」，避免把登記營業項目誤讀為完整公司簡介。
+- 官方中文內容旁新增明確資料說明：內容來自台灣官方公司登記與公開基本資料，僅用於了解公司登記業務範圍，不代表各項業務實際營收占比、主要產品或核心業務。
+- 官方完整內容 expander 改為「查看完整登記營業項目」。
+- 若 `Stock.company_summary` 有 Yahoo Finance 原始英文介紹，Research Company Overview 一律提供「查看 Yahoo Finance 詳細公司介紹」expander。
+- `Stock.company_summary`、SQLite `company_summary`、Yahoo `longBusinessSummary` mapping 皆未修改。
+
+### Testing Notes
+
+- 更新 `tests/test_company_summary_service.py`，覆蓋 official localized summary 與 Yahoo original detailed summary 同時保留。
+- 測試明確禁止把官方登記資料描述為「主要從事」。
+- 測試確認 disclaimer 包含登記業務範圍、非實際營收占比、非主要產品、非核心業務語意。
+
+### Modified Files
+
+- 修改 `src/company_summary_service.py`
+- 修改 `app.py`
+- 修改 `tests/test_company_summary_service.py`
+- 修改 `docs/COMPANY_SUMMARY_LOCALIZATION.md`
+- 修改 `docs/LEARNING_LOG.md`
+
 ## 2026-08-01 — Sprint 02 Batch C UX Localization Patch
 
 ### Completed Features

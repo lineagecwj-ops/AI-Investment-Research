@@ -191,13 +191,17 @@ def render_research_glossary() -> None:
 def render_company_summary(stock) -> None:
     summary = build_company_summary_display(stock)
 
-    st.markdown("#### 公司簡介")
+    st.markdown(f"#### {summary.section_title}")
     st.write(summary.short_summary)
     st.caption(summary.source_note)
 
-    if summary.full_summary:
-        with st.expander("查看完整公司介紹"):
+    if summary.full_summary and summary.full_summary_title:
+        with st.expander(summary.full_summary_title):
             st.write(summary.full_summary)
+
+    if summary.original_yahoo_summary:
+        with st.expander("查看 Yahoo Finance 詳細公司介紹"):
+            st.write(summary.original_yahoo_summary)
 
 
 def render_research() -> None:

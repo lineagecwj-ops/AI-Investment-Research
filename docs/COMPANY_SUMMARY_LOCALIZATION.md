@@ -8,7 +8,7 @@ The service does not overwrite `Stock.company_summary`, does not change Yahoo Fi
 
 ## Source Audit
 
-The MVP uses official public Taiwan data when a Taiwan stock has enough fields to build a short Chinese introduction.
+The MVP uses official public Taiwan data when a Taiwan stock has enough fields to build a short company registration business overview.
 
 Sources:
 
@@ -28,11 +28,21 @@ Fields used:
 
 The Research page shows:
 
-- A short primary company introduction.
-- A `查看完整公司介紹` expander when full content is available.
-- A short source note explaining the official-data-first rule.
+- A short `公司登記業務概覽` for Taiwan stocks when official registration content is available.
+- A `查看完整登記營業項目` expander for official business registration items.
+- A source note explaining that official registration items are only registration scope.
+- A `查看 Yahoo Finance 詳細公司介紹` expander whenever Yahoo `Stock.company_summary` is available.
 
-For Taiwan stocks, the localized summary is assembled from official company profile fields and registered business items. This is an official business-item summary, not full machine translation of Yahoo `longBusinessSummary`.
+For Taiwan stocks, the localized summary is assembled from official company profile fields and registered business items. This is an official business registration item overview, not full machine translation of Yahoo `longBusinessSummary`.
+
+Company registration items mean registered business scope only. They must not be interpreted as:
+
+- Actual revenue contribution
+- Main products
+- Core business
+- Business segment revenue mix
+
+Yahoo `longBusinessSummary` remains in `Stock.company_summary` and continues to be available as the original English detailed company description in the Research page.
 
 For non-Taiwan stocks, or Taiwan stocks without usable official business-item content, the page falls back to Yahoo Finance English company summary. If no summary exists, the page shows a friendly `N/A` message.
 
@@ -49,6 +59,6 @@ If official sources are unavailable but a stale cache exists, the stale cache ca
 ## Known Limitations
 
 - The MVP does not use AI, LLM, translation API, Google Translate, news, or web scraping.
-- Official company registration business items are not the same as a polished business description.
+- Official company registration business items are not the same as a polished business description, main revenue source, main product list, or core business statement.
 - The service does not build a large company profile database.
 - Coverage depends on official profile fields containing a usable business accounting number.

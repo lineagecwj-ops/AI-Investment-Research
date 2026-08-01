@@ -41,19 +41,33 @@ BUSINESS_ACCOUNTING_KEYS = (
 )
 BUSINESS_ITEM_KEYS = ("Business_Item_Desc", "營業項目", "營業項目名稱", "Cmp_Business")
 
+OFFICIAL_SECTION_TITLE = "公司登記業務概覽"
+OFFICIAL_FULL_SUMMARY_TITLE = "查看完整登記營業項目"
+OFFICIAL_SOURCE_NOTE = (
+    "資料說明：以下內容來自台灣官方公司登記與公開基本資料，"
+    "僅用於了解公司登記業務範圍，"
+    "不代表各項業務的實際營收占比、主要產品或核心業務。"
+)
+
 _memory_cache: dict[str, "CompanySummaryDisplay"] | None = None
 
 
 @dataclass(frozen=True)
 class CompanySummaryDisplay:
 
+    section_title: str
+
     short_summary: str
 
     full_summary: str | None
 
+    full_summary_title: str | None
+
     source_note: str
 
     is_localized: bool
+
+    original_yahoo_summary: str | None = None
 
 
 class CompanySummarySourceError(Exception):
@@ -69,26 +83,30 @@ def build_company_summary_display(
     cache_path: Path | str = DEFAULT_CACHE_PATH,
     fetch_json: Callable[[str], list[dict]] = None,
 ) -> CompanySummaryDisplay:
+    english_summary = clean_text(stock.company_summary)
     localized_summary = get_localized_company_summary(
         stock,
         cache_path=cache_path,
         fetch_json=fetch_json,
     )
     if localized_summary:
-        return localized_summary
+        return attach_original_yahoo_summary(localized_summary, english_summary)
 
-    english_summary = clean_text(stock.company_summary)
     if english_summary:
         return CompanySummaryDisplay(
+            section_title="公司簡介",
             short_summary=shorten_summary(english_summary),
             full_summary=english_summary,
+            full_summary_title="查看 Yahoo Finance 詳細公司介紹",
             source_note="公司簡介優先使用台灣官方公開資料；若無可用中文內容，則顯示 Yahoo Finance 英文介紹。",
             is_localized=False,
         )
 
     return CompanySummaryDisplay(
+        section_title="公司簡介",
         short_summary="公司簡介目前為 N/A。",
         full_summary=None,
+        full_summary_title=None,
         source_note="目前沒有可顯示的公司簡介資料。",
         is_localized=False,
     )
@@ -281,9 +299,11 @@ def build_official_summary(
     )
 
     return CompanySummaryDisplay(
+        section_title=OFFICIAL_SECTION_TITLE,
         short_summary=short_summary,
         full_summary=full_summary,
-        source_note="中文公司簡介使用台灣官方公開資料整理；若無可用中文內容，則顯示 Yahoo Finance 英文介紹。",
+        full_summary_title=OFFICIAL_FULL_SUMMARY_TITLE,
+        source_note=OFFICIAL_SOURCE_NOTE,
         is_localized=True,
     )
 
@@ -363,11 +383,26 @@ def parse_cached_summaries(payload) -> dict[str, CompanySummaryDisplay] | None:
         if not isinstance(short_summary, str) or not isinstance(source_note, str):
             continue
 
+        localized = bool(is_localized)
         summaries[symbol.strip().upper()] = CompanySummaryDisplay(
+            section_title=OFFICIAL_SECTION_TITLE
+            if localized
+            else (
+                data.get("section_title")
+                if isinstance(data.get("section_title"), str)
+                else "公司簡介"
+            ),
             short_summary=short_summary,
             full_summary=data.get("full_summary") if isinstance(data.get("full_summary"), str) else None,
-            source_note=source_note,
-            is_localized=bool(is_localized),
+            full_summary_title=OFFICIAL_FULL_SUMMARY_TITLE
+            if localized
+            else (
+                data.get("full_summary_title")
+                if isinstance(data.get("full_summary_title"), str)
+                else None
+            ),
+            source_note=OFFICIAL_SOURCE_NOTE if localized else source_note,
+            is_localized=localized,
         )
 
     return summaries
@@ -388,8 +423,10 @@ def write_cache(
         ],
         "summaries": {
             symbol: {
+                "section_title": summary.section_title,
                 "short_summary": summary.short_summary,
                 "full_summary": summary.full_summary,
+                "full_summary_title": summary.full_summary_title,
                 "source_note": summary.source_note,
                 "is_localized": summary.is_localized,
             }
@@ -412,3 +449,21 @@ def update_memory_cache(summaries: dict[str, CompanySummaryDisplay]) -> None:
     global _memory_cache
 
     _memory_cache = summaries
+
+
+def attach_original_yahoo_summary(
+    display: CompanySummaryDisplay,
+    original_yahoo_summary: str,
+) -> CompanySummaryDisplay:
+    if not original_yahoo_summary:
+        return display
+
+    return CompanySummaryDisplay(
+        section_title=display.section_title,
+        short_summary=display.short_summary,
+        full_summary=display.full_summary,
+        full_summary_title=display.full_summary_title,
+        source_note=display.source_note,
+        is_localized=display.is_localized,
+        original_yahoo_summary=original_yahoo_summary,
+    )
