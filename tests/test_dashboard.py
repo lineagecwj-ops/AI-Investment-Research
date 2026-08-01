@@ -489,6 +489,7 @@ class HistoricalTrendDashboardTestCase(unittest.TestCase):
         self.assertIn('value_format="percentage"', app_source)
         self.assertIn('alt.Axis(format=".0%", title="Percentage")', app_source)
         self.assertIn('alt.Axis(format="~s"', app_source)
+        self.assertIn('axis=alt.Axis(labelAngle=0)', app_source)
 
     def test_insufficient_series_detection(self):
         series = HistoricalFinancialSeries(

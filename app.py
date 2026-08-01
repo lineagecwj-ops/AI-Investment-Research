@@ -215,7 +215,12 @@ def render_historical_chart(
         y_axis = alt.Axis(format="~s", title=f"Amount ({series.currency or 'currency'})")
 
     base = alt.Chart(chart_data).encode(
-        x=alt.X("Period:N", sort=None, title="Fiscal period"),
+        x=alt.X(
+            "Period:N",
+            sort=None,
+            title="Fiscal period",
+            axis=alt.Axis(labelAngle=0),
+        ),
         y=alt.Y("Value:Q", axis=y_axis),
         color=alt.Color("Metric:N", title="Metric"),
         tooltip=[

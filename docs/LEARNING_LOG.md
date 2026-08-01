@@ -1,5 +1,18 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 03 Batch B Historical Chart X-axis Label Patch
+
+### Completed Features
+
+- Historical Trends 共用 chart renderer 的 X-axis 套用 `labelAngle=0`。
+- Revenue、Net Income、EPS、Margins、Cash Flow、Financial Position charts 皆沿用同一個水平 fiscal-period label 設定。
+- Visible chart labels 維持 compact `FY YYYY` format；table labels 與 tooltip `Period End` 仍保留完整 `FY ending YYYY-MM-DD`。
+- 本 patch 未修改 period semantics、SQLite、historical data logic、YoY、currency、table formatting 或 tooltip period-end data。
+
+### Testing Notes
+
+- 更新 `tests/test_dashboard.py`，確認 Historical chart X-axis 設定 `labelAngle=0`。
+
 ## 2026-08-02 — Sprint 03 Batch B Historical Trend Dashboard UX Polish
 
 ### Completed Features

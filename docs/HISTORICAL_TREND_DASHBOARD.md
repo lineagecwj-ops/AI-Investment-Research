@@ -146,6 +146,8 @@ Charts use compact period labels on the visible X-axis:
 FY 2025
 ```
 
+Visible X-axis fiscal-period labels are rendered horizontally with `labelAngle=0` across all Historical Trends charts.
+
 The exact table label remains:
 
 ```text
