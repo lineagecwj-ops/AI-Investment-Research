@@ -21,6 +21,7 @@ from dashboard import format_ratio
 from dashboard import format_sector
 from dashboard import query_stock_batch
 from dashboard import stock_display_data
+from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
 from symbol_utils import parse_stock_symbols
@@ -157,16 +158,33 @@ def render_observations(observations) -> None:
         return
 
     for observation in observations:
+        body = (
+            f"**{observation.title}**\n\n"
+            "**Observation（觀察）**\n\n"
+            f"{observation.what_happened}\n\n"
+            "**Why it matters（為什麼值得注意）**\n\n"
+            f"{observation.why_it_matters}\n\n"
+            "**What to check（下一步查什麼）**\n\n"
+            + "\n".join(f"- {item}" for item in observation.what_to_check)
+        )
         if observation.observation_type == "info":
-            st.info(f"**{observation.title}**\n\n{observation.message}")
+            st.info(body)
         else:
-            st.warning(f"**{observation.title}**\n\n{observation.message}")
+            st.warning(body)
 
 
 def render_next_steps(next_steps) -> None:
     for step in next_steps:
         st.write(f"**{step.category} · {step.title}**")
-        st.write(step.question)
+        for item in step.items:
+            st.write(f"□ {item}")
+
+
+def render_research_glossary() -> None:
+    with st.expander("研究名詞說明"):
+        for entry in get_research_glossary().values():
+            st.write(f"**{entry['title']}**")
+            st.write(entry["description"])
 
 
 def render_research() -> None:
@@ -211,6 +229,7 @@ def render_research() -> None:
             "本頁使用 Yahoo Finance 提供的單一 fundamental snapshot，協助建立研究問題與觀察方向。"
             "所有 observations 都是 deterministic research prompts，不是投資建議，也不是整體評分。"
         )
+    render_research_glossary()
 
     st.markdown("### Company Overview（公司概況）")
     render_research_metric_grid(
