@@ -1,29 +1,9 @@
 from stock_service import StockServiceError, get_stock
-
-
-def normalize_stock_symbol(symbol: str) -> str:
-    normalized_symbol = symbol.strip().upper()
-
-    if normalized_symbol.isdigit():
-        return normalized_symbol + ".TW"
-
-    return normalized_symbol
-
-
-def parse_stock_symbols(user_input: str) -> list[str]:
-    symbols = []
-    seen_symbols = set()
-
-    for raw_symbol in user_input.split(","):
-        symbol = normalize_stock_symbol(raw_symbol)
-
-        if not symbol or symbol in seen_symbols:
-            continue
-
-        symbols.append(symbol)
-        seen_symbols.add(symbol)
-
-    return symbols
+from symbol_utils import normalize_stock_symbol
+from symbol_utils import parse_stock_symbols
+from watchlist_service import add_stock
+from watchlist_service import list_watchlist
+from watchlist_service import remove_stock
 
 
 def get_stock_symbols() -> list[str]:
@@ -67,9 +47,7 @@ def format_percentage(value: float | None) -> str:
     return f"{value * 100:.2f}%"
 
 
-def main():
-    symbols = get_stock_symbols()
-
+def query_stocks(symbols: list[str]) -> None:
     if not symbols:
         print("請輸入至少一個股票代號。")
         return
@@ -82,6 +60,114 @@ def main():
             continue
 
         display_stock(stock)
+
+
+def query_stocks_from_input() -> None:
+    symbols = get_stock_symbols()
+    query_stocks(symbols)
+
+
+def display_main_menu() -> None:
+    print()
+    print("====================================")
+    print("AI Investment Research")
+    print("====================================")
+    print("1. 查詢股票")
+    print("2. Watchlist")
+    print("3. 離開")
+
+
+def display_watchlist_menu() -> None:
+    print()
+    print("========== Watchlist ==========")
+    print("1. 顯示 Watchlist")
+    print("2. 新增股票")
+    print("3. 移除股票")
+    print("4. 查詢 Watchlist 股票")
+    print("5. 返回")
+
+
+def show_watchlist() -> list[str]:
+    symbols = list_watchlist()
+
+    if not symbols:
+        print("Watchlist 目前沒有股票。")
+        return []
+
+    print("Watchlist：")
+    for symbol in symbols:
+        print("-", symbol)
+
+    return symbols
+
+
+def add_watchlist_stock() -> None:
+    symbol = normalize_stock_symbol(input("請輸入要新增的股票代號："))
+
+    if not symbol:
+        print("請輸入有效的股票代號。")
+        return
+
+    if add_stock(symbol):
+        print(f"已新增：{symbol}")
+    else:
+        print(f"Watchlist 已存在：{symbol}")
+
+
+def remove_watchlist_stock() -> None:
+    symbol = normalize_stock_symbol(input("請輸入要移除的股票代號："))
+
+    if not symbol:
+        print("請輸入有效的股票代號。")
+        return
+
+    if remove_stock(symbol):
+        print(f"已移除：{symbol}")
+    else:
+        print(f"Watchlist 找不到：{symbol}")
+
+
+def query_watchlist_stocks() -> None:
+    symbols = show_watchlist()
+    if not symbols:
+        return
+
+    query_stocks(symbols)
+
+
+def run_watchlist_menu() -> None:
+    while True:
+        display_watchlist_menu()
+        choice = input("請選擇功能：").strip()
+
+        if choice == "1":
+            show_watchlist()
+        elif choice == "2":
+            add_watchlist_stock()
+        elif choice == "3":
+            remove_watchlist_stock()
+        elif choice == "4":
+            query_watchlist_stocks()
+        elif choice == "5":
+            return
+        else:
+            print("請輸入 1 到 5。")
+
+
+def main():
+    while True:
+        display_main_menu()
+        choice = input("請選擇功能：").strip()
+
+        if choice == "1":
+            query_stocks_from_input()
+        elif choice == "2":
+            run_watchlist_menu()
+        elif choice == "3":
+            print("再見。")
+            return
+        else:
+            print("請輸入 1 到 3。")
 
 
 if __name__ == "__main__":

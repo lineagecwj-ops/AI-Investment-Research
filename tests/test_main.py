@@ -12,6 +12,7 @@ if str(SRC_PATH) not in sys.path:
 
 from main import parse_stock_symbols
 from main import main
+from main import query_stocks
 from stock_service import StockDataError
 
 
@@ -47,20 +48,18 @@ class ParseStockSymbolsTestCase(unittest.TestCase):
 
 class MainFlowTestCase(unittest.TestCase):
 
-    @patch("builtins.input", return_value="   ")
+    @patch("builtins.input", side_effect=["1", "   ", "3"])
     def test_blank_input_prints_friendly_message(self, _mock_input):
         with patch("builtins.print") as mock_print:
             main()
 
-        mock_print.assert_called_once_with("請輸入至少一個股票代號。")
+        mock_print.assert_any_call("請輸入至少一個股票代號。")
 
     @patch("main.display_stock")
-    @patch("builtins.input", return_value="2330,INVALID,NVDA")
     @patch("main.get_stock")
     def test_single_stock_error_does_not_stop_other_queries(
         self,
         mock_get_stock,
-        _mock_input,
         mock_display_stock,
     ):
         first_stock = object()
@@ -72,12 +71,19 @@ class MainFlowTestCase(unittest.TestCase):
         ]
 
         with patch("main.display_stock_error") as mock_display_error:
-            main()
+            query_stocks(["2330.TW", "INVALID", "NVDA"])
 
         self.assertEqual(mock_get_stock.call_count, 3)
         mock_display_stock.assert_any_call(first_stock)
         mock_display_stock.assert_any_call(third_stock)
         mock_display_error.assert_called_once()
+
+    @patch("builtins.input", side_effect=["3"])
+    def test_menu_exit_prints_goodbye(self, _mock_input):
+        with patch("builtins.print") as mock_print:
+            main()
+
+        mock_print.assert_any_call("再見。")
 
 
 if __name__ == "__main__":
