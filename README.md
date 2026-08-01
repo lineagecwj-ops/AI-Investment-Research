@@ -97,13 +97,13 @@ Dashboard 目前提供：
 
 - `Dashboard`：股票搜尋，可輸入單一股票或逗號分隔多股票，顯示公司、價格、市值、PE、EPS、ROE、Sector、Industry。
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
-- `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position 與完整 historical table。
+- `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
 
 Research 頁面使用 deterministic / explainable rules 產生 observations 與 next steps，不使用 OpenAI API、ChatGPT API 或其他 LLM。系統不提供 Buy / Sell / Hold recommendation、target price 或 overall stock score；頁面上的 observations 是 research prompts，不是投資建議。
 
-Historical Trends 頁面使用 Yahoo Finance annual financial statements 與 7-day SQLite historical cache。Period End 顯示為 `FY ending YYYY-MM-DD`，避免把 NVIDIA / Apple 等非 12/31 年結日誤讀為完整曆年；YoY 只在相鄰年度連續時顯示，缺資料顯示 `N/A`，不補 0、不自行計算 Yahoo 未提供的 EPS，也不做 trend classification。
+Historical Trends 頁面使用 Yahoo Finance annual financial statements 與 7-day SQLite historical cache。Period End 顯示為 `FY ending YYYY-MM-DD`，避免把 NVIDIA / Apple 等非 12/31 年結日誤讀為完整曆年；YoY 只在相鄰年度連續時顯示，缺資料顯示 `N/A`，不補 0、不自行計算 Yahoo 未提供的 EPS。Historical Interpretation 使用固定規則整理 What happened、Why it matters、What to check next，不使用 AI / LLM、不產生 Buy / Sell / Hold、target price、score 或 rating。
 
 Dashboard 與 console application 共用既有 service layer：
 
@@ -111,9 +111,11 @@ Dashboard 與 console application 共用既有 service layer：
 - Yahoo Finance 查詢與 SQLite cache：`src/stock_service.py`、`src/database.py`
 - Watchlist persistence：`src/watchlist_service.py`
 - Research interpretation：`src/research_service.py`
+- Historical interpretation：`src/historical_research_service.py`
 - Historical fundamentals normalization and cache：`src/historical_financial_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
+Historical Interpretation methodology 詳見 `docs/HISTORICAL_INTERPRETATION_FRAMEWORK.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。

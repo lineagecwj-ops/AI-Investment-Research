@@ -1,5 +1,54 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 03 Batch C Historical Interpretation UX Polish
+
+### Completed Features
+
+- 新增 `src/historical_interpretation_presentation.py`，把 Historical Interpretation 的 UX selection / grouping / checklist cleanup 從 `app.py` 抽出。
+- Historical Interpretation 改為三層 progressive disclosure：Historical Highlights、Detailed Interpretation、Research Next Steps。
+- Historical Highlights 從既有 deterministic observations 選取 factual summaries，預設最多 6 項，不建立 score、ranking 或 recommendation。
+- Detailed Interpretation 依固定 category order 分組，使用 collapsed `st.expander()`，避免使用者一進區塊就看到大量 observation cards。
+- Detailed Interpretation 上方新增顏色說明：藍色是一般歷史資料觀察，黃色是值得進一步確認的研究項目，不代表負面訊號或投資建議。
+- Research Next Steps 改為 presentation-level category grouping，使用 trim / lowercase English / exact normalized match 去重，每 category 預設顯示最多 3 項，整頁預設最多 10 個 visible items，overflow 放在 `查看更多研究項目` expander。
+- 補上 2454-like Revenue pattern：Revenue 前期下降後連續兩年回升時，產生單一 factual observation，讓 Highlights 可概括 FY2023 decline 與 FY2024 / FY2025 recovery。
+
+### Safety Notes
+
+- 本 UX polish 未修改 Yahoo parsing、SQLite schema、historical cache TTL、YoY calculation、Margin calculation、FCF calculation、CapEx calculation 或 period_year semantics。
+- Highlight builder consume existing `HistoricalResearchReport.observations`，不重新查詢資料，也不建立第二套 financial calculation rules。
+- Next Steps 去重只做 deterministic normalized exact match，不使用 AI / LLM 或 semantic deduplication。
+- FY2026 仍是 fiscal-period label，不描述為 calendar year 或 future forecast。
+
+### Testing Notes
+
+- 新增 `tests/test_historical_interpretation_presentation.py`，覆蓋 highlights count/order/determinism、2454-like recovery highlight、NVDA FY2026 wording、category grouping、attention explanation、next-step dedupe / limit / overflow 與 language safety。
+- 更新 `tests/test_historical_research_service.py`，覆蓋 Revenue 前期下降後連續回升 observation。
+
+## 2026-08-02 — Sprint 03 Batch C Historical Trend Interpretation
+
+### Completed Features
+
+- 新增 `src/historical_research_service.py`，建立 deterministic Historical Interpretation layer。
+- Historical Interpretation 直接消化 `HistoricalFinancialSeries`，輸出 `HistoricalResearchReport`，並重用 `ResearchObservation` / `ResearchNextStep` 的 explainability contract。
+- Revenue observations 支援 latest increase / decline、連續兩期增加、連續兩期下降、前期下降後回升、前期增加後下降、年度 gap 與資料不足。
+- Earnings observations 支援 Revenue / Net Income 同向或方向不同、EPS / Net Income 同向、EPS 下降後回升、EPS 連續下降與 latest EPS unavailable。
+- Margin observations 使用 percentage-point change，例如 `49.64%` 到 `47.50%` 描述為下降 `2.14 percentage points`，不使用相對百分比誤導。
+- Cash Flow observations 支援 OCF / FCF positive or negative、consecutive positive FCF、FCF turns negative、FCF recovery，並以 `abs(capital_expenditure)` 比較 CapEx 現金支出規模。
+- Financial Position observations 描述 Cash、Total Debt、Total Assets、Total Equity 的歷史變化；cross-metric observations 限縮在同期間可比較的 Revenue vs Net Income、Revenue vs Operating Margin、Net Income vs FCF、Cash vs Debt。
+- Historical Trends UI 新增集中式 `Historical Interpretation（歷史趨勢解讀）` 區塊，放在圖表與 section tables 之後、完整 historical table 之前。
+
+### Safety Notes
+
+- Interpretation 不使用 OpenAI / ChatGPT / LLM，不產生 Buy / Sell / Hold、target price、score、rating 或 overall financial judgment。
+- Missing values 不補 `0`；少於 2 個有效年度不建立 trend conclusion。
+- 年度 gap 透過 `research_metrics.are_consecutive_years()` 判斷，不建立跨缺漏年度的 consecutive trend。
+- `FY2026` 只代表 `period_year` label，不描述為 calendar year 2026。
+
+### Documentation
+
+- 新增 `docs/HISTORICAL_INTERPRETATION_FRAMEWORK.md`。
+- 更新 `README.md`、`docs/ARCHITECTURE.md`、`docs/HISTORICAL_TREND_DASHBOARD.md`。
+
 ## 2026-08-02 — Sprint 03 Batch B Historical Chart X-axis Label Patch
 
 ### Completed Features

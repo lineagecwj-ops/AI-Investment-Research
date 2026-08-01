@@ -18,7 +18,8 @@ Current sections:
 4. Margins（利潤率趨勢）
 5. Cash Flow（現金流趨勢）
 6. Financial Position（財務結構）
-7. Historical Table（完整年度資料）
+7. Historical Interpretation（歷史趨勢解讀）
+8. Historical Table（完整年度資料）
 
 The page supports single-symbol research first. It stores the selected current stock snapshot, historical series, and query failures in `st.session_state` so normal reruns, expanders, and tab interaction do not immediately repeat Yahoo provider requests.
 
@@ -167,9 +168,52 @@ Margin charts keep the underlying decimal values, such as `0.2` and `0.4`, but r
 
 Monetary charts keep the raw numeric values and show compact y-axis units where supported, such as `B` / `T`. The axis title preserves currency context.
 
-## No Trend Classification Policy
+## Historical Interpretation
 
-This Batch only presents historical values, YoY values, visible period labels, and missing-data context.
+The page includes a centralized Historical Interpretation section after the chart and section-table views.
+
+Historical Interpretation is built by `src/historical_research_service.py`, not by `app.py` or `dashboard.py`.
+
+The page uses progressive disclosure:
+
+1. Historical Highlights（歷史重點）
+2. Detailed Interpretation（詳細趨勢解讀）
+3. Research Next Steps（下一步研究）
+
+Historical Highlights show about 4 to 6 factual summaries selected from existing deterministic observations. They answer only what happened and do not include Why it matters, What to check, score, ranking, or recommendation wording.
+
+Detailed Interpretation groups deterministic observations into collapsed category expanders:
+
+- Revenue
+- Earnings
+- Margins
+- Cash Flow
+- Financial Position
+- Cross Metric
+- Data Quality
+- Research Next Steps
+
+Each detailed observation keeps the full explainability structure:
+
+- Observation（觀察）
+- Why it matters（為什麼值得注意）
+- What to check（下一步查什麼）
+
+The category expanders are collapsed by default so the user is not immediately shown every observation card.
+
+Color semantics are explained above the detailed expanders:
+
+- Blue means general historical data observation.
+- Yellow means a research item worth checking further.
+- Yellow does not mean a negative signal or investment recommendation.
+
+Research Next Steps are grouped by category, deterministically deduplicated by normalized exact text, limited to 3 visible items per category, and limited to 10 visible items across the page by default. Overflow items remain available in a collapsed `查看更多研究項目` expander.
+
+The service may describe historical facts directly supported by annual data, such as Revenue declining and then recovering, Free Cash Flow turning negative, or Capital Expenditure spending scale increasing. It does not present possible reasons as facts.
+
+## No Recommendation Or Score Policy
+
+Historical Trends and Historical Interpretation do not produce deterministic company judgments.
 
 It does not automatically produce words such as:
 
@@ -198,6 +242,20 @@ It also does not produce Buy / Sell / Hold, target price, overall score, or reco
 - Chart-ready numeric rows
 - Compact chart period labels and exact Period End tooltip values
 - Period End / currency / EPS / YoY formatting
+
+`src/historical_research_service.py` owns Historical Interpretation helpers:
+
+- Historical data sufficiency checks
+- Consecutive-year interpretation safety
+- Revenue, Earnings, Margin, Cash Flow, Financial Position, Data Quality, and Cross Metric observations
+- Historical Research Next Steps
+- Beginner-friendly value formatting used inside observation text
+
+`src/historical_interpretation_presentation.py` owns Historical Interpretation UX helpers:
+
+- Historical Highlight selection from existing observations
+- Detailed Interpretation category ordering and grouping
+- Research Next Steps normalized exact deduplication, display limits, and overflow grouping
 
 `src/historical_financial_service.py` owns Yahoo annual statement retrieval, row aliases, margin calculation, FCF source / derivation, period normalization, and 7-day historical cache integration.
 

@@ -37,6 +37,12 @@ dashboard.py
 research_service.py
     └── Deterministic research interpretation and observations
 
+historical_research_service.py
+    └── Deterministic historical trend interpretation and research checklists
+
+historical_interpretation_presentation.py
+    └── Historical Interpretation highlights, grouping, and checklist presentation helpers
+
 research_glossary.py
     └── Beginner research term glossary for Research UI
 
@@ -115,6 +121,35 @@ Responsibilities:
 - Keep each observation split into `what_happened`, `why_it_matters`, and `what_to_check`
 - Reuse `research_metrics.calculate_52_week_position()` for 52-week position
 - Avoid AI, LLM, buy / sell / hold recommendations, target prices, overall scores, and rating systems
+
+---
+
+### historical_research_service.py
+
+Responsibilities:
+
+- Build a deterministic `HistoricalResearchReport` from `HistoricalFinancialSeries`
+- Keep historical interpretation rules outside `app.py`, `dashboard.py`, `database.py`, and `historical_financial_service.py`
+- Reuse `ResearchObservation` and `ResearchNextStep` explainability structures
+- Describe historical facts with `what_happened`, `why_it_matters`, and `what_to_check`
+- Check data sufficiency before trend wording
+- Reuse `research_metrics.py` consecutive-year semantics instead of creating separate YoY rules
+- Compare margin changes in percentage points
+- Compare Capital Expenditure spending scale with `abs(capital_expenditure)` because Yahoo commonly reports CapEx as negative cash outflow
+- Avoid AI, LLM, buy / sell / hold recommendations, target prices, overall scores, and rating systems
+
+---
+
+### historical_interpretation_presentation.py
+
+Responsibilities:
+
+- Build Historical Highlights from existing deterministic observations
+- Keep highlight selection, detailed category grouping, and next-step display cleanup outside `app.py`
+- Group Detailed Interpretation by fixed category order
+- Deduplicate next-step items by deterministic normalized exact text
+- Limit default next-step display while preserving overflow items for collapsed expanders
+- Avoid recalculating historical financial metrics or creating scoring / ranking semantics
 
 ---
 
@@ -488,6 +523,38 @@ Historical Trends keeps these presentation semantics:
 - Missing values display as `N/A`; missing EPS is not self-calculated.
 - Currency context is preserved and no FX conversion or cross-currency ranking is performed.
 - The page displays values and visible trends only; it does not classify a company or metric as improving, deteriorating, strong, weak, good, bad, healthy, or unhealthy.
+
+## Streamlit Historical Interpretation Flow
+
+```
+HistoricalFinancialSeries
+   │
+   ▼
+historical_research_service.py
+   │
+   ├── Revenue observations
+   ├── Earnings / EPS observations
+   ├── Margin percentage-point observations
+   ├── Cash Flow and CapEx spending-scale observations
+   ├── Financial Position observations
+   ├── Cross-metric observations
+   └── Historical Research Next Steps
+   │
+   ▼
+HistoricalResearchReport
+   │
+   ▼
+historical_interpretation_presentation.py
+   │
+   ├── Historical Highlights
+   ├── Detailed Interpretation groups
+   └── Display-ready Research Next Steps
+   │
+   ▼
+app.py Historical Trends tab
+```
+
+Historical Interpretation is deterministic. It may describe directly supported historical changes such as Revenue declining and later recovering, EPS missing for the latest period, or Capital Expenditure spending scale increasing. Possible business reasons are only rendered as research checklist items.
 
 # Future Modules
 
