@@ -71,6 +71,7 @@
 ### Known Limits
 
 - Cache visibility 目前只顯示「資料可能使用 24 小時內的本地快取」，尚未揭露每支股票的 cache hit / Yahoo fetch 與 `fetched_at`。
+- Taiwan stock localized company name source：`yfinance` 對 `2330.TW` 目前只提供英文 `longName` / `shortName`，未提供可靠繁體中文公司名稱欄位；後續若需要繁中公司名，應評估可靠且可維護的台股公司主檔來源。
 - Dashboard 目前沒有 chart、AI analysis、news、portfolio、technical indicator、recommendation engine。
 - 無效股票錯誤仍沿用 Batch A / B 的 service error 訊息，尚未細分 invalid symbol 類型。
 - Streamlit smoke test 尚未加入 automated tests；目前以 manual validation 搭配 helper tests 驗證。

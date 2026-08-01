@@ -9,6 +9,8 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from dashboard import build_comparison_rows
+from dashboard import indicator_help
+from dashboard import indicator_label
 from dashboard import query_stock_batch
 from dashboard import stock_display_data
 from symbol_utils import normalize_stock_symbol
@@ -56,33 +58,58 @@ def render_stock_cards(stocks) -> None:
 
             price_col, market_cap_col, roe_col = st.columns(3)
             price_col.metric(
-                "Current Price",
+                indicator_label("current_price"),
                 display_data["Current Price"],
-                help="Current price is shown in the stock's original currency.",
+                help=indicator_help("current_price"),
             )
-            market_cap_col.metric("Market Cap", display_data["Market Cap"])
-            roe_col.metric("ROE", display_data["ROE"])
+            market_cap_col.metric(
+                indicator_label("market_cap"),
+                display_data["Market Cap"],
+                help=indicator_help("market_cap"),
+            )
+            roe_col.metric(
+                indicator_label("return_on_equity"),
+                display_data["ROE"],
+                help=indicator_help("return_on_equity"),
+            )
 
             col1, col2, col3, col4 = st.columns(4)
-            col1.write("Currency")
-            col1.write(display_data["Currency"])
-            col2.write("Trailing PE")
-            col2.write(display_data["Trailing PE"])
-            col3.write("Forward PE")
-            col3.write(display_data["Forward PE"])
-            col4.write("EPS")
-            col4.write(display_data["EPS"])
+            col1.metric(indicator_label("currency"), display_data["Currency"])
+            col2.metric(
+                indicator_label("trailing_pe"),
+                display_data["Trailing PE"],
+                help=indicator_help("trailing_pe"),
+            )
+            col3.metric(
+                indicator_label("forward_pe"),
+                display_data["Forward PE"],
+                help=indicator_help("forward_pe"),
+            )
+            col4.metric(
+                indicator_label("trailing_eps"),
+                display_data["EPS"],
+                help=indicator_help("trailing_eps"),
+            )
 
             sector_col, industry_col = st.columns(2)
-            sector_col.write("Sector")
-            sector_col.write(display_data["Sector"])
-            industry_col.write("Industry")
-            industry_col.write(display_data["Industry"])
+            sector_col.metric(
+                indicator_label("sector"),
+                display_data["Sector"],
+                help=indicator_help("sector"),
+            )
+            industry_col.metric(
+                indicator_label("industry"),
+                display_data["Industry"],
+                help=indicator_help("industry"),
+            )
 
 
 def render_stock_search() -> None:
     st.header("Dashboard")
-    st.caption("股票搜尋 · Company / Price · Market Cap · PE / EPS / ROE · Sector / Industry")
+    st.caption(
+        "股票搜尋 · Company / Price（公司 / 股價） · Market Cap（市值） · "
+        "P/E / EPS / ROE（估值 / 盈餘 / 股東權益報酬率） · Sector / Industry（產業）"
+    )
 
     with st.form("stock_search_form"):
         input_text = st.text_input(
