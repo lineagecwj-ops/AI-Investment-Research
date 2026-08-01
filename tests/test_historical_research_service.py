@@ -149,6 +149,65 @@ class HistoricalResearchServiceTestCase(unittest.TestCase):
         self.assertIn("FY2024 回升 +22.41%", text)
         self.assertIn("FY2025 再增加 +12.32%", text)
 
+    def test_revenue_decline_then_two_year_recovery_requires_connected_chain(self):
+        report = build_historical_research_report(
+            self.series([
+                self.period(2022, revenue=100),
+                self.period(2023, revenue=80),
+                self.period(2025, revenue=100),
+                self.period(2026, revenue=120),
+                self.period(2027, revenue=140),
+            ])
+        )
+
+        text = self.combined_text(report)
+        self.assertNotIn("Revenue 前期下降後連續回升", text)
+        self.assertIn("Revenue 年度資料不連續", text)
+
+    def test_revenue_decline_then_two_year_recovery_rejects_disconnected_changes(self):
+        report = build_historical_research_report(
+            self.series([
+                self.period(2021, revenue=150),
+                self.period(2022, revenue=100),
+                self.period(2023, revenue=80),
+                self.period(2025, revenue=100),
+                self.period(2026, revenue=120),
+                self.period(2027, revenue=140),
+            ])
+        )
+
+        text = self.combined_text(report)
+        self.assertIn("Revenue 連續兩期增加", text)
+        self.assertNotIn("Revenue 前期下降後連續回升", text)
+
+    def test_revenue_decline_then_two_year_recovery_requires_relative_changes(self):
+        report = build_historical_research_report(
+            self.series([
+                self.period(2022, revenue=100),
+                self.period(2023, revenue=0),
+                self.period(2024, revenue=10),
+                self.period(2025, revenue=20),
+            ])
+        )
+
+        text = self.combined_text(report)
+        self.assertNotIn("Revenue 前期下降後連續回升", text)
+        self.assertNotIn("回升 N/A", text)
+
+    def test_revenue_decline_then_two_year_recovery_rejects_zero_denominator(self):
+        report = build_historical_research_report(
+            self.series([
+                self.period(2022, revenue=0),
+                self.period(2023, revenue=10),
+                self.period(2024, revenue=20),
+                self.period(2025, revenue=30),
+            ])
+        )
+
+        text = self.combined_text(report)
+        self.assertNotIn("Revenue 前期下降後連續回升", text)
+        self.assertNotIn("回升 N/A", text)
+
     def test_revenue_growth_then_decline(self):
         report = build_historical_research_report(
             self.series([

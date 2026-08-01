@@ -146,7 +146,9 @@ def build_revenue_observations(
             earlier = changes[-3]
             earlier_direction = change_direction(earlier.absolute_change)
             if (
-                earlier_direction == "down"
+                is_connected_change_chain([earlier, previous, latest])
+                and all_relative_changes_available([earlier, previous, latest])
+                and earlier_direction == "down"
                 and previous_direction == "up"
                 and latest_direction == "up"
             ):
@@ -1072,6 +1074,23 @@ def consecutive_period_changes(
         )
 
     return changes
+
+
+def is_connected_change_chain(changes: list[PeriodChange]) -> bool:
+    if len(changes) < 2:
+        return True
+
+    for previous_change, current_change in zip(changes, changes[1:]):
+        if previous_change.current_period.period_end != current_change.previous_period.period_end:
+            return False
+        if previous_change.current_period.period_year != current_change.previous_period.period_year:
+            return False
+
+    return True
+
+
+def all_relative_changes_available(changes: list[PeriodChange]) -> bool:
+    return all(change.relative_change is not None for change in changes)
 
 
 def same_period_change(
