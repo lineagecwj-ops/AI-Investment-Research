@@ -129,6 +129,16 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertEqual(format_chart_period_label(date(2026, 1, 31), 2026), "FY 2026")
         self.assertEqual(format_chart_period_label(date(2025, 9, 30), 2025), "FY 2025")
 
+    def test_historical_page_renders_interpretation_before_full_table(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn("from historical_research_service import build_historical_research_report", app_source)
+        self.assertIn("def render_historical_interpretation(series)", app_source)
+        self.assertLess(
+            app_source.index("render_historical_interpretation(series)"),
+            app_source.index('st.markdown("### Historical Table（完整年度資料）")'),
+        )
+
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
         self.assertEqual(format_sector("Financial Services"), "Financial Services（金融服務）")

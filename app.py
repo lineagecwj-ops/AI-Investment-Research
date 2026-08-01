@@ -32,6 +32,12 @@ from dashboard import stock_display_data
 from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
+from historical_interpretation_presentation import ATTENTION_COLOR_EXPLANATION
+from historical_interpretation_presentation import build_historical_highlights
+from historical_interpretation_presentation import build_next_step_display_groups
+from historical_interpretation_presentation import FY_PERIOD_CAPTION
+from historical_interpretation_presentation import group_detailed_interpretation
+from historical_research_service import build_historical_research_report
 from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
@@ -192,6 +198,41 @@ def render_next_steps(next_steps) -> None:
         st.write(f"**{step.category} · {step.title}**")
         for item in step.items:
             st.write(f"□ {item}")
+
+
+def render_historical_interpretation(series) -> None:
+    report = build_historical_research_report(series)
+    highlights = build_historical_highlights(report.observations)
+    detail_groups = group_detailed_interpretation(report.observations)
+    next_step_groups = build_next_step_display_groups(report.next_steps, per_category_limit=3)
+
+    st.markdown("### Historical Interpretation（歷史趨勢解讀）")
+    st.caption("固定規則整理 historical observations；這些是研究提示，不是評分、預測或投資建議。")
+    st.caption(FY_PERIOD_CAPTION)
+
+    st.markdown("#### Historical Highlights（歷史重點）")
+    if highlights:
+        for highlight in highlights:
+            st.write(f"**{highlight.category} · {highlight.title}**")
+            st.write(f"• {highlight.summary}")
+    else:
+        st.info("目前 historical observations 不足以形成重點摘要。")
+
+    st.markdown("#### Detailed Interpretation（詳細趨勢解讀）")
+    st.caption(ATTENTION_COLOR_EXPLANATION)
+    for group in detail_groups:
+        with st.expander(f"{group.category} · {len(group.observations)} observations", expanded=False):
+            render_observations(group.observations)
+
+    st.markdown("#### Research Next Steps（下一步研究）")
+    for group in next_step_groups:
+        st.write(f"**{group.category}**")
+        for item in group.visible_items:
+            st.write(f"□ {item}")
+        if group.overflow_items:
+            with st.expander("查看更多研究項目", expanded=False):
+                for item in group.overflow_items:
+                    st.write(f"□ {item}")
 
 
 def render_historical_chart(
@@ -589,6 +630,8 @@ def render_historical_trends() -> None:
     else:
         st.info("目前可取得的歷史資料不足，暫不顯示趨勢。")
     st.dataframe(display.financial_position_rows, width="stretch", hide_index=True)
+
+    render_historical_interpretation(series)
 
     st.markdown("### Historical Table（完整年度資料）")
     st.dataframe(display.historical_table_rows, width="stretch", hide_index=True)
