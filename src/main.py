@@ -34,10 +34,31 @@ def get_stock_symbols() -> list[str]:
 
 def display_stock(stock):
     print()
-    print("股票代號：", stock.symbol)
-    print("股票名稱：", stock.company_name)
-    print("目前價格：", stock.price)
-    print("貨幣：", stock.currency)
+    print("股票代號：", format_value(stock.symbol))
+    print("股票名稱：", format_value(stock.company_name))
+    print("目前價格：", format_value(stock.current_price))
+    print("貨幣：", format_value(stock.currency))
+    print("市值：", format_value(stock.market_cap))
+    print("Trailing PE：", format_value(stock.trailing_pe))
+    print("Forward PE：", format_value(stock.forward_pe))
+    print("EPS：", format_value(stock.trailing_eps))
+    print("ROE：", format_percentage(stock.return_on_equity))
+    print("Sector：", format_value(stock.sector))
+    print("Industry：", format_value(stock.industry))
+
+
+def format_value(value) -> str:
+    if value is None or value == "":
+        return "N/A"
+
+    return str(value)
+
+
+def format_percentage(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+
+    return f"{value * 100:.2f}%"
 
 
 def main():
