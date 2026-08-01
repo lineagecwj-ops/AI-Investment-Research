@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.8
+v0.9
 
 ---
 
@@ -42,6 +42,9 @@ historical_research_service.py
 
 historical_interpretation_presentation.py
     └── Historical Interpretation highlights, grouping, and checklist presentation helpers
+
+research_context.py
+    └── Structured Research Context builder for AI / export / report inputs
 
 research_glossary.py
     └── Beginner research term glossary for Research UI
@@ -107,6 +110,34 @@ Responsibilities:
 - Provide reusable display formatters for percentage, ratio, price, currency-aware large numbers, and N/A
 - Build Historical Trends overview, section rows, chart rows, complete historical table rows, missing-data notes, and cache status text from `HistoricalFinancialSeries`
 - Reuse `research_metrics.py` historical YoY helpers instead of recalculating YoY in `app.py`
+
+---
+
+### research_context.py
+
+Responsibilities:
+
+- Build a structured `ResearchContext` from already-normalized application/domain models.
+- Purely assemble current `Stock`, deterministic `ResearchReport`, optional `HistoricalFinancialSeries`, and optional `HistoricalResearchReport`.
+- Preserve current snapshot fields as raw numeric/text values, not UI-formatted strings.
+- Group current snapshot data into Company, Market, Profitability, Growth, Financial Health, and Valuation contexts.
+- Preserve historical period values, `period_end`, `period_year`, currency, `fetched_at`, and stale-cache status when historical series is supplied.
+- Build per-metric source and derived `EvidenceItem` records with deterministic IDs and lineage.
+- Link observations to supporting evidence or missing-data records through `ObservationEvidenceLink`.
+- Keep explicit structured `missing_data` and `limitations` for current and historical inputs.
+- Validate symbol consistency, evidence lineage, duplicate IDs, period consistency, and non-finite numeric values.
+- Provide JSON-safe `ResearchContext.to_dict()` serialization.
+- Provide the future shared input layer for AI Research Assistant, summary, export, and report generation.
+
+Non-responsibilities:
+
+- Building `ResearchReport` or `HistoricalResearchReport`
+- Company-name cache lookup
+- Yahoo Finance fetch
+- SQLite SQL or persistence
+- Streamlit widgets or display formatting
+- AI / LLM generation
+- Scoring, recommendation, target price, or ranking
 
 ---
 
@@ -555,6 +586,41 @@ app.py Historical Trends tab
 ```
 
 Historical Interpretation is deterministic. It may describe directly supported historical changes such as Revenue declining and later recovering, EPS missing for the latest period, or Capital Expenditure spending scale increasing. Possible business reasons are only rendered as research checklist items.
+
+## Research Context Flow
+
+```
+Stock
+   │
+   ├── research_service.py
+   │      └── ResearchReport
+   │
+   ├── HistoricalFinancialSeries
+   │      └── historical_research_service.py
+   │             └── HistoricalResearchReport
+   │
+   ▼
+research_context.py
+   │
+   ├── CurrentSnapshotContext
+   ├── FundamentalResearchContext
+   ├── HistoricalFinancialsContext
+   ├── HistoricalResearchContext
+   ├── EvidenceItem
+   ├── ObservationEvidenceLink
+   ├── ResearchLimitation
+   └── MissingDataItem
+   │
+   ▼
+ResearchContext
+   │
+   ├── Future AI Research Assistant input
+   ├── Future Research Summary input
+   ├── Future Export input
+   └── Future Report generation input
+```
+
+Research Context is the application/domain integration boundary for future AI and report workflows. It consumes validated and normalized models only. It does not read Yahoo raw dictionaries, SQLite rows, Streamlit widget state, or UI-formatted strings. Detailed contract: `docs/RESEARCH_CONTEXT.md`.
 
 # Future Modules
 

@@ -1,5 +1,34 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 04 Batch A Research Context Foundation
+
+### Completed Features
+
+- 新增 `src/research_context.py`，建立未來 AI Research Assistant、Research Summary、Export、Report generation 共用的 `ResearchContext`。
+- Research Context 從已標準化的 `Stock`、`ResearchReport`、`HistoricalFinancialSeries`、`HistoricalResearchReport` 組裝，不直接讀 Yahoo raw dictionary、SQLite row 或 Streamlit widget state。
+- Current Snapshot 拆成 Company、Market、Profitability、Growth、Financial Health、Valuation，保留 raw numeric / text values，不使用 UI formatted string 作為 source-of-truth。
+- Historical Context 保留 periods、`period_end`、`period_year`、currency、`fetched_at` 與 stale-cache 狀態。
+- `EvidenceItem` 改為 per-metric evidence，使用 deterministic IDs，例如 `current:return_on_equity`、`historical:revenue:2025-12-31`、`derived:revenue_yoy:2025-12-31`。
+- Derived evidence 保留 `derived_from` lineage，52-week position 連回 current price / 52-week low / 52-week high；Revenue YoY / EPS YoY 連回相鄰 fiscal-period raw evidence。
+- 新增 `ObservationEvidenceLink`，不修改既有 `ResearchObservation` dataclass，但在 context 中建立 observation → evidence / missing-data 的外部 traceability mapping。
+- `MissingDataItem` 擴充為 structured model，包含 deterministic ID、metric、period、reason、impact 與 source。
+- `ResearchLimitation` 擴充為 structured model，分 global limitations 與 context-specific limitations。
+- `ResearchContext.to_dict()` 提供 JSON-safe serialization，date / datetime 轉 ISO、tuple 轉 list、`None` 保留。
+- Core builder 改為 pure assembler：必須由 caller 傳入 `ResearchReport`，不自行呼叫 research builders、不做 company-name cache lookup、不做 IO。
+
+### Safety Notes
+
+- 本 Batch 未修改 Yahoo fetch、SQLite schema、database cache TTL、Streamlit UI、dashboard formatters、deterministic research rules 或 historical interpretation rules。
+- Context builder 不使用 AI / LLM，不產生 Buy / Sell / Hold、target price、score、rating 或 recommendation。
+- Missing historical series 會明確進入 `missing_data` 與 `limitations`，不假裝 historical context 已完成。
+- Symbol mismatch 會 raise `ResearchContextError`；current / historical currency mismatch 不 raise，但會建立 context limitation。
+- Context validation 會阻止 NaN / inf、duplicate evidence IDs、broken derived lineage、broken observation links 與 period year mismatch。
+
+### Testing Notes
+
+- `tests/test_research_context.py` 擴充至 28 tests，覆蓋 pure builder、partial/no-history context、symbol mismatch、currency mismatch、per-metric source evidence、derived evidence、missing-data semantics、observation traceability、serialization、non-finite rejection 與 determinism。
+- 新增 `docs/RESEARCH_CONTEXT.md`，記錄 context contract、evidence ID convention、derived lineage、missing data、limitations、serialization 與 validation。
+
 ## 2026-08-02 — Sprint 03 Batch C Historical Interpretation UX Polish
 
 ### Completed Features
