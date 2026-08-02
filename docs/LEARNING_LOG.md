@@ -1,5 +1,36 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 04 Batch B AI-Ready Context Selection
+
+### Completed Features
+
+- 新增 `src/research_context_selector.py`，建立 deterministic AI-ready context selection layer。
+- Selector 從既有 `ResearchContext` 選出 `SelectedResearchContext`，不複製完整 context，不查 Yahoo、不讀 SQLite、不碰 UI。
+- 新增 `ResearchQuestionType` enum，支援 company overview、profitability、growth、financial health、valuation、market position、五種 historical-specific question、risks and attention、research next steps、general research。
+- 新增 `ResearchSelectionRequest`，包含 explicit question type、optional `max_evidence`、以及 observation / missing-data / limitation include flags。
+- 集中管理 metric groups 與 question-type policy，避免 selector logic 把 metric 名稱散落在大量 ad hoc branches。
+- 建立 historical window policy：historical-specific 保留所有可用年度；current-focused question 保留最新 3 個 relevant historical periods；market position 不帶 historical fundamentals；general research 在 metric scope 內保留完整年度。
+- Derived evidence selection 會透過 recursive lineage closure 自動包含 `derived_from` source evidence，並偵測 circular lineage。
+- Evidence budget 以 atomic lineage group 套用，避免 budget 把 derived evidence 與 source lineage 拆開。
+- Observation selection 改為依 question type、metric relevance、evidence links 與 missing-data links 選取，不再全量帶入 observations。
+- `ObservationEvidenceLink.id` 改為 stable semantic ID，不再依賴 list index；`observation_index` 只保留作為 source observation lookup pointer。
+- Missing-data selection 根據 metric / period / linked observation relevance 選取，並在 selected context 內 deterministic denoise，例如 source EPS missing 可取代同期間 EPS YoY missing。
+- Limitation selection 依 question type 過濾；market position 不帶 annual-only / no-quarterly historical limitation，historical-specific questions 會保留 historical data scope limitations。
+- `SelectedResearchContext.to_dict()` 保持 JSON-safe，`ResearchQuestionType` 序列化為 stable string。
+
+### Safety Notes
+
+- 本 Batch 未新增 OpenAI API、ChatGPT API、LLM、prompt template、embedding、vector DB、semantic search、natural-language classifier、AI summary 或 AI recommendation。
+- 本 Batch 未修改 Yahoo fetch、SQLite schema、cache TTL、Streamlit UI、dashboard presentation、historical normalization 或 deterministic interpretation rules。
+- Selector 不產生 Buy / Sell / Hold、target price、score、rating 或 recommendation。
+- Source `ResearchContext.evidence`、`missing_data`、`limitations` 不被 selector mutate。
+
+### Testing Notes
+
+- 新增 `tests/test_research_context_selector.py`，覆蓋 question type stable values、invalid request、Growth、Valuation、Market Position、historical-specific periods、lineage closure、circular lineage、stable observation ID、missing-data denoise、limitation selection、evidence budget、general research subset、serialization、validation 與 no recommendation language。
+- 更新 `tests/test_research_context.py` 相關 expectation，確認 observation links 在 `generated_at` 改變時仍 deterministic。
+- 新增 `docs/RESEARCH_CONTEXT_SELECTION.md`，記錄 selection boundary、policy、validation 與未來 routing / prompt boundary。
+
 ## 2026-08-02 — Sprint 04 Batch A Research Context Foundation
 
 ### Completed Features

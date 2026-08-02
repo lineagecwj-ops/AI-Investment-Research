@@ -46,6 +46,9 @@ historical_interpretation_presentation.py
 research_context.py
     └── Structured Research Context builder for AI / export / report inputs
 
+research_context_selector.py
+    └── Deterministic AI-ready Research Context subset selector by explicit question type
+
 research_glossary.py
     └── Beginner research term glossary for Research UI
 
@@ -138,6 +141,36 @@ Non-responsibilities:
 - Streamlit widgets or display formatting
 - AI / LLM generation
 - Scoring, recommendation, target price, or ranking
+
+---
+
+### research_context_selector.py
+
+Responsibilities:
+
+- Select a deterministic AI-ready subset from an existing `ResearchContext`.
+- Accept only explicit `ResearchQuestionType` enum values; do not classify natural-language questions.
+- Apply centralized question-type to metric policies for company overview, profitability, growth, financial health, valuation, market position, historical-specific research, risks and attention, next steps, and general research.
+- Apply historical window policy: all available annual periods for historical-specific questions, latest 3 periods for current-focused questions, metric-scoped full periods for general research, and no historical fundamentals for market position.
+- Close derived evidence lineage recursively so selected derived evidence is never isolated from source evidence.
+- Preserve observation traceability through `ObservationEvidenceLink` while selecting only relevant observation links.
+- Keep stable observation link IDs independent from list ordering.
+- Select and denoise relevant missing-data records without mutating the source `ResearchContext`.
+- Select relevant limitations by question type.
+- Apply optional `max_evidence` budget through atomic lineage groups.
+- Provide JSON-safe `SelectedResearchContext.to_dict()` serialization and selector-specific validation.
+
+Non-responsibilities:
+
+- Yahoo Finance fetch
+- SQLite persistence or schema changes
+- Building `ResearchContext`, `ResearchReport`, or `HistoricalResearchReport`
+- Streamlit rendering
+- Natural-language routing
+- Prompt generation
+- OpenAI / ChatGPT / LLM calls
+- Embeddings, vector database, or semantic search
+- Buy / Sell / Hold recommendations, target prices, scores, ratings, or rankings
 
 ---
 

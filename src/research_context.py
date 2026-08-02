@@ -4,6 +4,7 @@ from dataclasses import is_dataclass
 from datetime import UTC
 from datetime import date
 from datetime import datetime
+import hashlib
 import math
 from numbers import Real
 from typing import Any
@@ -1098,7 +1099,7 @@ def build_current_observation_link(
         return None
 
     return ObservationEvidenceLink(
-        id=f"current:{index}:{observation.metric}",
+        id=stable_observation_link_id("current", observation),
         observation_scope="current",
         observation_index=index,
         category=observation.category,
@@ -1143,7 +1144,7 @@ def build_historical_observation_link(
         return None
 
     return ObservationEvidenceLink(
-        id=f"historical:{index}:{observation.metric}",
+        id=stable_observation_link_id("historical", observation),
         observation_scope="historical",
         observation_index=index,
         category=observation.category,
@@ -1151,6 +1152,34 @@ def build_historical_observation_link(
         evidence_ids=linked_evidence_ids,
         missing_data_ids=missing_data_ids,
     )
+
+
+def stable_observation_link_id(scope: str, observation: ResearchObservation) -> str:
+    category_key = stable_slug(observation.category)
+    title_key = stable_slug(observation.title)
+    metric_key = stable_slug(observation.metric)
+    semantic_key = "|".join([
+        observation.category,
+        observation.metric,
+        observation.title,
+        observation.what_happened,
+        observation.why_it_matters,
+    ])
+    semantic_digest = hashlib.sha1(semantic_key.encode("utf-8")).hexdigest()[:10]
+    return f"{scope}:{category_key}:{metric_key}:{title_key}:{semantic_digest}"
+
+
+def stable_slug(value: str) -> str:
+    normalized = []
+    previous_was_separator = False
+    for character in value.lower():
+        if character.isascii() and character.isalnum():
+            normalized.append(character)
+            previous_was_separator = False
+        elif not previous_was_separator:
+            normalized.append("_")
+            previous_was_separator = True
+    return "".join(normalized).strip("_") or "unknown"
 
 
 def current_evidence_id(metric: str) -> str:
