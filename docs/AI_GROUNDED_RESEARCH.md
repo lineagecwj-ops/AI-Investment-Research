@@ -21,7 +21,7 @@ The AI service accepts only `SelectedResearchContext`. It does not accept full `
 ## Files
 
 - `src/ai_config.py`
-  - central model, timeout, output-token, and question-length defaults
+  - central model, reasoning, verbosity, timeout, output-token, and question-length defaults
   - reads optional `OPENAI_MODEL`
 - `src/ai_research_service.py`
   - OpenAI Responses API client boundary
@@ -82,8 +82,18 @@ Installed SDK introspection confirmed `OpenAI(api_key=..., timeout=...)` and `cl
 Structured output is requested with:
 
 ```python
-text={"format": {"type": "json_schema", "strict": True, ...}}
+text={
+    "verbosity": "low",
+    "format": {"type": "json_schema", "strict": True, ...},
+}
 ```
+
+Installed SDK introspection also confirmed:
+
+- `responses.create(..., reasoning={"effort": "minimal"})` is supported by the local SDK call shape.
+- `gpt-5` and o-series reasoning config supports effort values including `minimal`.
+- `text.verbosity` supports `low`, `medium`, and `high`.
+- `ResponseUsage.output_tokens_details.reasoning_tokens` is available for reasoning-token diagnostics.
 
 The request explicitly sets `store=False` because this Batch is stateless and does not persist AI answers or conversations.
 
@@ -153,6 +163,8 @@ Metadata is built by the service, not by the model:
 - generated timestamp
 - selected question type
 - optional usage data
+- optional reasoning tokens
+- optional cached input tokens
 
 ## Output Length Policy
 
@@ -165,6 +177,24 @@ The strict schema still requires evidence-backed structured output, but develope
 - next steps: up to 3 concise research tasks
 
 This keeps the first live provider path less likely to exhaust `max_output_tokens` while preserving evidence citations and grounding requirements.
+
+The request also instructs the model to return only the required structured answer and avoid unnecessary explanation outside the schema.
+
+## Reasoning Budget Policy
+
+Live smoke validation showed that simply raising `max_output_tokens` was not enough:
+
+- Attempt 1: `max_output_tokens = 1200`, `status = incomplete`, `reason = max_output_tokens`, `output_tokens = 1152`
+- Attempt 2: `max_output_tokens = 2400`, `status = incomplete`, `reason = max_output_tokens`, `output_tokens = 2400`
+
+Grounded Research now uses:
+
+```text
+reasoning.effort = minimal
+text.verbosity = low
+```
+
+This workload is a constrained synthesis task: question type is deterministic, selected context is deterministic, evidence is normalized, observations are deterministic, strict structured output constrains the response shape, and deterministic post-validation still checks grounding and numeric claims. For that reason, the default should minimize unnecessary reasoning and verbosity before increasing the output-token ceiling again.
 
 ## Grounding Validation
 
@@ -218,6 +248,8 @@ Responses API can return `status == "incomplete"` before a strict structured out
 - response ID, if returned
 - `incomplete_details.reason`, if returned
 - input tokens, output tokens, and total tokens, if returned
+- reasoning tokens, if returned
+- cached input tokens, if returned
 
 The error message never includes the API key, full prompt payload, raw response JSON, headers, or partial output text.
 

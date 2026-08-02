@@ -18,6 +18,8 @@ if str(SRC_PATH) not in sys.path:
 
 from ai_config import DEFAULT_OPENAI_MODEL
 from ai_config import DEFAULT_MAX_OUTPUT_TOKENS
+from ai_config import DEFAULT_REASONING_EFFORT
+from ai_config import DEFAULT_TEXT_VERBOSITY
 from ai_config import get_ai_research_config
 from ai_research_service import AIConfigurationError
 from ai_research_service import AIIncompleteResponseError
@@ -57,7 +59,13 @@ class FakeAIClient:
             id="resp_test_123",
             status="completed",
             output_text=json.dumps(self.output, ensure_ascii=False),
-            usage={"input_tokens": 100, "output_tokens": 80},
+            usage={
+                "input_tokens": 100,
+                "input_tokens_details": {"cached_tokens": 40},
+                "output_tokens": 80,
+                "output_tokens_details": {"reasoning_tokens": 12},
+                "total_tokens": 180,
+            },
         )
 
 
@@ -223,10 +231,15 @@ class AIResearchServiceTestCase(unittest.TestCase):
 
     def test_config_uses_openai_model_override_or_default(self):
         self.assertEqual(DEFAULT_MAX_OUTPUT_TOKENS, 2400)
+        self.assertEqual(DEFAULT_REASONING_EFFORT, "minimal")
+        self.assertEqual(DEFAULT_TEXT_VERBOSITY, "low")
 
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(get_ai_research_config().model, DEFAULT_OPENAI_MODEL)
-            self.assertEqual(get_ai_research_config().max_output_tokens, DEFAULT_MAX_OUTPUT_TOKENS)
+            config = get_ai_research_config()
+            self.assertEqual(config.model, DEFAULT_OPENAI_MODEL)
+            self.assertEqual(config.max_output_tokens, DEFAULT_MAX_OUTPUT_TOKENS)
+            self.assertEqual(config.reasoning_effort, DEFAULT_REASONING_EFFORT)
+            self.assertEqual(config.text_verbosity, DEFAULT_TEXT_VERBOSITY)
 
         with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-test-model"}, clear=True):
             self.assertEqual(get_ai_research_config().model, "gpt-test-model")
@@ -264,11 +277,38 @@ class AIResearchServiceTestCase(unittest.TestCase):
 
         self.assertEqual(answer.metadata.response_id, "resp_test_123")
         self.assertEqual(answer.metadata.model, DEFAULT_OPENAI_MODEL)
+        self.assertEqual(answer.metadata.reasoning_tokens, 12)
+        self.assertEqual(answer.metadata.cached_input_tokens, 40)
         self.assertEqual(answer.findings[0].evidence_ids, ["current:revenue_growth"])
         self.assertEqual(client.calls[0]["max_output_tokens"], 2400)
+        self.assertEqual(client.calls[0]["reasoning_effort"], "minimal")
+        self.assertEqual(client.calls[0]["text_verbosity"], "low")
         self.assertEqual(client.calls[0]["response_format"]["type"], "json_schema")
         self.assertTrue(client.calls[0]["response_format"]["strict"])
         self.assertNotIn("tools", client.calls[0])
+
+    def test_completed_metadata_reasoning_tokens_unavailable_returns_none(self):
+        class ClientWithoutUsageDetails(FakeAIClient):
+            def create_grounded_answer(self, **kwargs):
+                self.calls.append(kwargs)
+                return SimpleNamespace(
+                    id="resp_test_no_details",
+                    status="completed",
+                    output_text=json.dumps(self.output, ensure_ascii=False),
+                    usage={"input_tokens": 100, "output_tokens": 80, "total_tokens": 180},
+                )
+
+        client = ClientWithoutUsageDetails(self.valid_output())
+
+        answer = generate_grounded_research_answer(
+            question="近年營收成長如何？",
+            selected_context=self.selected_context(),
+            client=client,
+            generated_at=GENERATED_AT,
+        )
+
+        self.assertIsNone(answer.metadata.reasoning_tokens)
+        self.assertIsNone(answer.metadata.cached_input_tokens)
 
     def test_openai_client_boundary_passes_store_false_and_no_tools(self):
         response = SimpleNamespace(
@@ -284,6 +324,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
             instructions="instructions",
             payload={"question": "x"},
             max_output_tokens=10,
+            reasoning_effort="minimal",
+            text_verbosity="low",
             response_format={"type": "json_schema"},
         )
 
@@ -291,6 +333,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertFalse(call["store"])
         self.assertNotIn("tools", call)
         self.assertEqual(call["text"]["format"]["type"], "json_schema")
+        self.assertEqual(call["text"]["verbosity"], "low")
+        self.assertEqual(call["reasoning"], {"effort": "minimal"})
         self.assertEqual(call["max_output_tokens"], 10)
 
     def test_request_guards_reject_invalid_questions_before_provider_call(self):
@@ -382,7 +426,13 @@ class AIResearchServiceTestCase(unittest.TestCase):
             id="resp_incomplete_123",
             status="incomplete",
             incomplete_details=SimpleNamespace(reason="max_output_tokens"),
-            usage=SimpleNamespace(input_tokens=1500, output_tokens=1200, total_tokens=2700),
+            usage=SimpleNamespace(
+                input_tokens=1500,
+                input_tokens_details=SimpleNamespace(cached_tokens=300),
+                output_tokens=1200,
+                output_tokens_details=SimpleNamespace(reasoning_tokens=900),
+                total_tokens=2700,
+            ),
             output=[SimpleNamespace(content=[SimpleNamespace(type="output_text", text="{")])],
         )
 
@@ -395,6 +445,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertEqual(error.input_tokens, 1500)
         self.assertEqual(error.output_tokens, 1200)
         self.assertEqual(error.total_tokens, 2700)
+        self.assertEqual(error.reasoning_tokens, 900)
+        self.assertEqual(error.cached_input_tokens, 300)
         self.assertIn("output token budget exhausted", str(error))
         self.assertNotIn("{", str(error))
         self.assertNotIn("sk-", str(error))
@@ -404,7 +456,13 @@ class AIResearchServiceTestCase(unittest.TestCase):
             "id": "resp_filtered_123",
             "status": "incomplete",
             "incomplete_details": {"reason": "content_filter"},
-            "usage": {"input_tokens": 20, "output_tokens": 0, "total_tokens": 20},
+            "usage": {
+                "input_tokens": 20,
+                "input_tokens_details": {"cached_tokens": 5},
+                "output_tokens": 0,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 20,
+            },
         }
 
         with self.assertRaises(AIIncompleteResponseError) as raised:
@@ -416,6 +474,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertEqual(error.input_tokens, 20)
         self.assertEqual(error.output_tokens, 0)
         self.assertEqual(error.total_tokens, 20)
+        self.assertEqual(error.reasoning_tokens, 0)
+        self.assertEqual(error.cached_input_tokens, 5)
         self.assertIn("provider safety interruption", str(error))
         self.assertNotIn("token budget", str(error))
 
@@ -434,6 +494,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertIsNone(error.response_id)
         self.assertIsNone(error.reason)
         self.assertIsNone(error.input_tokens)
+        self.assertIsNone(error.reasoning_tokens)
+        self.assertIsNone(error.cached_input_tokens)
         self.assertEqual(str(error), "OpenAI response incomplete.")
 
     def test_incomplete_error_string_does_not_leak_payload_or_secret(self):
@@ -732,6 +794,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
                 instructions="instructions",
                 payload={"question": "x"},
                 max_output_tokens=10,
+                reasoning_effort="minimal",
+                text_verbosity="low",
                 response_format={"type": "json_schema"},
             )
 

@@ -42,12 +42,16 @@ class AIIncompleteResponseError(AIStructuredOutputError):
         input_tokens: int | None,
         output_tokens: int | None,
         total_tokens: int | None,
+        reasoning_tokens: int | None,
+        cached_input_tokens: int | None,
     ) -> None:
         self.response_id = response_id
         self.reason = reason
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.total_tokens = total_tokens
+        self.reasoning_tokens = reasoning_tokens
+        self.cached_input_tokens = cached_input_tokens
         super().__init__(build_incomplete_response_message(reason))
 
 
@@ -71,6 +75,8 @@ class AIResponseMetadata:
     response_id: str | None
     generated_at: datetime
     question_type: str
+    reasoning_tokens: int | None = None
+    cached_input_tokens: int | None = None
     usage: dict[str, Any] | None = None
 
 
@@ -163,6 +169,7 @@ Rules:
 9. Answer in Traditional Chinese while preserving important English financial terminology.
 10. Research next steps must be research tasks, not investment actions.
 11. Keep the structured answer concise: summary 2-4 short sentences; findings 3-5 concise items; limitations, missing_information, and next_steps up to 3 concise items each.
+12. Return only the required structured answer. Do not include unnecessary explanation outside the schema.
 """.strip()
 
 
@@ -214,6 +221,8 @@ class OpenAIResearchClient:
         instructions: str,
         payload: dict[str, Any],
         max_output_tokens: int,
+        reasoning_effort: str,
+        text_verbosity: str,
         response_format: dict[str, Any],
     ) -> Any:
         try:
@@ -226,7 +235,8 @@ class OpenAIResearchClient:
                         "content": json.dumps(payload, ensure_ascii=False),
                     },
                 ],
-                text={"format": response_format},
+                text={"verbosity": text_verbosity, "format": response_format},
+                reasoning={"effort": reasoning_effort},
                 max_output_tokens=max_output_tokens,
                 store=False,
             )
@@ -255,15 +265,20 @@ def generate_grounded_research_answer(
         instructions=DEVELOPER_INSTRUCTIONS,
         payload=payload,
         max_output_tokens=resolved_config.max_output_tokens,
+        reasoning_effort=resolved_config.reasoning_effort,
+        text_verbosity=resolved_config.text_verbosity,
         response_format=STRUCTURED_OUTPUT_FORMAT,
     )
 
     answer_data = parse_structured_response(response)
+    usage = extract_token_usage(response)
     metadata = AIResponseMetadata(
         model=resolved_config.model,
         response_id=getattr(response, "id", None),
         generated_at=generated_at or datetime.now(UTC),
         question_type=selected_context.question_type.value,
+        reasoning_tokens=usage.get("reasoning_tokens"),
+        cached_input_tokens=usage.get("cached_input_tokens"),
         usage=json_safe_value(getattr(response, "usage", None)) if getattr(response, "usage", None) is not None else None,
     )
     answer = build_grounded_answer(answer_data, metadata)
@@ -398,6 +413,8 @@ def build_incomplete_response_error(response: Any) -> AIIncompleteResponseError:
         input_tokens=usage.get("input_tokens"),
         output_tokens=usage.get("output_tokens"),
         total_tokens=usage.get("total_tokens"),
+        reasoning_tokens=usage.get("reasoning_tokens"),
+        cached_input_tokens=usage.get("cached_input_tokens"),
     )
 
 
@@ -443,6 +460,16 @@ def extract_token_usage(response: Any) -> dict[str, int | None]:
         "input_tokens": optional_int_attribute(usage, "input_tokens"),
         "output_tokens": optional_int_attribute(usage, "output_tokens"),
         "total_tokens": optional_int_attribute(usage, "total_tokens"),
+        "reasoning_tokens": optional_nested_int_attribute(
+            usage,
+            "output_tokens_details",
+            "reasoning_tokens",
+        ),
+        "cached_input_tokens": optional_nested_int_attribute(
+            usage,
+            "input_tokens_details",
+            "cached_tokens",
+        ),
     }
 
 
@@ -456,6 +483,16 @@ def optional_int_attribute(source: Any, name: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
+
+
+def optional_nested_int_attribute(source: Any, parent_name: str, child_name: str) -> int | None:
+    if source is None:
+        return None
+
+    parent = getattr(source, parent_name, None)
+    if parent is None and isinstance(source, dict):
+        parent = source.get(parent_name)
+    return optional_int_attribute(parent, child_name)
 
 
 def extract_refusal_from_response(response: Any) -> str | None:

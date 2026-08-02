@@ -1,5 +1,35 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch A Reasoning Budget Optimization Patch
+
+### Completed Features
+
+- 新增 `DEFAULT_REASONING_EFFORT = "minimal"` 與 `DEFAULT_TEXT_VERBOSITY = "low"`，集中於 `src/ai_config.py`。
+- Production Responses API request 會傳入 `reasoning={"effort": "minimal"}`，並保留 strict structured output：`text={"verbosity": "low", "format": ...}`。
+- 保留 `DEFAULT_MAX_OUTPUT_TOKENS = 2400`，不再單純提高 output-token ceiling。
+- Developer instructions 保留 concise contract，並補充只回傳 required structured answer、不要在 schema 外加入不必要說明。
+- `AIIncompleteResponseError` 新增安全 diagnostics：`reasoning_tokens` 與 `cached_input_tokens`。
+- `AIResponseMetadata` 新增 `reasoning_tokens` 與 `cached_input_tokens`，讓 completed response 也可比較 reasoning effort 與 visible answer token 行為。
+
+### Rationale
+
+- Live smoke attempt 1：`max_output_tokens = 1200`、`status = incomplete`、`reason = max_output_tokens`、`output_tokens = 1152`。
+- Live smoke attempt 2：`max_output_tokens = 2400`、`status = incomplete`、`reason = max_output_tokens`、`output_tokens = 2400`。
+- 因此策略不是繼續無限制提高 token cap，而是先降低 reasoning / verbosity token 使用。
+- Grounded Research 是 constrained synthesis：question type 已 deterministic、context selection 已 deterministic、evidence 已 normalized、observations 已 deterministic、output 使用 strict schema，且後續仍有 deterministic grounding / numeric / forbidden-output validation。
+
+### SDK Audit
+
+- Installed `openai 2.52.0` 的 `responses.create()` signature 支援 `reasoning` argument。
+- SDK type definitions 顯示 reasoning effort 支援 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`，且 `Reasoning` 標註適用於 `gpt-5` 與 o-series models。
+- SDK type definitions 顯示 `text.verbosity` 支援 `low`、`medium`、`high`。
+- SDK `ResponseUsage.output_tokens_details.reasoning_tokens` 與 `input_tokens_details.cached_tokens` 可作為安全 token diagnostics。
+
+### Safety Notes
+
+- 本 patch 未修改 `ResearchContext`、selector、Structured Output schema、grounding validation、numeric validation、forbidden-output validation、citation policy、OpenAI model、UI 或 SQLite。
+- 本 patch 沒有執行新的 live OpenAI request，也沒有 push。
+
 ## 2026-08-02 — Sprint 05 Batch A Output Token Budget Fix
 
 ### Completed Features
