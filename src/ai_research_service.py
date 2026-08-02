@@ -64,6 +64,43 @@ class AIGroundingError(AIResearchError):
 
 
 @dataclass(frozen=True)
+class PercentageClaim:
+    text: str
+    value: float
+    normalized_value: float
+    has_explicit_sign: bool
+    direction: str | None
+
+
+@dataclass(frozen=True)
+class PercentageEvidenceCandidate:
+    evidence_id: str
+    metric: str
+    raw_value: int | float
+    normalized_percentage: float
+
+
+class AINumericGroundingError(AIGroundingError):
+    """Raised when numeric claims are unsupported by cited evidence."""
+
+    def __init__(
+        self,
+        *,
+        statement: str,
+        claims: list[PercentageClaim],
+        cited_evidence_ids: list[str],
+        candidates: list[PercentageEvidenceCandidate],
+        reason: str,
+    ) -> None:
+        self.statement = statement
+        self.claims = claims
+        self.cited_evidence_ids = cited_evidence_ids
+        self.candidates = candidates
+        self.reason = reason
+        super().__init__(build_numeric_grounding_message(reason, claims, candidates))
+
+
+@dataclass(frozen=True)
 class GroundedFinding:
     statement: str
     evidence_ids: list[str]
@@ -170,6 +207,8 @@ Rules:
 10. Research next steps must be research tasks, not investment actions.
 11. Keep the structured answer concise: summary 2-4 short sentences; findings 3-5 concise items; limitations, missing_information, and next_steps up to 3 concise items each.
 12. Return only the required structured answer. Do not include unnecessary explanation outside the schema.
+13. When stating a percentage, use the numeric value from the cited evidence exactly or with normal rounding.
+14. Do not calculate a new percentage unless a provided derived evidence item already contains that percentage.
 """.strip()
 
 
@@ -194,6 +233,29 @@ FORBIDDEN_PATTERNS = [
     r"投資評級",
     r"評分",
 ]
+
+
+PERCENTAGE_CLAIM_PATTERN = re.compile(r"(?<!\d)([-+]?\d+(?:\.\d+)?)\s*%")
+PERCENTAGE_TOLERANCE_POINTS = 0.2
+PERCENTAGE_CAPABLE_METRICS = {
+    "return_on_equity",
+    "gross_margin",
+    "operating_margin",
+    "net_margin",
+    "revenue_growth",
+    "earnings_growth",
+    "debt_to_equity",
+    "fifty_two_week_position",
+    "revenue_yoy",
+    "eps_yoy",
+}
+RAW_PERCENTAGE_SCALE_METRICS = {
+    "debt_to_equity",
+}
+NEGATIVE_DIRECTION_PATTERN = re.compile(
+    r"(下降|減少|下滑|衰退|declin(?:e|ed|ing)|decreas(?:e|ed|ing)|down)",
+    flags=re.IGNORECASE,
+)
 
 
 class OpenAIResearchClient:
@@ -622,22 +684,105 @@ def validate_numeric_percentage_claims(
     evidence_ids: list[str],
     evidence_by_id: dict[str, EvidenceItem],
 ) -> None:
-    claims = [float(match.group(1)) for match in re.finditer(r"(?<!\d)([-+]?\d+(?:\.\d+)?)\s*%", statement)]
+    claims = extract_percentage_claims(statement)
     if not claims:
         return
 
-    evidence_percent_values = []
-    for evidence_id in evidence_ids:
-        value = evidence_by_id[evidence_id].value
-        if isinstance(value, (int, float)):
-            evidence_percent_values.append(float(value) * 100 if abs(float(value)) <= 1.5 else float(value))
+    candidates = [
+        candidate
+        for evidence_id in evidence_ids
+        if (candidate := percentage_evidence_candidate(evidence_id, evidence_by_id[evidence_id])) is not None
+    ]
 
-    if not evidence_percent_values:
-        raise AIGroundingError("Percentage claim cites no numeric evidence.")
+    if not candidates:
+        raise AINumericGroundingError(
+            statement=statement,
+            claims=claims,
+            cited_evidence_ids=evidence_ids,
+            candidates=[],
+            reason="no_percentage_capable_evidence",
+        )
 
     for claim in claims:
-        if not any(abs(claim - evidence_value) <= 0.2 for evidence_value in evidence_percent_values):
-            raise AIGroundingError("Percentage claim is not supported by cited numeric evidence.")
+        if not any(
+            abs(claim.normalized_value - candidate.normalized_percentage) <= PERCENTAGE_TOLERANCE_POINTS
+            for candidate in candidates
+        ):
+            raise AINumericGroundingError(
+                statement=statement,
+                claims=claims,
+                cited_evidence_ids=evidence_ids,
+                candidates=candidates,
+                reason="unsupported_percentage_claim",
+            )
+
+
+def extract_percentage_claims(statement: str) -> list[PercentageClaim]:
+    claims = []
+    for match in PERCENTAGE_CLAIM_PATTERN.finditer(statement):
+        raw_text = match.group(0)
+        raw_value = float(match.group(1))
+        has_explicit_sign = match.group(1).startswith(("+", "-"))
+        direction = percentage_claim_direction(statement, match.start()) if not has_explicit_sign else None
+        normalized_value = -abs(raw_value) if direction == "negative" else raw_value
+        claims.append(
+            PercentageClaim(
+                text=raw_text,
+                value=raw_value,
+                normalized_value=normalized_value,
+                has_explicit_sign=has_explicit_sign,
+                direction=direction,
+            )
+        )
+    return claims
+
+
+def percentage_claim_direction(statement: str, claim_start: int) -> str | None:
+    prefix = statement[max(0, claim_start - 16):claim_start]
+    if NEGATIVE_DIRECTION_PATTERN.search(prefix):
+        return "negative"
+    return None
+
+
+def percentage_evidence_candidate(
+    evidence_id: str,
+    item: EvidenceItem,
+) -> PercentageEvidenceCandidate | None:
+    if item.metric not in PERCENTAGE_CAPABLE_METRICS:
+        return None
+    if item.unit != "ratio":
+        return None
+    if isinstance(item.value, bool) or not isinstance(item.value, (int, float)):
+        return None
+
+    raw_value = item.value
+    if item.metric in RAW_PERCENTAGE_SCALE_METRICS:
+        normalized = float(raw_value)
+    else:
+        normalized = float(raw_value) * 100 if abs(float(raw_value)) <= 1.5 else float(raw_value)
+
+    return PercentageEvidenceCandidate(
+        evidence_id=evidence_id,
+        metric=item.metric,
+        raw_value=raw_value,
+        normalized_percentage=normalized,
+    )
+
+
+def build_numeric_grounding_message(
+    reason: str,
+    claims: list[PercentageClaim],
+    candidates: list[PercentageEvidenceCandidate],
+) -> str:
+    claim_values = ", ".join(f"{claim.normalized_value:.2f}%" for claim in claims) or "none"
+    candidate_values = ", ".join(
+        f"{candidate.evidence_id} -> {candidate.normalized_percentage:.2f}%"
+        for candidate in candidates
+    ) or "none"
+    return (
+        "Percentage claim is not supported by cited numeric evidence "
+        f"({reason}; claims: {claim_values}; candidates: {candidate_values})."
+    )
 
 
 def validate_forbidden_output_policy(answer: GroundedResearchAnswer) -> None:

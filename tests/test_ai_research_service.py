@@ -27,6 +27,7 @@ from ai_research_service import AIProviderError
 from ai_research_service import AIRefusalError
 from ai_research_service import AIResearchError
 from ai_research_service import AIGroundingError
+from ai_research_service import AINumericGroundingError
 from ai_research_service import AIStructuredOutputError
 from ai_research_service import DEVELOPER_INSTRUCTIONS
 from ai_research_service import GroundedFinding
@@ -199,6 +200,50 @@ class AIResearchServiceTestCase(unittest.TestCase):
             source_context_generated_at=selected.source_context_generated_at,
             source_evidence_count=selected.source_evidence_count,
         )
+
+    def selected_context_with_evidence(self, extra_evidence):
+        selected = self.selected_context()
+        return SelectedResearchContext(
+            symbol=selected.symbol,
+            display_name=selected.display_name,
+            question_type=selected.question_type,
+            selected_evidence=[*selected.selected_evidence, *extra_evidence],
+            selected_observation_links=selected.selected_observation_links,
+            selected_observations=selected.selected_observations,
+            selected_missing_data=selected.selected_missing_data,
+            selected_limitations=selected.selected_limitations,
+            selection_notes=selected.selection_notes,
+            generated_at=selected.generated_at,
+            source_context_generated_at=selected.source_context_generated_at,
+            source_evidence_count=selected.source_evidence_count + len(extra_evidence),
+        )
+
+    def percentage_evidence(self, evidence_id, metric, value, *, unit="ratio", period_year=2024):
+        return EvidenceItem(
+            id=evidence_id,
+            category="test",
+            metric=metric,
+            value=value,
+            unit=unit,
+            currency=None,
+            period_end=date(period_year, 12, 31),
+            period_year=period_year,
+            source="test evidence",
+            source_type="derived" if evidence_id.startswith("derived:") else "source",
+        )
+
+    def assert_single_finding_validates(self, statement, evidence_ids, selected_context=None):
+        answer = GroundedResearchAnswer(
+            symbol="2454.TW",
+            question_type="growth",
+            summary="摘要",
+            findings=[GroundedFinding(statement=statement, evidence_ids=list(evidence_ids))],
+            limitations=[],
+            missing_information=[],
+            next_steps=[],
+            metadata=self.metadata(),
+        )
+        validate_grounded_ai_answer(answer, selected_context or self.selected_context())
 
     def valid_output(self):
         return {
@@ -649,8 +694,158 @@ class AIResearchServiceTestCase(unittest.TestCase):
             metadata=self.metadata(),
         )
 
-        with self.assertRaisesRegex(AIGroundingError, "Percentage claim"):
+        with self.assertRaisesRegex(AINumericGroundingError, "Percentage claim"):
             validate_grounded_ai_answer(answer, self.selected_context())
+
+    def test_percentage_validation_accepts_multiple_claims_and_multiple_citations(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2024-12-31", "revenue_yoy", 0.2241),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2024 Revenue YoY 約 22.41%，FY2025 約 15.79%。",
+            ["derived:revenue_yoy:2024-12-31", "derived:revenue_yoy:2025-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_rejects_one_invalid_claim_with_diagnostics(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2024-12-31", "revenue_yoy", 0.2241),
+        ])
+
+        answer = GroundedResearchAnswer(
+            symbol="2454.TW",
+            question_type="growth",
+            summary="摘要",
+            findings=[
+                GroundedFinding(
+                    statement="FY2024 Revenue YoY 約 22.41%，FY2025 約 50.00%。",
+                    evidence_ids=["derived:revenue_yoy:2024-12-31", "derived:revenue_yoy:2025-12-31"],
+                )
+            ],
+            limitations=[],
+            missing_information=[],
+            next_steps=[],
+            metadata=self.metadata(),
+        )
+
+        with self.assertRaises(AINumericGroundingError) as raised:
+            validate_grounded_ai_answer(answer, selected)
+
+        error = raised.exception
+        self.assertIn("50.00%", str(error))
+        self.assertEqual(error.statement, "FY2024 Revenue YoY 約 22.41%，FY2025 約 50.00%。")
+        self.assertEqual([claim.normalized_value for claim in error.claims], [22.41, 50.0])
+        self.assertEqual(
+            error.cited_evidence_ids,
+            ["derived:revenue_yoy:2024-12-31", "derived:revenue_yoy:2025-12-31"],
+        )
+        self.assertEqual(
+            [candidate.evidence_id for candidate in error.candidates],
+            ["derived:revenue_yoy:2024-12-31", "derived:revenue_yoy:2025-12-31"],
+        )
+
+    def test_percentage_validation_accepts_reversed_evidence_order(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2024-12-31", "revenue_yoy", 0.2241),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2024 Revenue YoY 約 22.41%，FY2025 約 15.79%。",
+            ["derived:revenue_yoy:2025-12-31", "derived:revenue_yoy:2024-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_accepts_duplicate_claims_deterministically(self):
+        self.assert_single_finding_validates(
+            "Revenue Growth 為 12.32%，也就是約 12.32%。",
+            ["current:revenue_growth"],
+        )
+
+    def test_percentage_validation_handles_negative_signed_claims(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2023-12-31", "revenue_yoy", -0.2102, period_year=2023),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2023 Revenue YoY 為 -21.02%。",
+            ["derived:revenue_yoy:2023-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_rejects_wrong_sign(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2023-12-31", "revenue_yoy", -0.2102, period_year=2023),
+        ])
+
+        with self.assertRaises(AINumericGroundingError):
+            self.assert_single_finding_validates(
+                "FY2023 Revenue YoY 為 +21.02%。",
+                ["derived:revenue_yoy:2023-12-31"],
+                selected,
+            )
+
+    def test_percentage_validation_accepts_deterministic_decline_wording(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("derived:revenue_yoy:2023-12-31", "revenue_yoy", -0.2102, period_year=2023),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2023 Revenue 較前一年下降 21.02%。",
+            ["derived:revenue_yoy:2023-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_tolerance_is_percentage_points(self):
+        self.assert_single_finding_validates("Revenue Growth 約 12.50%。", ["current:revenue_growth"])
+
+        with self.assertRaises(AINumericGroundingError):
+            self.assert_single_finding_validates("Revenue Growth 約 12.60%。", ["current:revenue_growth"])
+
+    def test_percentage_validation_ignores_non_percentage_numbers(self):
+        self.assert_single_finding_validates(
+            "FY2025 Revenue 為 110.0，未使用百分比敘述。",
+            ["historical:revenue:2025-12-31"],
+        )
+
+    def test_percentage_validation_rejects_missing_percentage_capable_evidence(self):
+        with self.assertRaises(AINumericGroundingError) as raised:
+            self.assert_single_finding_validates(
+                "FY2025 Revenue YoY 為 15.79%。",
+                ["historical:revenue:2025-12-31"],
+            )
+
+        self.assertEqual(raised.exception.reason, "no_percentage_capable_evidence")
+
+    def test_percentage_validation_accepts_when_one_of_multiple_evidence_matches(self):
+        self.assert_single_finding_validates(
+            "FY2025 Revenue YoY 為 15.79%。",
+            ["historical:revenue:2025-12-31", "derived:revenue_yoy:2025-12-31"],
+        )
+
+    def test_percentage_validation_uses_metric_semantics_for_ratio_conversion(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence("current:debt_to_equity", "debt_to_equity", 1.2),
+        ])
+
+        self.assert_single_finding_validates(
+            "Debt to Equity 為 1.20%。",
+            ["current:debt_to_equity"],
+            selected,
+        )
+
+        with self.assertRaises(AINumericGroundingError):
+            self.assert_single_finding_validates(
+                "Debt to Equity 為 120.00%。",
+                ["current:debt_to_equity"],
+                selected,
+            )
+
+    def test_percentage_point_wording_does_not_trigger_percentage_validator(self):
+        self.assert_single_finding_validates(
+            "Gross Margin 下降 2.14 個百分點。",
+            ["current:revenue_growth"],
+        )
 
     def answer_with_forbidden_text(self, *, summary="摘要", finding_statement="Revenue Growth（營收成長率）為 12.32%。", next_steps=None):
         return GroundedResearchAnswer(

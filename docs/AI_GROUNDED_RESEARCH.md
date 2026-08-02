@@ -219,6 +219,46 @@ The current MVP adds a small deterministic guard for explicit percentage claims,
 
 This is an intentional Batch A limit. Future work can add stronger metric-specific validators after the output patterns are better understood.
 
+## Numeric Percentage Validation
+
+Structured Outputs guarantees the JSON shape, not factual correctness. The fourth live smoke test reached `status = completed`; structured output parsing and citation grounding passed, but numeric validation failed with an unsupported percentage claim.
+
+The current numeric guard intentionally covers only explicit percentage claims written with `%`.
+
+Validation strategy:
+
+- Extract explicit percentage claims with sign support, such as `12.32%`, `+21.02%`, or `-21.02%`.
+- Keep tolerance at `0.2` percentage points, not 20%.
+- For each extracted percentage claim, require at least one cited percentage-capable evidence item to match.
+- Multiple claims and multiple cited evidence IDs are supported; each claim can match any cited candidate, and evidence order does not need to match statement order.
+- Duplicate percentage claims are checked deterministically and may match the same cited candidate.
+- Unknown evidence IDs are still rejected before numeric validation.
+
+Evidence conversion is metric-aware:
+
+- Percentage-capable metrics include growth, YoY, margins, return on equity, 52-week position, and debt-to-equity.
+- Ratio-style percentage metrics are normalized from `0.1232` to `12.32%`.
+- `debt_to_equity` is treated as provider percentage-scale raw data, so `1.2` remains `1.2%` instead of becoming `120%`.
+- Non-percentage metrics such as revenue, EPS, P/E, price-to-book, and currency amounts do not participate in this validator.
+- `None`, boolean, text, and non-numeric evidence values are ignored as candidates.
+
+Negative percentages:
+
+- Explicit signed claims such as `-21.02%` must match the signed evidence percentage.
+- Explicit wrong signs such as `+21.02%` against `-21.02%` evidence fail.
+- A narrow deterministic decline-word rule supports phrasing such as `下降 21.02%` as negative magnitude. This is deliberately limited and is not a general Chinese NLP system.
+
+Percentage-point phrases such as `2.14 percentage points` or `2.14 個百分點` are not treated as `%` claims by this validator. Full numeric fact checking for currency amounts, EPS, P/E, and percentage-point deltas is future work.
+
+When numeric validation fails, `AINumericGroundingError` preserves safe diagnostics:
+
+- offending finding statement
+- extracted percentage claims
+- cited evidence IDs
+- normalized cited percentage candidates
+
+It does not store raw provider responses, full prompts, API keys, secret headers, or full `SelectedResearchContext`.
+
 ## Error Handling
 
 The service exposes domain exceptions:
@@ -230,6 +270,7 @@ The service exposes domain exceptions:
 - `AIIncompleteResponseError`
 - `AIRefusalError`
 - `AIGroundingError`
+- `AINumericGroundingError`
 
 Missing API key produces a clear configuration error:
 

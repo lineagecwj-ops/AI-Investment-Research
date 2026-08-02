@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch A Numeric Grounding Diagnostics Patch
+
+### Completed Features
+
+- 新增 `AINumericGroundingError`，專門表示 explicit percentage claim 與 cited evidence numeric candidates 不一致。
+- Numeric diagnostic error 保存安全資訊：offending finding statement、extracted percentage claims、cited evidence IDs、normalized cited percentage candidates。
+- Percentage validator 改為 metric-aware，只讓 percentage-capable evidence 參與比對，避免任意 numeric evidence 造成誤判。
+- 多個 percentage claims / 多個 citations 採用 any-candidate matching：每個 claim 至少匹配其中一筆 cited percentage candidate；不要求 claim 與 evidence 順序一致。
+- 保留 `0.2` percentage-point tolerance，不放寬 tolerance。
+- 支援 signed negative percentage，例如 `-21.02%`；wrong sign 會 fail。
+- 加入狹窄 deterministic decline-word rule，讓 `下降 21.02%` 可對應負向 evidence；此規則不是大型中文 NLP。
+- `debt_to_equity` 視為 provider percentage-scale raw data，不把 `1.2` 自動轉成 `120%`。
+- Developer instructions 小幅補強：百分比應使用 cited evidence 的 numeric value 或正常 rounding，不要自行計算不存在於 derived evidence 的 percentage。
+
+### Live Smoke Context
+
+- 第四次 live smoke：provider `status = completed`，usage 為 `input_tokens = 3533`、`output_tokens = 852`、`reasoning_tokens = 0`、`total_tokens = 4385`。
+- Structured Output validation pass，citation grounding pass。
+- Numeric validation fail：`Percentage claim is not supported by cited numeric evidence`。
+- 因此目前 live-provider blocker 已從 token budget 轉為 numeric factual consistency validation。
+
+### Safety Notes
+
+- 本 patch 未重跑 live OpenAI API。
+- 本 patch 未放寬 numeric validator、未提高 tolerance、未修改 Structured Output schema、citation policy、forbidden-output policy、ResearchContext、selector、UI 或 SQLite。
+- Structured Outputs 只保證 schema，不保證 factual correctness；目前 numeric guard 僅覆蓋 explicit `%` claims。
+- 非百分比數字，例如 TWD amounts、EPS、P/E、price-to-book，以及 percentage-point deltas，仍列為 future technical debt。
+
+### Testing Notes
+
+- AI service tests 新增 percentage validation matrix：single valid / invalid、multiple claims / citations、one invalid among valid claims、reversed evidence order、duplicate claims、signed negative、wrong sign、decline wording、percentage-point tolerance、non-percentage statements、missing percentage-capable evidence、one matching evidence among many、unknown evidence remains citation-layer failure。
+
 ## 2026-08-02 — Sprint 05 Batch A Reasoning Budget Optimization Patch
 
 ### Completed Features
