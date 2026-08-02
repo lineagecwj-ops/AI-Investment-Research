@@ -4,6 +4,7 @@ from datetime import UTC
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,7 @@ from ai_dashboard import evidence_lookup
 from ai_dashboard import format_evidence_period
 from ai_dashboard import format_evidence_value
 from ai_dashboard import is_openai_api_configured
+from ai_dashboard import normalize_question_type
 from ai_dashboard import question_type_help
 from ai_dashboard import question_type_label
 from ai_dashboard import question_type_options
@@ -95,8 +97,8 @@ class AIDashboardTestCase(unittest.TestCase):
                 id="historical:revenue:2024-12-31",
                 category="historical_financials",
                 metric="revenue",
-                value=95_000_000_000,
-                unit="currency",
+                value=95_123_456_789.12345,
+                unit="currency_amount",
                 currency="TWD",
                 period_end=date(2024, 12, 31),
                 period_year=2024,
@@ -142,6 +144,14 @@ class AIDashboardTestCase(unittest.TestCase):
             self.assertIn("（", label)
             self.assertIn("）", label)
             self.assertTrue(help_text)
+
+    def test_question_type_helpers_accept_value_and_enum_like_values_after_rerun(self):
+        self.assertEqual(normalize_question_type("growth"), ResearchQuestionType.GROWTH)
+        self.assertEqual(
+            question_type_label(SimpleNamespace(value="growth")),
+            "Growth（成長）",
+        )
+        self.assertIn("Revenue", question_type_help(SimpleNamespace(value="growth")))
 
     def test_request_fingerprint_is_stable_and_changes_for_inputs(self):
         selected = self.selected_context()
@@ -219,6 +229,18 @@ class AIDashboardTestCase(unittest.TestCase):
     def test_evidence_formatting(self):
         revenue_growth = self.sample_evidence()[0]
         revenue = self.sample_evidence()[1]
+        negative_ratio = EvidenceItem(
+            id="derived:revenue_yoy:2023-12-31",
+            category="historical_derived",
+            metric="revenue_yoy",
+            value=-0.34878012345,
+            unit="ratio",
+            currency=None,
+            period_end=date(2023, 12, 31),
+            period_year=2023,
+            source="research_metrics.calculate_yoy_growth",
+            source_type="derived",
+        )
         price = EvidenceItem(
             id="current:current_price",
             category="current_snapshot",
@@ -226,6 +248,30 @@ class AIDashboardTestCase(unittest.TestCase):
             value=1250,
             unit="price",
             currency="TWD",
+            period_end=None,
+            period_year=None,
+            source="Yahoo Finance current snapshot",
+            source_type="source",
+        )
+        eps = EvidenceItem(
+            id="historical:eps:2025-12-31",
+            category="historical_financials",
+            metric="eps",
+            value=12.3456789,
+            unit="per_share",
+            currency=None,
+            period_end=date(2025, 12, 31),
+            period_year=2025,
+            source="Yahoo Finance annual financial statement",
+            source_type="source",
+        )
+        multiple = EvidenceItem(
+            id="current:trailing_pe",
+            category="current_snapshot",
+            metric="trailing_pe",
+            value=25.345,
+            unit="multiple",
+            currency=None,
             period_end=None,
             period_year=None,
             source="Yahoo Finance current snapshot",
@@ -257,13 +303,20 @@ class AIDashboardTestCase(unittest.TestCase):
         )
 
         self.assertEqual(format_evidence_value(revenue_growth), "12.32%")
-        self.assertEqual(format_evidence_value(revenue), "TWD 95.00B")
+        self.assertEqual(format_evidence_value(negative_ratio), "-34.88%")
+        self.assertEqual(format_evidence_value(revenue), "TWD 95.12B")
         self.assertEqual(format_evidence_value(price), "TWD 1,250.00")
+        self.assertEqual(format_evidence_value(eps), "12.35")
+        self.assertEqual(format_evidence_value(multiple), "25.34")
         self.assertEqual(format_evidence_value(decimal), "25.34")
         self.assertEqual(format_evidence_value(missing), "N/A")
         self.assertEqual(format_evidence_period(date(2025, 12, 31)), "FY ending 2025-12-31")
         self.assertEqual(source_type_label("derived"), "衍生計算")
         self.assertEqual(source_type_label("source"), "原始資料")
+        self.assertEqual(revenue_growth.value, 0.1232)
+        self.assertEqual(negative_ratio.value, -0.34878012345)
+        self.assertEqual(revenue.value, 95_123_456_789.12345)
+        self.assertEqual(eps.value, 12.3456789)
 
     def test_evidence_lineage_resolves_sources_and_missing_safely(self):
         selected = self.selected_context()

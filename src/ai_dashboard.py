@@ -107,16 +107,23 @@ def question_type_options() -> list[ResearchQuestionType]:
     return list(QUESTION_TYPE_DISPLAY)
 
 
-def question_type_label(question_type: ResearchQuestionType) -> str:
-    return QUESTION_TYPE_DISPLAY[question_type].label
+def normalize_question_type(question_type: ResearchQuestionType | str) -> ResearchQuestionType:
+    if isinstance(question_type, ResearchQuestionType):
+        return question_type
+    value = getattr(question_type, "value", question_type)
+    return ResearchQuestionType(str(value))
 
 
-def question_type_help(question_type: ResearchQuestionType) -> str:
-    return QUESTION_TYPE_DISPLAY[question_type].help_text
+def question_type_label(question_type: ResearchQuestionType | str) -> str:
+    return QUESTION_TYPE_DISPLAY[normalize_question_type(question_type)].label
 
 
-def question_type_placeholder(question_type: ResearchQuestionType) -> str:
-    return QUESTION_TYPE_DISPLAY[question_type].placeholder
+def question_type_help(question_type: ResearchQuestionType | str) -> str:
+    return QUESTION_TYPE_DISPLAY[normalize_question_type(question_type)].help_text
+
+
+def question_type_placeholder(question_type: ResearchQuestionType | str) -> str:
+    return QUESTION_TYPE_DISPLAY[normalize_question_type(question_type)].placeholder
 
 
 def is_openai_api_configured(environ: dict[str, str] | None = None) -> bool:
@@ -197,7 +204,7 @@ def format_evidence_value(item: EvidenceItem) -> str:
         if item.metric == "debt_to_equity":
             return f"{numeric_value:.2f}%"
         return f"{numeric_value * 100:.2f}%"
-    if item.unit == "currency":
+    if item.unit in {"currency", "currency_amount"}:
         formatted = format_compact_number(numeric_value)
         if item.currency:
             return f"{item.currency} {formatted}"
@@ -207,6 +214,8 @@ def format_evidence_value(item: EvidenceItem) -> str:
         if item.currency:
             return f"{item.currency} {formatted}"
         return formatted
+    if item.unit in {"per_share", "multiple"}:
+        return f"{numeric_value:,.2f}"
     if numeric_value.is_integer():
         return f"{int(numeric_value):,}"
     return f"{numeric_value:,.2f}"

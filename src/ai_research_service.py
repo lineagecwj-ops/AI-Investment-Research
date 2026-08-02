@@ -207,8 +207,11 @@ Rules:
 10. Research next steps must be research tasks, not investment actions.
 11. Keep the structured answer concise: summary 2-4 short sentences; findings 3-5 concise items; limitations, missing_information, and next_steps up to 3 concise items each.
 12. Return only the required structured answer. Do not include unnecessary explanation outside the schema.
-13. When stating a percentage, use the numeric value from the cited evidence exactly or with normal rounding.
-14. Do not calculate a new percentage unless a provided derived evidence item already contains that percentage.
+13. In user-facing text, do not output unnecessary raw floating-point precision.
+14. Percentages must use normal percentage representation with at most 2 decimal places. Ratio evidence such as 0.123221890602646 should be written as 12.32%; negative ratio evidence such as -0.348780 should be written as -34.88% or a clearly negative decline wording.
+15. Monetary values should use reasonable compact formatting with currency context when available, such as TWD 595.97B or USD 215.94B.
+16. EPS and per-share values should use at most 2 decimal places.
+17. Rounding must come from cited evidence values. Do not calculate a new percentage unless a provided derived evidence item already contains that percentage.
 """.strip()
 
 

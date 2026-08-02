@@ -289,6 +289,14 @@ class AIResearchServiceTestCase(unittest.TestCase):
         with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-test-model"}, clear=True):
             self.assertEqual(get_ai_research_config().model, "gpt-test-model")
 
+    def test_developer_instructions_require_user_facing_number_formatting(self):
+        self.assertIn("at most 2 decimal places", DEVELOPER_INSTRUCTIONS)
+        self.assertIn("0.123221890602646 should be written as 12.32%", DEVELOPER_INSTRUCTIONS)
+        self.assertIn("-0.348780 should be written as -34.88%", DEVELOPER_INSTRUCTIONS)
+        self.assertIn("Monetary values should use reasonable compact formatting", DEVELOPER_INSTRUCTIONS)
+        self.assertIn("EPS and per-share values should use at most 2 decimal places", DEVELOPER_INSTRUCTIONS)
+        self.assertIn("Rounding must come from cited evidence values", DEVELOPER_INSTRUCTIONS)
+
     def test_missing_api_key_raises_clear_configuration_error(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(AIConfigurationError, "OPENAI_API_KEY"):
@@ -705,6 +713,42 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assert_single_finding_validates(
             "FY2024 Revenue YoY 約 22.41%，FY2025 約 15.79%。",
             ["derived:revenue_yoy:2024-12-31", "derived:revenue_yoy:2025-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_accepts_positive_two_decimal_rounding_from_raw_ratio(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence(
+                "derived:revenue_yoy:2024-12-31",
+                "revenue_yoy",
+                0.2101683339528164,
+            ),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2024 Revenue YoY 約 21.02%。",
+            ["derived:revenue_yoy:2024-12-31"],
+            selected,
+        )
+
+    def test_percentage_validation_accepts_negative_two_decimal_rounding_from_raw_ratio(self):
+        selected = self.selected_context_with_evidence([
+            self.percentage_evidence(
+                "derived:revenue_yoy:2023-12-31",
+                "revenue_yoy",
+                -0.348780,
+                period_year=2023,
+            ),
+        ])
+
+        self.assert_single_finding_validates(
+            "FY2023 Revenue YoY 為 -34.88%。",
+            ["derived:revenue_yoy:2023-12-31"],
+            selected,
+        )
+        self.assert_single_finding_validates(
+            "FY2023 Revenue 較前一年下降 34.88%。",
+            ["derived:revenue_yoy:2023-12-31"],
             selected,
         )
 
