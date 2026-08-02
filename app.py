@@ -47,6 +47,13 @@ from ai_dashboard import question_type_placeholder
 from ai_dashboard import safe_error_details
 from ai_dashboard import safe_error_message
 from ai_dashboard import source_type_label
+from ai_followup import AIResearchSession
+from ai_followup import MAX_RESEARCH_TURNS
+from ai_followup import aggregate_session_usage
+from ai_followup import append_verified_turn
+from ai_followup import build_followup_suggestions
+from ai_followup import create_research_turn
+from ai_followup import infer_followup_question_type
 from ai_research_service import generate_grounded_research_answer
 from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
@@ -88,7 +95,11 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("watchlist_query_failures", [])
     st.session_state.setdefault("comparison_stocks", [])
     st.session_state.setdefault("comparison_failures", [])
-    st.session_state.setdefault("ai_research_result", None)
+    st.session_state.setdefault("ai_research_session", None)
+    st.session_state.setdefault("ai_research_last_error", None)
+    st.session_state.setdefault("ai_research_last_error_details", None)
+    st.session_state.setdefault("ai_followup_question_draft", "")
+    st.session_state.setdefault("ai_followup_question_type", None)
 
 
 def render_query_failures(failures) -> None:
@@ -664,7 +675,14 @@ def openai_api_configured() -> bool:
     return is_openai_api_configured()
 
 
-def build_ai_research_result(input_text: str, question_type, question: str) -> dict:
+def build_ai_research_turn(
+    input_text: str,
+    question_type,
+    question: str,
+    *,
+    parent_turn_id: str | None = None,
+    on_provider_call=None,
+) -> dict:
     symbols = parse_stock_symbols(input_text)
     if not symbols:
         raise ValueError("請輸入至少一個股票代號。")
@@ -702,24 +720,47 @@ def build_ai_research_result(input_text: str, question_type, question: str) -> d
         question=question,
         selected_context=selected_context,
     )
+    if on_provider_call is not None:
+        on_provider_call()
     answer = generate_grounded_research_answer(
         question=question,
         selected_context=selected_context,
     )
+    turn = create_research_turn(
+        parent_turn_id=parent_turn_id,
+        symbol=stock.symbol or symbol,
+        question_type=question_type,
+        question=question,
+        fingerprint=fingerprint,
+        answer=answer,
+        selected_context=selected_context,
+    )
 
     return {
-        "last_symbol": stock.symbol or symbol,
-        "last_display_name": display_data["Company Name"],
-        "last_question_type": question_type,
-        "last_question": question.strip(),
+        "turn": turn,
+        "display_name": display_data["Company Name"],
+        "historical_stale": bool(historical_series.is_stale),
+    }
+
+
+def build_ai_research_result(input_text: str, question_type, question: str) -> dict:
+    turn_result = build_ai_research_turn(input_text, question_type, question)
+    turn = turn_result["turn"]
+    selected_context = turn.selected_context
+    answer = turn.answer
+    return {
+        "last_symbol": turn.symbol,
+        "last_display_name": turn_result["display_name"],
+        "last_question_type": turn.question_type,
+        "last_question": turn.question,
         "selected_context": selected_context,
         "selected_context_summary": json_safe_selected_context_summary(selected_context),
         "answer": answer,
         "metadata": answer.metadata,
         "error": None,
         "error_details": None,
-        "request_fingerprint": fingerprint,
-        "historical_stale": bool(historical_series.is_stale),
+        "request_fingerprint": turn.fingerprint,
+        "historical_stale": turn_result["historical_stale"],
     }
 
 
@@ -756,6 +797,12 @@ def render_ai_research() -> None:
 
     config = get_ai_research_config()
     question_options = question_type_options()
+
+    session = st.session_state["ai_research_session"]
+    if session is not None:
+        render_ai_research_session_header(session)
+
+    st.markdown("### Initial Grounded Research（初始研究）")
     with st.form("ai_research_form"):
         input_text = st.text_input(
             "股票",
@@ -786,39 +833,95 @@ def render_ai_research() -> None:
         )
 
     if submitted:
+        request_attempts = {"count": 0}
+
+        def count_provider_call() -> None:
+            request_attempts["count"] += 1
+
         with st.spinner("正在產生 Grounded AI Research…"):
             try:
-                st.session_state["ai_research_result"] = build_ai_research_result(
+                turn_result = build_ai_research_turn(
                     input_text,
                     question_type,
                     question,
+                    on_provider_call=count_provider_call,
                 )
+                turn = turn_result["turn"]
+                new_session = AIResearchSession(
+                    symbol=turn.symbol,
+                    display_name=turn_result["display_name"],
+                    turns=[],
+                    api_request_count=request_attempts["count"],
+                )
+                append_verified_turn(new_session, turn)
+                st.session_state["ai_research_session"] = new_session
+                st.session_state["ai_research_last_error"] = None
+                st.session_state["ai_research_last_error_details"] = None
+                st.session_state["ai_followup_question_draft"] = ""
+                st.session_state["ai_followup_question_type"] = None
             except Exception as error:
-                st.session_state["ai_research_result"] = build_ai_research_error_result(
-                    input_text,
-                    question_type,
-                    question,
-                    error,
-                )
+                if request_attempts["count"] and st.session_state["ai_research_session"] is not None:
+                    st.session_state["ai_research_session"].api_request_count += request_attempts["count"]
+                st.session_state["ai_research_last_error"] = safe_error_message(error)
+                st.session_state["ai_research_last_error_details"] = safe_error_details(error)
 
     if st.button(
-        "清除 AI 研究結果",
-        disabled=st.session_state["ai_research_result"] is None,
+        "清除 AI 研究工作階段",
+        disabled=st.session_state["ai_research_session"] is None
+        and st.session_state["ai_research_last_error"] is None,
     ):
-        st.session_state["ai_research_result"] = None
+        st.session_state["ai_research_session"] = None
+        st.session_state["ai_research_last_error"] = None
+        st.session_state["ai_research_last_error_details"] = None
+        st.session_state["ai_followup_question_draft"] = ""
+        st.session_state["ai_followup_question_type"] = None
         st.rerun()
 
-    result = st.session_state["ai_research_result"]
-    if result is None:
+    if st.session_state["ai_research_last_error"]:
+        render_ai_research_error(
+            {
+                "error": st.session_state["ai_research_last_error"],
+                "error_details": st.session_state["ai_research_last_error_details"],
+            }
+        )
+        st.info("延伸研究未完成，先前研究結果仍保留。")
+
+    session = st.session_state["ai_research_session"]
+    if session is None or not session.turns:
         st.info("輸入單一股票與研究問題後，按下「產生 AI 研究」才會呼叫 OpenAI API。")
         return
 
-    st.caption("以下為上一次已完成的 AI Research。")
-    if result["error"]:
-        render_ai_research_error(result)
-        return
+    render_research_history(session, config.model)
+    current_turn = session.turns[-1]
+    st.markdown("### 目前研究結果")
+    render_ai_research_turn_answer(current_turn, config.model)
+    render_followup_research(session, current_turn, config.model)
 
-    render_ai_research_answer(result, config.model)
+
+def render_ai_research_session_header(session: AIResearchSession) -> None:
+    usage = aggregate_session_usage(session.turns or [])
+    st.subheader(f"{session.symbol} · {session.display_name or 'N/A'}")
+    cols = st.columns(4)
+    cols[0].metric("Research Session", f"{session.turn_count} / {MAX_RESEARCH_TURNS}")
+    cols[1].metric("AI Requests in this session", f"{session.api_request_count} / {MAX_RESEARCH_TURNS}")
+    cols[2].metric("Input tokens", f"{usage['input_tokens']:,}")
+    cols[3].metric("Total tokens", f"{usage['total_tokens']:,}")
+
+
+def render_research_history(session: AIResearchSession, fallback_model: str) -> None:
+    st.markdown("### Research History（本次研究歷程）")
+    for index, turn in enumerate(session.turns or [], start=1):
+        label = (
+            f"Turn {index} — {question_type_label(turn.question_type)} — "
+            f"{format_generated_at(turn.generated_at)}"
+        )
+        if turn is session.turns[-1]:
+            st.write(f"**{label}**")
+            st.caption(turn.question)
+            continue
+        with st.expander(label, expanded=False):
+            st.caption("先前研究結果")
+            render_ai_research_turn_answer(turn, fallback_model)
 
 
 def render_ai_research_error(result: dict) -> None:
@@ -832,28 +935,42 @@ def render_ai_research_error(result: dict) -> None:
 
 
 def render_ai_research_answer(result: dict, fallback_model: str) -> None:
-    answer = result["answer"]
-    selected_context = result["selected_context"]
-    metadata = answer.metadata
-    question_type = result["last_question_type"]
+    turn = create_research_turn(
+        parent_turn_id=None,
+        symbol=result["last_symbol"],
+        question_type=result["last_question_type"],
+        question=result["last_question"],
+        fingerprint=result["request_fingerprint"],
+        answer=result["answer"],
+        selected_context=result["selected_context"],
+    )
+    render_ai_research_turn_answer(turn, fallback_model)
 
-    display_name = result["last_display_name"] or selected_context.display_name or "N/A"
-    st.subheader(f"{result['last_symbol']} · {display_name}")
-    if result["historical_stale"]:
-        st.warning("Historical financial data 目前使用 stale cache。")
 
+def render_ai_research_turn_answer(turn, fallback_model: str) -> None:
+    answer = turn.answer
+    selected_context = turn.selected_context
+    metadata = turn.metadata
+    question_type = turn.question_type
+
+    display_name = selected_context.display_name or "N/A"
+    st.subheader(f"{turn.symbol} · {display_name}")
     header_cols = st.columns(4)
     header_cols[0].metric("Question Type", question_type_label(question_type))
     header_cols[1].metric("Generated", format_generated_at(metadata.generated_at))
     header_cols[2].metric("Model", metadata.model or fallback_model)
-    header_cols[3].metric("Fingerprint", result["request_fingerprint"][:12])
-    st.write(f"**User Question：** {result['last_question']}")
+    header_cols[3].metric("Fingerprint", turn.fingerprint[:12])
+    st.write(f"**User Question：** {turn.question}")
 
-    st.markdown("### AI Summary（AI 摘要）")
+    render_grounded_answer_sections(answer, selected_context, metadata)
+
+
+def render_grounded_answer_sections(answer, selected_context, metadata) -> None:
+    st.markdown("#### AI Summary（AI 摘要）")
     st.write(answer.summary)
-    st.caption("此回答僅依目前選取的研究資料產生。")
+    st.caption("此回答僅依本回合重新選取的研究資料產生。")
 
-    st.markdown("### Grounded Findings（有證據支持的研究觀察）")
+    st.markdown("#### Grounded Findings（有證據支持的研究觀察）")
     selected_evidence = evidence_lookup(selected_context)
     for index, finding in enumerate(answer.findings, start=1):
         st.write(f"**Finding {index}**")
@@ -866,7 +983,7 @@ def render_ai_research_answer(result: dict, fallback_model: str) -> None:
                     continue
                 render_evidence_detail(evidence, selected_evidence)
 
-    st.markdown("### Limitations（資料限制）")
+    st.markdown("#### Limitations（資料限制）")
     if answer.limitations:
         st.write("**AI 提到的限制**")
         for item in answer.limitations:
@@ -878,7 +995,7 @@ def render_ai_research_answer(result: dict, fallback_model: str) -> None:
     if not answer.limitations and not selected_context.selected_limitations:
         st.info("目前沒有額外 limitations。")
 
-    st.markdown("### Missing Information（缺漏資料）")
+    st.markdown("#### Missing Information（缺漏資料）")
     if answer.missing_information:
         st.write("**AI 提到的缺漏資料**")
         for item in answer.missing_information:
@@ -893,17 +1010,112 @@ def render_ai_research_answer(result: dict, fallback_model: str) -> None:
     if not answer.missing_information and not selected_context.selected_missing_data:
         st.info("目前沒有 selected missing-data detail。")
 
-    st.markdown("### Research Next Steps（下一步研究）")
+    st.markdown("#### Research Next Steps（下一步研究）")
     for item in answer.next_steps:
         st.write(f"□ {item}")
     st.caption("這些是研究方向，不是投資建議。")
 
-    st.markdown("### Validation")
+    st.markdown("#### Validation")
     st.success("Structured Output ✓　Evidence Grounding ✓　Numeric Guard ✓　Advice Guard ✓")
     st.caption("回答已通過系統的結構與引用驗證。")
 
     render_selected_context_preview(selected_context)
     render_ai_request_details(metadata)
+
+
+def render_followup_research(session: AIResearchSession, current_turn, fallback_model: str) -> None:
+    st.markdown("### Follow-up Research（延伸研究）")
+    st.caption("你可以從以下方向繼續研究。這些是下一步研究問題，不是 AI 結論。")
+    st.caption("每次延伸研究都是新的 OpenAI API request，可能產生額外 API 使用費用。")
+    st.caption("系統只會根據目前研究資料提供研究整理，不提供買賣建議。")
+
+    suggestions = build_followup_suggestions(
+        current_question_type=current_turn.question_type,
+        answer_next_steps=current_turn.answer.next_steps,
+        selected_context=current_turn.selected_context,
+    )
+    if suggestions:
+        for suggestion in suggestions:
+            with st.container(border=True):
+                st.write(f"**{suggestion.title}**")
+                st.write(f"問題：{suggestion.question}")
+                st.caption(f"Research Type：{question_type_label(suggestion.question_type)}")
+                if st.button(
+                    "使用這個問題",
+                    key=f"use_followup_{current_turn.turn_id}_{suggestion.id}",
+                    disabled=not session.can_add_turn,
+                ):
+                    st.session_state["ai_followup_question_draft"] = suggestion.question
+                    st.session_state["ai_followup_question_type"] = suggestion.question_type
+                    st.rerun()
+    else:
+        st.info("目前沒有可顯示的延伸研究問題。")
+
+    if not session.can_add_turn:
+        st.warning(f"此研究工作階段已達 {MAX_RESEARCH_TURNS} 回合上限。可清除後重新開始。")
+        return
+
+    inferred_type = infer_followup_question_type(
+        st.session_state.get("ai_followup_question_draft", ""),
+        st.session_state.get("ai_followup_question_type"),
+    )
+    selected_type = st.session_state.get("ai_followup_question_type") or inferred_type
+    type_index = question_type_options().index(selected_type) if selected_type in question_type_options() else 0
+    st.caption(f"建議研究類型：{question_type_label(inferred_type)}")
+    st.caption("Routing: deterministic")
+
+    with st.form("ai_followup_form"):
+        followup_type = st.selectbox(
+            "Question Type",
+            question_type_options(),
+            index=type_index,
+            format_func=question_type_label,
+            help="可覆寫建議研究類型；AI 不會自動偷偷改 question type。",
+            key=f"ai_followup_question_type_widget_{current_turn.turn_id}",
+        )
+        followup_question = st.text_area(
+            "Question",
+            value=st.session_state.get("ai_followup_question_draft", ""),
+            max_chars=MAX_RESEARCH_QUESTION_LENGTH,
+            key=f"ai_followup_question_widget_{current_turn.turn_id}",
+        )
+        st.caption(f"最多 {MAX_RESEARCH_QUESTION_LENGTH} 字。延伸研究只針對目前股票：{session.symbol}。")
+        followup_submitted = st.form_submit_button(
+            "產生延伸研究",
+            disabled=not openai_api_configured() or not session.can_add_turn,
+        )
+
+    if followup_submitted:
+        if not followup_question.strip():
+            st.session_state["ai_research_last_error"] = "延伸研究問題不可空白。"
+            st.session_state["ai_research_last_error_details"] = {"error_type": "ValueError"}
+            st.rerun()
+
+        with st.spinner("正在產生 Follow-up Grounded AI Research…"):
+            try:
+                request_attempts = {"count": 0}
+
+                def count_provider_call() -> None:
+                    request_attempts["count"] += 1
+                    session.api_request_count += 1
+
+                turn_result = build_ai_research_turn(
+                    session.symbol,
+                    followup_type,
+                    followup_question,
+                    parent_turn_id=current_turn.turn_id,
+                    on_provider_call=count_provider_call,
+                )
+                append_verified_turn(session, turn_result["turn"])
+                st.session_state["ai_research_last_error"] = None
+                st.session_state["ai_research_last_error_details"] = None
+                st.session_state["ai_followup_question_draft"] = ""
+                st.session_state["ai_followup_question_type"] = None
+                st.rerun()
+            except Exception as error:
+                st.session_state["ai_research_last_error"] = safe_error_message(error)
+                st.session_state["ai_research_last_error_details"] = safe_error_details(error)
+                st.rerun()
 
 
 def render_evidence_detail(
