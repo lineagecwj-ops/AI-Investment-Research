@@ -31,6 +31,26 @@ class AIStructuredOutputError(AIResearchError):
     """Raised when provider output cannot be parsed into the expected schema."""
 
 
+class AIIncompleteResponseError(AIStructuredOutputError):
+    """Raised when the provider stops before completing structured output."""
+
+    def __init__(
+        self,
+        *,
+        response_id: str | None,
+        reason: str | None,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        total_tokens: int | None,
+    ) -> None:
+        self.response_id = response_id
+        self.reason = reason
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.total_tokens = total_tokens
+        super().__init__(build_incomplete_response_message(reason))
+
+
 class AIRefusalError(AIStructuredOutputError):
     """Raised when the model refuses to produce the structured answer."""
 
@@ -142,6 +162,7 @@ Rules:
 8. Do not present speculation as fact.
 9. Answer in Traditional Chinese while preserving important English financial terminology.
 10. Research next steps must be research tasks, not investment actions.
+11. Keep the structured answer concise: summary 2-4 short sentences; findings 3-5 concise items; limitations, missing_information, and next_steps up to 3 concise items each.
 """.strip()
 
 
@@ -335,8 +356,10 @@ def build_period_metadata(evidence: list[EvidenceItem]) -> dict[str, Any]:
 
 
 def parse_structured_response(response: Any) -> dict[str, Any]:
-    status = getattr(response, "status", "completed")
+    status = response_attribute(response, "status", "completed")
     if status != "completed":
+        if status == "incomplete":
+            raise build_incomplete_response_error(response)
         raise AIStructuredOutputError(f"AI response status is {status}.")
 
     refusal = extract_refusal_from_response(response)
@@ -359,6 +382,80 @@ def parse_structured_response(response: Any) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise AIStructuredOutputError("AI response JSON must be an object.")
     return parsed
+
+
+def response_attribute(response: Any, name: str, default: Any = None) -> Any:
+    if isinstance(response, dict):
+        return response.get(name, default)
+    return getattr(response, name, default)
+
+
+def build_incomplete_response_error(response: Any) -> AIIncompleteResponseError:
+    usage = extract_token_usage(response)
+    return AIIncompleteResponseError(
+        response_id=safe_response_id(response),
+        reason=incomplete_response_reason(response),
+        input_tokens=usage.get("input_tokens"),
+        output_tokens=usage.get("output_tokens"),
+        total_tokens=usage.get("total_tokens"),
+    )
+
+
+def build_incomplete_response_message(reason: str | None) -> str:
+    if reason == "max_output_tokens":
+        return (
+            "OpenAI response incomplete: max_output_tokens "
+            "(output token budget exhausted before structured response completed)."
+        )
+    if reason == "content_filter":
+        return "OpenAI response incomplete: content_filter (provider safety interruption)."
+    if reason:
+        return f"OpenAI response incomplete: {reason}."
+    return "OpenAI response incomplete."
+
+
+def safe_response_id(response: Any) -> str | None:
+    response_id = getattr(response, "id", None)
+    if response_id is None and isinstance(response, dict):
+        response_id = response.get("id")
+    return str(response_id) if response_id else None
+
+
+def incomplete_response_reason(response: Any) -> str | None:
+    details = getattr(response, "incomplete_details", None)
+    if details is None and isinstance(response, dict):
+        details = response.get("incomplete_details")
+    if not details:
+        return None
+
+    reason = getattr(details, "reason", None)
+    if reason is None and isinstance(details, dict):
+        reason = details.get("reason")
+    return str(reason) if reason else None
+
+
+def extract_token_usage(response: Any) -> dict[str, int | None]:
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage")
+
+    return {
+        "input_tokens": optional_int_attribute(usage, "input_tokens"),
+        "output_tokens": optional_int_attribute(usage, "output_tokens"),
+        "total_tokens": optional_int_attribute(usage, "total_tokens"),
+    }
+
+
+def optional_int_attribute(source: Any, name: str) -> int | None:
+    if source is None:
+        return None
+
+    value = getattr(source, name, None)
+    if value is None and isinstance(source, dict):
+        value = source.get(name)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 def extract_refusal_from_response(response: Any) -> str | None:

@@ -1,5 +1,29 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch A Incomplete Response Diagnostics Patch
+
+### Completed Features
+
+- 新增 `AIIncompleteResponseError`，專門表示 OpenAI Responses API 回傳 `status == "incomplete"` 的 structured-output 中止狀態。
+- Incomplete domain error 只保留安全 diagnostics：`response_id`、`incomplete_details.reason`、`input_tokens`、`output_tokens`、`total_tokens`。
+- `reason == "max_output_tokens"` 會明確表示 output token budget exhausted before structured response completed。
+- `reason == "content_filter"` 會明確表示 provider safety interruption，不會誤判成 token shortage。
+- `incomplete_details` 或 usage 缺失時，回傳 generic safe incomplete error，不輸出 raw provider response。
+- Developer instructions 小幅收斂 structured answer 長度：summary 2-4 short sentences、findings 3-5 concise items、limitations / missing_information / next_steps up to 3 concise items each。
+- `DEFAULT_MAX_OUTPUT_TOKENS` 維持 `1200`，因第一次 live smoke test 的舊版程式未保留 `incomplete_details.reason`，目前不能確認 root cause 是 token budget。
+
+### Safety Notes
+
+- 本 patch 未修改 `ResearchContext`、selector、grounding rules、numeric validation、forbidden-output policy、Streamlit UI 或 provider tools。
+- Error string 不包含 API key、full payload、partial output、raw response JSON 或 headers。
+- Live smoke failure policy 維持：遇到 authentication、quota、rate limit、provider error、structured output error、refusal、grounding / numeric / forbidden validation failure 時回報並停止，不自動 retry。
+- 本 patch 沒有重新執行 live OpenAI request。
+
+### Testing Notes
+
+- `tests/test_ai_research_service.py` 新增 incomplete response coverage：max output tokens、response ID preservation、usage preservation、content filter distinction、missing incomplete details、secret / payload non-leakage、completed response path unchanged。
+- SDK audit 使用 installed `openai 2.52.0` type definitions 確認 `Response` 具備 `id`、`status`、`incomplete_details`、`usage`、`output`，且 `IncompleteDetails.reason` 支援 `max_output_tokens` / `content_filter`。
+
 ## 2026-08-02 — Sprint 05 Batch A Grounded AI Research Foundation
 
 ### Completed Features

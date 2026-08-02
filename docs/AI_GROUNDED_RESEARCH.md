@@ -154,6 +154,18 @@ Metadata is built by the service, not by the model:
 - selected question type
 - optional usage data
 
+## Output Length Policy
+
+The strict schema still requires evidence-backed structured output, but developer instructions keep the response concise:
+
+- summary: 2-4 short sentences
+- findings: 3-5 concise items
+- limitations: up to 3 concise items
+- missing information: up to 3 concise items
+- next steps: up to 3 concise research tasks
+
+This keeps the first live provider path less likely to exhaust `max_output_tokens` while preserving evidence citations and grounding requirements.
+
 ## Grounding Validation
 
 After parsing the structured response, `validate_grounded_ai_answer()` checks:
@@ -185,6 +197,7 @@ The service exposes domain exceptions:
 - `AIConfigurationError`
 - `AIProviderError`
 - `AIStructuredOutputError`
+- `AIIncompleteResponseError`
 - `AIRefusalError`
 - `AIGroundingError`
 
@@ -200,6 +213,24 @@ Provider error mapping converts authentication, timeout, rate-limit, connection,
 
 If the provider response contains a refusal content item, the parser raises `AIRefusalError` instead of treating the refusal as malformed JSON.
 
+Responses API can return `status == "incomplete"` before a strict structured output is complete. The service now raises `AIIncompleteResponseError` and preserves only safe diagnostics:
+
+- response ID, if returned
+- `incomplete_details.reason`, if returned
+- input tokens, output tokens, and total tokens, if returned
+
+The error message never includes the API key, full prompt payload, raw response JSON, headers, or partial output text.
+
+Incomplete reason handling is intentionally explicit:
+
+- `max_output_tokens`: output token budget was exhausted before structured response completion
+- `content_filter`: provider safety interruption
+- other / missing reason: generic incomplete provider response
+
+`content_filter` must not be treated as token shortage. The live-smoke policy is to report this domain error and stop; no automatic retry is performed by the service.
+
+`DEFAULT_MAX_OUTPUT_TOKENS` remains `1200` until a preserved `incomplete_details.reason == "max_output_tokens"` confirms output budget exhaustion. `max_output_tokens` is a ceiling, not a request for the model to spend that many tokens.
+
 ## Runtime Validation Policy
 
 Automated validation is intentionally no-live-API:
@@ -211,6 +242,8 @@ Automated validation is intentionally no-live-API:
 - no OpenAI live request is made during automated tests
 
 If `OPENAI_API_KEY` is configured later, live smoke validation should be run as a separate explicit task so paid provider calls are not mixed with unit-test or code-review validation.
+
+The first explicit live smoke test for `2454.TW` reached the real provider, but the production service only reported `status = incomplete` before this diagnostic patch. Because the previous implementation did not preserve `response.id`, `incomplete_details.reason`, or usage, the root cause could not be confirmed from that run.
 
 ## Current Non-Goals
 

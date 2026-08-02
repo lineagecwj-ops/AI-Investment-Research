@@ -17,8 +17,10 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from ai_config import DEFAULT_OPENAI_MODEL
+from ai_config import DEFAULT_MAX_OUTPUT_TOKENS
 from ai_config import get_ai_research_config
 from ai_research_service import AIConfigurationError
+from ai_research_service import AIIncompleteResponseError
 from ai_research_service import AIProviderError
 from ai_research_service import AIRefusalError
 from ai_research_service import AIResearchError
@@ -222,6 +224,7 @@ class AIResearchServiceTestCase(unittest.TestCase):
     def test_config_uses_openai_model_override_or_default(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(get_ai_research_config().model, DEFAULT_OPENAI_MODEL)
+            self.assertEqual(get_ai_research_config().max_output_tokens, DEFAULT_MAX_OUTPUT_TOKENS)
 
         with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-test-model"}, clear=True):
             self.assertEqual(get_ai_research_config().model, "gpt-test-model")
@@ -285,6 +288,7 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertFalse(call["store"])
         self.assertNotIn("tools", call)
         self.assertEqual(call["text"]["format"]["type"], "json_schema")
+        self.assertEqual(call["max_output_tokens"], 10)
 
     def test_request_guards_reject_invalid_questions_before_provider_call(self):
         for question in ["", "   ", "x" * 1501]:
@@ -361,7 +365,7 @@ class AIResearchServiceTestCase(unittest.TestCase):
             parse_structured_response(response)
 
     def test_parse_structured_response_rejects_incomplete_missing_or_invalid_json(self):
-        with self.assertRaisesRegex(AIStructuredOutputError, "incomplete"):
+        with self.assertRaisesRegex(AIIncompleteResponseError, "OpenAI response incomplete"):
             parse_structured_response(SimpleNamespace(status="incomplete", output_text="{}"))
 
         with self.assertRaisesRegex(AIStructuredOutputError, "valid JSON"):
@@ -369,6 +373,81 @@ class AIResearchServiceTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(AIStructuredOutputError, "structured output"):
             parse_structured_response(SimpleNamespace(status="completed"))
+
+    def test_incomplete_max_output_tokens_preserves_safe_diagnostics(self):
+        response = SimpleNamespace(
+            id="resp_incomplete_123",
+            status="incomplete",
+            incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+            usage=SimpleNamespace(input_tokens=1500, output_tokens=1200, total_tokens=2700),
+            output=[SimpleNamespace(content=[SimpleNamespace(type="output_text", text="{")])],
+        )
+
+        with self.assertRaises(AIIncompleteResponseError) as raised:
+            parse_structured_response(response)
+
+        error = raised.exception
+        self.assertEqual(error.response_id, "resp_incomplete_123")
+        self.assertEqual(error.reason, "max_output_tokens")
+        self.assertEqual(error.input_tokens, 1500)
+        self.assertEqual(error.output_tokens, 1200)
+        self.assertEqual(error.total_tokens, 2700)
+        self.assertIn("output token budget exhausted", str(error))
+        self.assertNotIn("{", str(error))
+        self.assertNotIn("sk-", str(error))
+
+    def test_incomplete_content_filter_is_not_mapped_to_token_shortage(self):
+        response = {
+            "id": "resp_filtered_123",
+            "status": "incomplete",
+            "incomplete_details": {"reason": "content_filter"},
+            "usage": {"input_tokens": 20, "output_tokens": 0, "total_tokens": 20},
+        }
+
+        with self.assertRaises(AIIncompleteResponseError) as raised:
+            parse_structured_response(response)
+
+        error = raised.exception
+        self.assertEqual(error.response_id, "resp_filtered_123")
+        self.assertEqual(error.reason, "content_filter")
+        self.assertEqual(error.input_tokens, 20)
+        self.assertEqual(error.output_tokens, 0)
+        self.assertEqual(error.total_tokens, 20)
+        self.assertIn("provider safety interruption", str(error))
+        self.assertNotIn("token budget", str(error))
+
+    def test_incomplete_missing_details_uses_safe_generic_error(self):
+        response = SimpleNamespace(
+            id=None,
+            status="incomplete",
+            incomplete_details=None,
+            usage=None,
+        )
+
+        with self.assertRaises(AIIncompleteResponseError) as raised:
+            parse_structured_response(response)
+
+        error = raised.exception
+        self.assertIsNone(error.response_id)
+        self.assertIsNone(error.reason)
+        self.assertIsNone(error.input_tokens)
+        self.assertEqual(str(error), "OpenAI response incomplete.")
+
+    def test_incomplete_error_string_does_not_leak_payload_or_secret(self):
+        response = SimpleNamespace(
+            id="resp_secret_123",
+            status="incomplete",
+            incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+            usage={"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
+            output_text='{"payload":"sk-test-secret"}',
+        )
+
+        with self.assertRaises(AIIncompleteResponseError) as raised:
+            parse_structured_response(response)
+
+        text = str(raised.exception)
+        self.assertNotIn("sk-test-secret", text)
+        self.assertNotIn("payload", text)
 
     def test_validation_rejects_unknown_evidence_id(self):
         data = self.valid_output()
