@@ -33,6 +33,8 @@ from ai_research_service import AIRefusalError
 from ai_research_service import AIGroundingError
 from ai_research_service import AINumericGroundingError
 from ai_research_service import AIStructuredOutputError
+from ai_research_service import PercentageClaim
+from ai_research_service import PercentageEvidenceCandidate
 from research_context import EvidenceItem
 from research_context import MissingDataItem
 from research_context import ResearchLimitation
@@ -379,6 +381,64 @@ class AIDashboardTestCase(unittest.TestCase):
         details = safe_error_details(errors[2])
         self.assertEqual(details["response_id"], "resp_123")
         self.assertEqual(details["incomplete_reason"], "max_output_tokens")
+
+    def test_numeric_grounding_failure_has_safe_technical_diagnostics(self):
+        error = AINumericGroundingError(
+            statement="Revenue Growth 為 99.00%。 raw provider answer sk-test-secret",
+            claims=[
+                PercentageClaim(
+                    text="99.00%",
+                    value=99.0,
+                    normalized_value=99.0,
+                    has_explicit_sign=False,
+                    direction=None,
+                )
+            ],
+            cited_evidence_ids=["current:revenue_growth"],
+            candidates=[
+                PercentageEvidenceCandidate(
+                    evidence_id="current:revenue_growth",
+                    metric="revenue_growth",
+                    raw_value=0.1232,
+                    normalized_percentage=12.32,
+                )
+            ],
+            reason="unsupported_percentage_claim",
+        )
+
+        self.assertEqual(
+            safe_error_message(error),
+            "AI 回答未通過資料一致性驗證，因此未顯示。",
+        )
+        details = safe_error_details(error)
+
+        self.assertEqual(details["error_type"], "AINumericGroundingError")
+        self.assertEqual(details["diagnostic_type"], "numeric_grounding")
+        self.assertEqual(details["reason"], "unsupported_percentage_claim")
+        self.assertEqual(
+            details["offending_statement"],
+            "Revenue Growth 為 99.00%。 raw provider answer [REDACTED]",
+        )
+        self.assertEqual(details["percentage_claims"][0]["text"], "99.00%")
+        self.assertEqual(details["cited_evidence_ids"], ["current:revenue_growth"])
+        self.assertEqual(details["percentage_candidates"][0]["normalized_percentage"], 12.32)
+        self.assertNotIn("OPENAI_API_KEY", str(details))
+        self.assertNotIn("sk-test-secret", str(details))
+
+    def test_citation_grounding_failure_has_safe_technical_diagnostics(self):
+        error = AIGroundingError("Unknown evidence ID cited: hallucinated:evidence")
+
+        self.assertEqual(
+            safe_error_message(error),
+            "AI 回答未通過資料一致性驗證，因此未顯示。",
+        )
+        details = safe_error_details(error)
+
+        self.assertEqual(details["error_type"], "AIGroundingError")
+        self.assertEqual(details["diagnostic_type"], "citation_grounding")
+        self.assertEqual(details["grounding_message"], "Unknown evidence ID cited: hallucinated:evidence")
+        self.assertNotIn("raw provider answer", str(details))
+        self.assertNotIn("sk-test-secret", str(details))
 
     def test_api_key_status_is_boolean_only(self):
         self.assertFalse(is_openai_api_configured({"OPENAI_API_KEY": ""}))

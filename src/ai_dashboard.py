@@ -3,6 +3,7 @@ from datetime import date
 import hashlib
 import json
 import os
+import re
 from numbers import Real
 from typing import Any
 
@@ -20,6 +21,9 @@ from research_context import ResearchLimitation
 from research_context import json_safe_value
 from research_context_selector import ResearchQuestionType
 from research_context_selector import SelectedResearchContext
+
+
+SECRET_LIKE_PATTERN = re.compile(r"(sk-[A-Za-z0-9_-]+|OPENAI_API_KEY\s*=\s*\S+|OPENAI_API_KEY)")
 
 
 @dataclass(frozen=True)
@@ -310,7 +314,45 @@ def safe_error_details(error: Exception) -> dict[str, Any]:
                 "total_tokens": error.total_tokens,
             }
         )
+    elif isinstance(error, AINumericGroundingError):
+        details.update(
+            {
+                "diagnostic_type": "numeric_grounding",
+                "reason": error.reason,
+                "offending_statement": redact_sensitive_text(error.statement),
+                "percentage_claims": [
+                    {
+                        "text": redact_sensitive_text(claim.text),
+                        "value": claim.value,
+                        "normalized_value": claim.normalized_value,
+                        "direction": claim.direction,
+                    }
+                    for claim in error.claims
+                ],
+                "cited_evidence_ids": list(error.cited_evidence_ids),
+                "percentage_candidates": [
+                    {
+                        "evidence_id": candidate.evidence_id,
+                        "metric": candidate.metric,
+                        "raw_value": candidate.raw_value,
+                        "normalized_percentage": candidate.normalized_percentage,
+                    }
+                    for candidate in error.candidates
+                ],
+            }
+        )
+    elif isinstance(error, AIGroundingError):
+        details.update(
+            {
+                "diagnostic_type": "citation_grounding",
+                "grounding_message": redact_sensitive_text(str(error)),
+            }
+        )
     return {key: value if value is not None else "N/A" for key, value in details.items()}
+
+
+def redact_sensitive_text(value: Any) -> str:
+    return SECRET_LIKE_PATTERN.sub("[REDACTED]", str(value))
 
 
 def json_safe_selected_context_summary(selected_context: SelectedResearchContext) -> dict[str, Any]:
