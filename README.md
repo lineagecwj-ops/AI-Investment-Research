@@ -117,5 +117,12 @@ Dashboard 與 console application 共用既有 service layer：
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
 Historical Interpretation methodology 詳見 `docs/HISTORICAL_INTERPRETATION_FRAMEWORK.md`。
+Grounded AI Research foundation 詳見 `docs/AI_GROUNDED_RESEARCH.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
+
+## Grounded AI Research Foundation
+
+目前已建立第一版 Grounded AI Research service boundary，但尚未接入 Streamlit UI，也不會把 AI answer 寫入 SQLite。
+
+此 layer 使用 `SelectedResearchContext` 作為唯一 AI input，透過 OpenAI Responses API strict structured output 產生 `GroundedResearchAnswer`，並在回傳前做 deterministic grounding validation。Production 使用 `OPENAI_API_KEY`，tests 使用 fake client，不需要 network 或 API key。

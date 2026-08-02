@@ -1,5 +1,45 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch A Grounded AI Research Foundation
+
+### Completed Features
+
+- 新增 `src/ai_config.py`，集中管理 Grounded AI Research 的 default model、max output tokens、timeout 與 question length guard。
+- 新增 `src/ai_research_service.py`，建立第一版 Grounded AI Research service boundary。
+- AI service API 接受 `question` 與 `SelectedResearchContext`，不接受完整 `ResearchContext`，也不自行做 selection。
+- Production client boundary 使用 OpenAI Responses API，並以 `text.format` 的 strict `json_schema` 要求 structured output。
+- 新增 `GroundedResearchAnswer`、`GroundedFinding` 與 `AIResponseMetadata` dataclass，避免 AI 只回傳一大段 Markdown。
+- 新增 AI-specific payload builder，只傳 symbol、display name、question type、selected evidence、selected observations、selected missing data、selected limitations、next-step hints 與 period metadata。
+- Developer instructions 集中於 AI service，明確限制模型只能使用 selected context、不得新增不存在數字、不得忽略 missing data / limitations、不得產生 Buy / Sell / Hold、target price、score、rating 或 investment recommendation，並要求繁體中文與保留重要英文 financial terminology。
+- 新增 deterministic grounding validation：檢查 symbol / question type、finding evidence IDs 不可空白、citation 必須存在於 selected evidence、duplicate IDs normalize、unknown citation reject、forbidden recommendation language reject。
+- 加入最小 explicit percentage claim guard，針對 statement 中明確百分比與 cited numeric evidence 做 deterministic consistency check。
+- 新增 domain exceptions：`AIResearchError`、`AIConfigurationError`、`AIProviderError`、`AIStructuredOutputError`、`AIGroundingError`。
+- `OPENAI_API_KEY` 只在 production client 初始化時讀取；缺少時 raise 清楚錯誤，不印出 secret。
+- 測試全部使用 fake client，不需要 network、API key 或 OpenAI billing。
+- `requirements.txt` 新增 `openai>=1.99.0`；`.gitignore` 新增 `.env` 與 `.env.*`。
+- 新增 `docs/AI_GROUNDED_RESEARCH.md` 記錄 architecture boundary、payload、structured output、validation、error handling 與 non-goals。
+- Runtime validation / hardening：安裝 project requirements 後確認 `openai 2.52.0` 與 `pydantic 2.13.4`，並完成 `openai` / `OpenAI` import validation。
+- Installed SDK introspection 確認 `OpenAI(api_key=..., timeout=...)` 與 Responses API `responses.create(model=..., input=..., text=..., max_output_tokens=..., store=...)` call shape 可用。
+- Production Responses API request 明確加入 `store=False`，維持本 Batch stateless、不保存 provider conversation state。
+- Parser 新增 refusal content detection，若 provider 回傳 refusal item，轉成 `AIRefusalError`。
+- Provider error mapping 補強 authentication、timeout、rate-limit、connection、status 與 generic provider failure 的 domain exception boundary。
+
+### Safety Notes
+
+- 本 Batch 未接 Streamlit UI，未新增 AI answer SQLite persistence，未建立 conversation database。
+- AI request 不提供 web search、file search、code interpreter、function tools 或任何外部工具。
+- AI service 不查 Yahoo、不讀 SQLite、不讀完整 ResearchContext、不做 natural-language question classification。
+- Citation existence validation 不等於完整 factual verification；目前只額外加入明確 percentage claim 的最小 deterministic guard。
+- Forbidden output validation 對 summary、findings、next steps 生效；limitations 中允許出現「本回答不提供 Buy / Sell recommendation」這類 disclaimer。
+- Runtime validation 沒有呼叫 OpenAI live API；若後續要做 paid smoke test，需另開明確任務。
+
+### Testing Notes
+
+- 新增 `tests/test_ai_research_service.py`，覆蓋 config override、missing API key、AI-specific payload、fake client generation、strict JSON Schema request、invalid structured response、unknown evidence citation、empty factual citation、unsupported percentage claim、forbidden recommendation language、limitations disclaimer allowance。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_ai_research_service`，10 tests passed。
+- Full tests：`.venv/bin/python -m unittest discover -s tests`，243 tests passed。
+- Hardening 後 `tests.test_ai_research_service` 擴充至 22 tests，新增 request guards、selected-context evidence guard、duplicate citation normalization、outside-selected citation rejection、multi-evidence citation acceptance、prompt-injection structural boundary、provider refusal parsing、fallback SDK-like output parsing、provider error mapping、`store=False` request boundary、與個別 forbidden output terms。
+
 ## 2026-08-02 — Sprint 04 Batch B AI-Ready Context Selection
 
 ### Completed Features

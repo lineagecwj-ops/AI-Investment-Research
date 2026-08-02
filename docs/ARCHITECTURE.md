@@ -49,6 +49,12 @@ research_context.py
 research_context_selector.py
     └── Deterministic AI-ready Research Context subset selector by explicit question type
 
+ai_config.py
+    └── Central Grounded AI Research configuration for model, timeout, output-token, and input-length defaults
+
+ai_research_service.py
+    └── Grounded AI Research service using SelectedResearchContext, OpenAI Responses API, strict structured output, and deterministic grounding validation
+
 research_glossary.py
     └── Beginner research term glossary for Research UI
 
@@ -170,6 +176,51 @@ Non-responsibilities:
 - Prompt generation
 - OpenAI / ChatGPT / LLM calls
 - Embeddings, vector database, or semantic search
+- Buy / Sell / Hold recommendations, target prices, scores, ratings, or rankings
+
+---
+
+### ai_config.py
+
+Responsibilities:
+
+- Keep Grounded AI Research model, timeout, output-token, and input-length defaults in one module.
+- Allow `OPENAI_MODEL` environment variable override.
+- Avoid scattering model names or output settings across service modules.
+
+Non-responsibilities:
+
+- Reading or storing `OPENAI_API_KEY`
+- Instantiating the OpenAI client
+- Prompt construction
+- Streamlit rendering
+
+---
+
+### ai_research_service.py
+
+Responsibilities:
+
+- Generate a structured `GroundedResearchAnswer` from an explicit user question and `SelectedResearchContext`.
+- Accept only selected context, not full `ResearchContext`.
+- Build an AI-specific payload instead of dumping `SelectedResearchContext.to_dict()`.
+- Centralize developer instructions and prompt-injection boundary wording.
+- Use OpenAI Responses API with strict JSON Schema structured output through a small client boundary.
+- Read `OPENAI_API_KEY` only when the production OpenAI client is instantiated.
+- Support test-time client injection so automated tests never call OpenAI, require network, require an API key, or incur billing.
+- Parse structured provider output into dataclasses and attach service-generated metadata.
+- Validate evidence IDs, empty factual citations, forbidden recommendation language, and minimal explicit percentage consistency.
+- Convert configuration, provider, structured-output, and grounding failures into domain exceptions.
+
+Non-responsibilities:
+
+- Selecting context from full `ResearchContext`
+- Natural-language question classification
+- Yahoo Finance fetch
+- SQLite persistence or AI response history
+- Streamlit UI rendering
+- Web search, file search, code interpreter, or provider tools
+- Full natural-language fact checking
 - Buy / Sell / Hold recommendations, target prices, scores, ratings, or rankings
 
 ---
