@@ -55,6 +55,9 @@ ai_config.py
 ai_dashboard.py
     └── AI Research UI presentation helpers, question-type labels, request fingerprinting, evidence formatting, and safe error messages
 
+ai_followup.py
+    └── Grounded follow-up research turn/session models, deterministic question routing, suggestion policy, dedupe, turn IDs, and token aggregation
+
 ai_research_service.py
     └── Grounded AI Research service using SelectedResearchContext, OpenAI Responses API, strict structured output, and deterministic grounding validation
 
@@ -107,7 +110,8 @@ Responsibilities:
 - Session state for keeping query results across Streamlit reruns
 - User-friendly Streamlit messages for stock query and Watchlist errors
 - AI Research tab orchestration through explicit form submit only
-- Store AI Research answers only in `st.session_state`, without SQLite persistence or conversation memory
+- Store AI Research sessions and verified turns only in `st.session_state`, without SQLite persistence or conversation memory
+- Render grounded follow-up suggestions, explicit follow-up form, current turn, previous-turn research history, and session request/token counters
 - Render grounded findings, selected evidence, limitations, missing data, validation status, and safe provider metadata
 - Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
 
@@ -223,6 +227,27 @@ Non-responsibilities:
 - Fetching Yahoo Finance or querying SQLite
 - Persisting AI answers
 - Streamlit widget rendering
+
+---
+
+### ai_followup.py
+
+Responsibilities:
+
+- Define frozen `AIResearchTurn` snapshots and session-level `AIResearchSession`.
+- Build deterministic follow-up suggestions from AI next steps, deterministic next steps, missing data, and fallback policy.
+- Infer follow-up `ResearchQuestionType` through local keyword rules only.
+- Normalize and dedupe suggestion questions without embeddings or fuzzy AI matching.
+- Build deterministic turn IDs and aggregate session token usage.
+
+Non-responsibilities:
+
+- Calling OpenAI or any provider
+- Selecting `ResearchContext`
+- Fetching Yahoo Finance or querying SQLite
+- Persisting AI turns
+- Rendering Streamlit widgets
+- Chat history, conversation memory, embeddings, or AI routing
 
 ---
 

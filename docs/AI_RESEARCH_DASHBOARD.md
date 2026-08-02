@@ -4,7 +4,7 @@
 
 AI Research Dashboard connects the existing Grounded AI Research service to Streamlit.
 
-It lets the user submit one explicit stock research question, builds a deterministic selected research context, generates one structured grounded answer, and renders the answer with visible evidence.
+It lets the user submit one explicit stock research question, builds a deterministic selected research context, generates one structured grounded answer, and renders the answer with visible evidence. It also supports controlled grounded follow-up research as a session-only research log.
 
 ## User Flow
 
@@ -19,13 +19,17 @@ Stock
 → SelectedResearchContext
 → GroundedResearchAnswer
 → Streamlit presentation
+→ Suggested follow-up questions
+→ Explicit follow-up form submit
+→ New SelectedResearchContext
+→ New GroundedResearchAnswer
 ```
 
 ## AI Research Tab
 
 `app.py` renders AI Research as its own tab. It is intentionally separate from deterministic `Research` and `Historical Trends` pages so fixed-rule interpretation and AI output are not mixed.
 
-`app.py` owns only form interaction, orchestration, `st.session_state`, and Streamlit rendering. Prompt rules, OpenAI client handling, structured output parsing, and grounding validation remain in `src/ai_research_service.py`.
+`app.py` owns only form interaction, orchestration, `st.session_state`, and Streamlit rendering. Prompt rules, OpenAI client handling, structured output parsing, and grounding validation remain in `src/ai_research_service.py`. Follow-up turn/session helpers live in `src/ai_followup.py`.
 
 ## Question Type
 
@@ -33,11 +37,11 @@ The tab uses explicit `ResearchQuestionType` values from `src/research_context_s
 
 Friendly labels, helper text, and placeholders are centralized in `src/ai_dashboard.py`, so `app.py` does not scatter enum-label mappings.
 
-The UI does not auto-route or reclassify natural-language questions. If the selected type is `Growth`, the selector uses the growth policy even if the question asks about another topic.
+Initial research uses the explicit type chosen by the user. Follow-up suggestions can preselect a type through deterministic keyword routing, but the user can override it before submit. Routing does not use AI.
 
 ## Explicit Submit / API Cost Boundary
 
-OpenAI calls are made only after `st.form_submit_button("產生 AI 研究")` returns `True`.
+OpenAI calls are made only after `st.form_submit_button("產生 AI 研究")` or `st.form_submit_button("產生延伸研究")` returns `True`.
 
 The tab displays:
 
@@ -45,17 +49,17 @@ The tab displays:
 此操作會呼叫 OpenAI API，可能產生 API 使用費用。
 ```
 
-It does not show estimated pricing because the project has no token pricing calculator. It also does not imply that ChatGPT Plus includes API usage.
+Follow-up suggestion buttons only fill the follow-up form. They do not call OpenAI. The UI does not show estimated pricing because the project has no token pricing calculator. It also does not imply that ChatGPT Plus includes API usage.
 
 ## Session State
 
-The latest result is stored in:
+The current session is stored in:
 
 ```text
-st.session_state["ai_research_result"]
+st.session_state["ai_research_session"]
 ```
 
-Stored fields include the last symbol, display name, question type, question, selected context summary, selected context, grounded answer, metadata, error detail, request fingerprint, and stale historical data flag.
+The session stores symbol, display name, verified turns, API request count, and safe last-error details. Each turn stores its own question, question type, fingerprint, grounded answer, metadata, and `SelectedResearchContext`.
 
 Streamlit reruns caused by expanders, widgets, scrolling, or page redraws re-render the stored result and do not call OpenAI again.
 
@@ -74,7 +78,7 @@ The fingerprint never includes the API key. It is displayed as a short UI identi
 
 ## Selected Research Context
 
-The tab builds `ResearchContext` from already-normalized domain objects and then calls `select_research_context()`.
+The tab builds `ResearchContext` from already-normalized domain objects and then calls `select_research_context()`. Every successful follow-up repeats this path with the follow-up question type, so old selected context is not reused as a factual source.
 
 The `Research Context Used（本次使用資料）` expander shows counts and evidence IDs grouped by category. It does not dump the full context JSON.
 
@@ -93,6 +97,8 @@ If a cited evidence ID cannot be found in `SelectedResearchContext.selected_evid
 Evidence display uses only `SelectedResearchContext.selected_evidence`.
 
 It does not query SQLite, fetch Yahoo Finance again, or inspect the full `ResearchContext`.
+
+For old turns, evidence display reads `turn.selected_context`; it does not lookup the current turn's selected context.
 
 Value formatting is presentation-only:
 
@@ -156,6 +162,8 @@ Grounding, numeric-grounding, structured-output, refusal, incomplete response, c
 
 When grounding validation fails, the unverified answer is not rendered.
 
+Follow-up errors do not remove previous verified turns. Failed requests are not appended to history.
+
 ## API Key Status
 
 The tab checks only whether `OPENAI_API_KEY` exists in the environment.
@@ -164,7 +172,7 @@ It shows `Configured` or `Not configured`. It does not show the key prefix, suff
 
 ## No Automatic Rerun Requests
 
-Initial render, widget changes, expanders, and reruns do not call OpenAI.
+Initial render, widget changes, suggestion clicks, expanders, and reruns do not call OpenAI.
 
 Only explicit form submit can create a provider request. The clear-result button only clears session state.
 
@@ -176,9 +184,15 @@ The MVP is session-only. Browser or app restart may lose the answer.
 
 ## No Chat / No Streaming
 
-This Batch does not add `chat_input`, chat history, conversation memory, follow-up turns, streaming, web search, embeddings, vector DB, or scheduled/background AI requests.
+This Batch does not add `chat_input`, chat history, conversation memory, streaming, web search, embeddings, vector DB, or scheduled/background AI requests.
 
 The service waits for full structured output and deterministic validation before the UI renders the answer.
+
+## Follow-up Research
+
+Follow-up Research is documented in `docs/AI_FOLLOWUP_RESEARCH.md`.
+
+The UI shows a research history of up to 5 verified turns. The current turn is expanded as the current result; previous turns are collapsed as prior research results. This is a research log, not chat bubbles.
 
 ## Live UI Validation Policy
 

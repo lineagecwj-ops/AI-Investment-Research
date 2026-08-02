@@ -98,7 +98,7 @@ Dashboard 目前提供：
 - `Dashboard`：股票搜尋，可輸入單一股票或逗號分隔多股票，顯示公司、價格、市值、PE、EPS、ROE、Sector、Industry。
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
-- `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer。
+- `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
 
@@ -139,4 +139,8 @@ AI Research tab 需要在啟動 Dashboard 前設定 `OPENAI_API_KEY` 環境變�
 
 在 `AI Research` tab 輸入單一股票、選擇 Research Question Type、輸入研究問題，並明確按下 `產生 AI 研究` 後才會呼叫 OpenAI API。此操作可能產生 API 使用費用。
 
+延伸研究不是自由聊天。每一輪都會重新依研究類型挑選可追溯資料，再發出新的 Grounded AI request；上一輪 AI answer 不會成為下一輪 factual source。
+
 AI answer 只保存在 `st.session_state`，不寫入 SQLite，也不建立聊天記憶或對話紀錄。展開 evidence、切換非 AI 控制或 Streamlit rerun 不會自動重新呼叫 OpenAI API。
+
+AI Follow-up Research workflow 詳見 `docs/AI_FOLLOWUP_RESEARCH.md`。

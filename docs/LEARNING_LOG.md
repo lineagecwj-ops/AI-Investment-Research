@@ -1,5 +1,32 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch C Grounded Follow-up Research Workflow
+
+### Completed Features
+
+- 新增 `src/ai_followup.py`，建立 `FollowUpResearchSuggestion`、frozen `AIResearchTurn`、session-only `AIResearchSession`、deterministic turn ID、suggestion dedupe、question routing、fallback suggestion policy 與 token usage aggregation。
+- AI Research tab 從單一 result 升級為 session research log；每個 session 最多 5 個 successful verified turns。
+- Initial research 成功後才建立新 session；新股票 request 失敗時不會先清掉舊 session。
+- Follow-up suggestions 顯示在目前 answer 下方，來源可包含 AI `next_steps`、missing data 與 deterministic fallback，但只作為下一步研究問題，不作為 factual evidence。
+- 「使用這個問題」只填入 follow-up form 與預選 question type，不呼叫 provider。
+- Follow-up submit 會重新建立 stock / historical data、`ResearchContext`、`SelectedResearchContext`，再發出新的 stateless Grounded AI request。
+- Turn history 顯示目前研究結果與先前研究結果；previous turns collapsed，並保存各自的 selected evidence snapshot。
+- Clear action 升級為「清除 AI 研究工作階段」，只清 session、draft、last error 與 request counter，不刪 API key、不碰 SQLite。
+- Session header 顯示 successful turn count、session API request count 與 token usage aggregation。
+
+### Safety Notes
+
+- 本 Batch 未新增 free chat、conversation memory、`previous_response_id`、OpenAI conversation object、streaming、web search、RAG、embeddings、vector DB、AI router、scheduled/background AI call 或 AI SQLite persistence。
+- Previous AI answer summary / findings / next steps 不會進入下一輪 provider payload；下一輪 factual grounding 只來自 new `SelectedResearchContext`。
+- Failed follow-up 不 append turn，也不顯示未驗證 raw answer；previous verified turns 仍保留。
+- API key 仍只由 provider client 讀取環境變數；turn/session 不保存 raw provider response、Authorization header 或 secret。
+
+### Testing Notes
+
+- 新增 `tests/test_ai_followup.py`，覆蓋中英文 deterministic routing、unknown fallback、suggestion priority、dedupe、5 item limit、fallback suggestions、missing-data suggestion、turn ID、frozen turn、hard 5-turn limit、failed-turn preservation、clear reset、token aggregation、previous answer isolation、new context snapshot、same-question explicit resubmit、secret/raw-response exclusion。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_ai_followup`，21 tests passed。
+- Regression tests：`.venv/bin/python -m unittest tests.test_ai_dashboard`，8 tests passed；`.venv/bin/python -m unittest tests.test_ai_research_service`，43 tests passed。
+
 ## 2026-08-02 — Sprint 05 Batch B Grounded AI Research Dashboard Integration
 
 ### Completed Features
