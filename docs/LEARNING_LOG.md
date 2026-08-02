@@ -1,5 +1,35 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch B Grounded AI Research Dashboard Integration
+
+### Completed Features
+
+- 新增 Streamlit `AI Research` tab，獨立於 deterministic `Research` / `Historical Trends`，避免固定規則輸出與 AI answer 混淆。
+- AI Research 使用單一股票、explicit `ResearchQuestionType`、使用者研究問題與 `st.form()` submit。
+- OpenAI API request 只在明確按下 `產生 AI 研究` 後執行；初始 render、widget change、expander、rerun 與 clear result 不會自動呼叫 provider。
+- 新增 `st.session_state["ai_research_result"]` 保存上一份 answer / selected context / metadata / error；rerun 直接重新 render session result。
+- 新增 `src/ai_dashboard.py`，集中管理 question-type label / help / placeholder、request fingerprint、evidence formatting、source-type label、derived lineage helper、safe error message 與 API key boolean status。
+- AI tab orchestration 會建立 `ResearchReport`、`HistoricalFinancialSeries`、`HistoricalResearchReport`、`ResearchContext`、`SelectedResearchContext`，再呼叫既有 `generate_grounded_research_answer()`。
+- Answer UI 顯示 header、AI Summary、Grounded Findings、Evidence expander、Limitations、Missing Information、Research Next Steps、validation badges、selected context preview 與 provider metadata。
+- Evidence UI 只 lookup `SelectedResearchContext.selected_evidence`，不回查 SQLite、不重抓 Yahoo、不 dump full context JSON。
+- Derived evidence 顯示 `Derived Evidence（衍生資料）` 與 `Derived from` source evidence detail；缺少 citation / lineage 時 defensive 顯示 unavailable。
+- API key status 僅顯示 Configured / Not configured，不顯示 key prefix、suffix、length 或 value，也不提供 UI key input。
+
+### Safety Notes
+
+- 本 Batch 未新增 AI answer SQLite persistence、AI table、conversation memory、chat input、streaming、web search、RAG、embeddings、vector DB、model selector、scheduled/background AI request。
+- Request fingerprint 不包含 API key，也不作為自動 cache key；使用者明確再次 submit 時允許新的 provider request。
+- Grounding / numeric / structured-output validation fail 時，未驗證 answer 不會顯示給使用者。
+- Provider metadata 只顯示 model、response ID、generated_at 與 token usage；不顯示 raw prompt、raw payload、raw response、headers 或 secrets。
+- Historical stale cache 會在 AI answer header 顯示 warning；AI tab 不宣稱 real-time analysis。
+
+### Testing Notes
+
+- 新增 `tests/test_ai_dashboard.py`，覆蓋 14 個 question type label / help、fingerprint determinism / input sensitivity / secret exclusion、evidence formatting、period / source-type labels、derived lineage safe resolution、safe error messages、incomplete response technical detail 與 API key boolean status。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_ai_dashboard`，7 tests passed。
+- AI service regression：`.venv/bin/python -m unittest tests.test_ai_research_service`，40 tests passed。
+- Compile validation：`.venv/bin/python -m py_compile app.py src/ai_dashboard.py src/ai_research_service.py` passed。
+
 ## 2026-08-02 — Sprint 05 Batch A Numeric Grounding Diagnostics Patch
 
 ### Completed Features

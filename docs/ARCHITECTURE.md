@@ -52,6 +52,9 @@ research_context_selector.py
 ai_config.py
     └── Central Grounded AI Research configuration for model, timeout, output-token, and input-length defaults
 
+ai_dashboard.py
+    └── AI Research UI presentation helpers, question-type labels, request fingerprinting, evidence formatting, and safe error messages
+
 ai_research_service.py
     └── Grounded AI Research service using SelectedResearchContext, OpenAI Responses API, strict structured output, and deterministic grounding validation
 
@@ -103,6 +106,9 @@ Responsibilities:
 - Dashboard page layout and widgets
 - Session state for keeping query results across Streamlit reruns
 - User-friendly Streamlit messages for stock query and Watchlist errors
+- AI Research tab orchestration through explicit form submit only
+- Store AI Research answers only in `st.session_state`, without SQLite persistence or conversation memory
+- Render grounded findings, selected evidence, limitations, missing data, validation status, and safe provider metadata
 - Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
 
 ---
@@ -194,6 +200,29 @@ Non-responsibilities:
 - Instantiating the OpenAI client
 - Prompt construction
 - Streamlit rendering
+
+---
+
+### ai_dashboard.py
+
+Responsibilities:
+
+- Centralize AI Research question-type labels, helper text, and placeholders for all `ResearchQuestionType` enum values.
+- Build deterministic request fingerprints from symbol, question type, question, selected evidence IDs, missing-data IDs, and limitation IDs.
+- Format selected evidence values and periods for UI display without mutating raw evidence values.
+- Provide human-readable source-type labels for source and derived evidence.
+- Resolve derived evidence lineage for presentation and handle missing lineage IDs safely.
+- Format safe user-facing AI error messages and technical details without raw prompt, raw response, API key, or traceback leakage.
+- Provide a boolean-only API key status helper.
+
+Non-responsibilities:
+
+- Calling OpenAI or any provider client
+- Building prompts or structured output schemas
+- Selecting Research Context
+- Fetching Yahoo Finance or querying SQLite
+- Persisting AI answers
+- Streamlit widget rendering
 
 ---
 

@@ -98,6 +98,7 @@ Dashboard 目前提供：
 - `Dashboard`：股票搜尋，可輸入單一股票或逗號分隔多股票，顯示公司、價格、市值、PE、EPS、ROE、Sector、Industry。
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
+- `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
 
@@ -118,11 +119,24 @@ Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
 Historical Interpretation methodology 詳見 `docs/HISTORICAL_INTERPRETATION_FRAMEWORK.md`。
 Grounded AI Research foundation 詳見 `docs/AI_GROUNDED_RESEARCH.md`。
+AI Research Dashboard integration 詳見 `docs/AI_RESEARCH_DASHBOARD.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
 ## Grounded AI Research Foundation
 
-目前已建立第一版 Grounded AI Research service boundary，但尚未接入 Streamlit UI，也不會把 AI answer 寫入 SQLite。
+目前已建立第一版 Grounded AI Research service boundary，並已接入 Streamlit AI Research tab；AI answer 仍不會寫入 SQLite。
 
 此 layer 使用 `SelectedResearchContext` 作為唯一 AI input，透過 OpenAI Responses API strict structured output 產生 `GroundedResearchAnswer`，並在回傳前做 deterministic grounding validation。Production 使用 `OPENAI_API_KEY`，tests 使用 fake client，不需要 network 或 API key。
+
+## AI Research Dashboard 使用方式
+
+AI Research tab 需要在啟動 Dashboard 前設定 `OPENAI_API_KEY` 環境變數。系統只檢查是否已設定，不會在 UI 顯示、輸入或保存 API key。
+
+```bash
+.venv/bin/streamlit run app.py
+```
+
+在 `AI Research` tab 輸入單一股票、選擇 Research Question Type、輸入研究問題，並明確按下 `產生 AI 研究` 後才會呼叫 OpenAI API。此操作可能產生 API 使用費用。
+
+AI answer 只保存在 `st.session_state`，不寫入 SQLite，也不建立聊天記憶或對話紀錄。展開 evidence、切換非 AI 控制或 Streamlit rerun 不會自動重新呼叫 OpenAI API。
