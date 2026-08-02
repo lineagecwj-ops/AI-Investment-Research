@@ -29,6 +29,25 @@ from dashboard import historical_metric_help
 from dashboard import query_stock_batch
 from dashboard import StockQueryFailure
 from dashboard import stock_display_data
+from ai_config import MAX_RESEARCH_QUESTION_LENGTH
+from ai_config import get_ai_research_config
+from ai_dashboard import build_request_fingerprint
+from ai_dashboard import evidence_lookup
+from ai_dashboard import format_evidence_period
+from ai_dashboard import format_evidence_value
+from ai_dashboard import format_generated_at
+from ai_dashboard import format_limitation_item
+from ai_dashboard import format_missing_data_item
+from ai_dashboard import is_openai_api_configured
+from ai_dashboard import json_safe_selected_context_summary
+from ai_dashboard import question_type_help
+from ai_dashboard import question_type_label
+from ai_dashboard import question_type_options
+from ai_dashboard import question_type_placeholder
+from ai_dashboard import safe_error_details
+from ai_dashboard import safe_error_message
+from ai_dashboard import source_type_label
+from ai_research_service import generate_grounded_research_answer
 from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
@@ -38,6 +57,9 @@ from historical_interpretation_presentation import build_next_step_display_group
 from historical_interpretation_presentation import FY_PERIOD_CAPTION
 from historical_interpretation_presentation import group_detailed_interpretation
 from historical_research_service import build_historical_research_report
+from research_context import build_research_context
+from research_context_selector import ResearchSelectionRequest
+from research_context_selector import select_research_context
 from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
@@ -66,6 +88,7 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("watchlist_query_failures", [])
     st.session_state.setdefault("comparison_stocks", [])
     st.session_state.setdefault("comparison_failures", [])
+    st.session_state.setdefault("ai_research_result", None)
 
 
 def render_query_failures(failures) -> None:
@@ -637,6 +660,326 @@ def render_historical_trends() -> None:
     st.dataframe(display.historical_table_rows, width="stretch", hide_index=True)
 
 
+def openai_api_configured() -> bool:
+    return is_openai_api_configured()
+
+
+def build_ai_research_result(input_text: str, question_type, question: str) -> dict:
+    symbols = parse_stock_symbols(input_text)
+    if not symbols:
+        raise ValueError("請輸入至少一個股票代號。")
+    if len(symbols) > 1:
+        raise ValueError("AI Research 目前只支援單一股票。")
+    if not question.strip():
+        raise ValueError("你想研究什麼？不可空白。")
+    if len(question.strip()) > MAX_RESEARCH_QUESTION_LENGTH:
+        raise ValueError("研究問題長度超過限制。")
+
+    symbol = symbols[0]
+    stocks, failures = query_stock_batch([symbol])
+    if failures:
+        raise ValueError(f"{failures[0].symbol} 查詢失敗：{failures[0].message}")
+    stock = stocks[0]
+    display_data = stock_display_data(stock)
+
+    research_report = build_research_report(stock)
+    historical_series = get_historical_financials(stock.symbol or symbol)
+    historical_research_report = build_historical_research_report(historical_series)
+    context = build_research_context(
+        stock=stock,
+        research_report=research_report,
+        historical_series=historical_series,
+        historical_research_report=historical_research_report,
+        display_name=display_data["Company Name"],
+    )
+    selected_context = select_research_context(
+        context,
+        ResearchSelectionRequest(question_type=question_type),
+    )
+    fingerprint = build_request_fingerprint(
+        symbol=stock.symbol or symbol,
+        question_type=question_type,
+        question=question,
+        selected_context=selected_context,
+    )
+    answer = generate_grounded_research_answer(
+        question=question,
+        selected_context=selected_context,
+    )
+
+    return {
+        "last_symbol": stock.symbol or symbol,
+        "last_display_name": display_data["Company Name"],
+        "last_question_type": question_type,
+        "last_question": question.strip(),
+        "selected_context": selected_context,
+        "selected_context_summary": json_safe_selected_context_summary(selected_context),
+        "answer": answer,
+        "metadata": answer.metadata,
+        "error": None,
+        "error_details": None,
+        "request_fingerprint": fingerprint,
+        "historical_stale": bool(historical_series.is_stale),
+    }
+
+
+def build_ai_research_error_result(
+    input_text: str,
+    question_type,
+    question: str,
+    error: Exception,
+) -> dict:
+    return {
+        "last_symbol": normalize_stock_symbol(input_text),
+        "last_display_name": None,
+        "last_question_type": question_type,
+        "last_question": question.strip(),
+        "selected_context": None,
+        "selected_context_summary": None,
+        "answer": None,
+        "metadata": None,
+        "error": safe_error_message(error),
+        "error_details": safe_error_details(error),
+        "request_fingerprint": None,
+        "historical_stale": False,
+    }
+
+
+def render_ai_research() -> None:
+    st.header("AI Research（AI 研究）")
+    st.caption("AI 依系統目前可取得的資料與快取狀態回答；回答不是即時分析，也不是投資建議。")
+
+    if openai_api_configured():
+        st.success("OpenAI API：Configured")
+    else:
+        st.warning("OpenAI API：Not configured。請先以環境變數設定 OpenAI API Key。")
+
+    config = get_ai_research_config()
+    question_options = question_type_options()
+    with st.form("ai_research_form"):
+        input_text = st.text_input(
+            "股票",
+            placeholder="2454 或 NVDA",
+            key="ai_research_symbol_input",
+        )
+        question_type = st.selectbox(
+            "Research Question Type",
+            question_options,
+            format_func=question_type_label,
+            help="請選擇本次 AI Research 使用的 deterministic context selection 類型。",
+            key="ai_research_question_type",
+        )
+        st.caption(question_type_help(question_type))
+        question = st.text_area(
+            "你想研究什麼？",
+            placeholder=question_type_placeholder(question_type),
+            max_chars=MAX_RESEARCH_QUESTION_LENGTH,
+            key="ai_research_question",
+        )
+        st.caption(
+            f"最多 {MAX_RESEARCH_QUESTION_LENGTH} 字。AI 只會依選擇的研究類型與可用證據回答。"
+        )
+        st.caption("此操作會呼叫 OpenAI API，可能產生 API 使用費用。")
+        submitted = st.form_submit_button(
+            "產生 AI 研究",
+            disabled=not openai_api_configured(),
+        )
+
+    if submitted:
+        with st.spinner("正在產生 Grounded AI Research…"):
+            try:
+                st.session_state["ai_research_result"] = build_ai_research_result(
+                    input_text,
+                    question_type,
+                    question,
+                )
+            except Exception as error:
+                st.session_state["ai_research_result"] = build_ai_research_error_result(
+                    input_text,
+                    question_type,
+                    question,
+                    error,
+                )
+
+    if st.button(
+        "清除 AI 研究結果",
+        disabled=st.session_state["ai_research_result"] is None,
+    ):
+        st.session_state["ai_research_result"] = None
+        st.rerun()
+
+    result = st.session_state["ai_research_result"]
+    if result is None:
+        st.info("輸入單一股票與研究問題後，按下「產生 AI 研究」才會呼叫 OpenAI API。")
+        return
+
+    st.caption("以下為上一次已完成的 AI Research。")
+    if result["error"]:
+        render_ai_research_error(result)
+        return
+
+    render_ai_research_answer(result, config.model)
+
+
+def render_ai_research_error(result: dict) -> None:
+    st.error(result["error"])
+    with st.expander("技術資訊", expanded=False):
+        details = result.get("error_details") or {}
+        if details:
+            st.dataframe([details], width="stretch", hide_index=True)
+        else:
+            st.write("N/A")
+
+
+def render_ai_research_answer(result: dict, fallback_model: str) -> None:
+    answer = result["answer"]
+    selected_context = result["selected_context"]
+    metadata = answer.metadata
+    question_type = result["last_question_type"]
+
+    display_name = result["last_display_name"] or selected_context.display_name or "N/A"
+    st.subheader(f"{result['last_symbol']} · {display_name}")
+    if result["historical_stale"]:
+        st.warning("Historical financial data 目前使用 stale cache。")
+
+    header_cols = st.columns(4)
+    header_cols[0].metric("Question Type", question_type_label(question_type))
+    header_cols[1].metric("Generated", format_generated_at(metadata.generated_at))
+    header_cols[2].metric("Model", metadata.model or fallback_model)
+    header_cols[3].metric("Fingerprint", result["request_fingerprint"][:12])
+    st.write(f"**User Question：** {result['last_question']}")
+
+    st.markdown("### AI Summary（AI 摘要）")
+    st.write(answer.summary)
+    st.caption("此回答僅依目前選取的研究資料產生。")
+
+    st.markdown("### Grounded Findings（有證據支持的研究觀察）")
+    selected_evidence = evidence_lookup(selected_context)
+    for index, finding in enumerate(answer.findings, start=1):
+        st.write(f"**Finding {index}**")
+        st.write(finding.statement)
+        with st.expander("查看 Evidence", expanded=False):
+            for evidence_id in finding.evidence_ids:
+                evidence = selected_evidence.get(evidence_id)
+                if evidence is None:
+                    st.warning(f"{evidence_id}：Evidence unavailable")
+                    continue
+                render_evidence_detail(evidence, selected_evidence)
+
+    st.markdown("### Limitations（資料限制）")
+    if answer.limitations:
+        st.write("**AI 提到的限制**")
+        for item in answer.limitations:
+            st.write(f"- {item}")
+    if selected_context.selected_limitations:
+        st.write("**Underlying Context Limitations**")
+        for item in selected_context.selected_limitations:
+            st.write(f"- {format_limitation_item(item)}")
+    if not answer.limitations and not selected_context.selected_limitations:
+        st.info("目前沒有額外 limitations。")
+
+    st.markdown("### Missing Information（缺漏資料）")
+    if answer.missing_information:
+        st.write("**AI 提到的缺漏資料**")
+        for item in answer.missing_information:
+            st.write(f"- {item}")
+    if selected_context.selected_missing_data:
+        st.write("**Deterministic Missing Data Detail**")
+        st.dataframe(
+            [format_missing_data_item(item) for item in selected_context.selected_missing_data],
+            width="stretch",
+            hide_index=True,
+        )
+    if not answer.missing_information and not selected_context.selected_missing_data:
+        st.info("目前沒有 selected missing-data detail。")
+
+    st.markdown("### Research Next Steps（下一步研究）")
+    for item in answer.next_steps:
+        st.write(f"□ {item}")
+    st.caption("這些是研究方向，不是投資建議。")
+
+    st.markdown("### Validation")
+    st.success("Structured Output ✓　Evidence Grounding ✓　Numeric Guard ✓　Advice Guard ✓")
+    st.caption("回答已通過系統的結構與引用驗證。")
+
+    render_selected_context_preview(selected_context)
+    render_ai_request_details(metadata)
+
+
+def render_evidence_detail(
+    evidence,
+    selected_evidence: dict,
+    *,
+    visited: set[str] | None = None,
+) -> None:
+    visited = visited or set()
+    if evidence.id in visited:
+        st.warning(f"{evidence.id}：lineage already shown")
+        return
+    visited.add(evidence.id)
+
+    st.write(f"**Evidence ID：** {evidence.id}")
+    st.write(f"**Metric：** {evidence.metric}")
+    st.write(f"**Value：** {format_evidence_value(evidence)}")
+    st.write(f"**Period：** {format_evidence_period(evidence.period_end)}")
+    st.write(f"**Source：** {evidence.source}")
+    st.write(f"**Source Type：** {source_type_label(evidence.source_type)}")
+    if evidence.source_type == "derived":
+        st.write("**Derived Evidence（衍生資料）**")
+    if evidence.note:
+        st.caption(evidence.note)
+    if evidence.derived_from:
+        with st.expander("Derived from", expanded=False):
+            for source_id in evidence.derived_from:
+                source_evidence = selected_evidence.get(source_id)
+                if source_evidence is None:
+                    st.warning(f"{source_id}：Evidence unavailable")
+                else:
+                    render_evidence_detail(source_evidence, selected_evidence, visited=visited)
+
+
+def render_selected_context_preview(selected_context) -> None:
+    with st.expander("Research Context Used（本次使用資料）", expanded=False):
+        summary = json_safe_selected_context_summary(selected_context)
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("Evidence count", summary["evidence_count"])
+        metric_cols[1].metric("Observation count", len(selected_context.selected_observations))
+        metric_cols[2].metric("Missing-data count", summary["missing_data_count"])
+        metric_cols[3].metric("Limitation count", summary["limitation_count"])
+        grouped = {}
+        for item in selected_context.selected_evidence:
+            grouped.setdefault(item.category, []).append(item.id)
+        for category, ids in grouped.items():
+            st.write(f"**{category}**")
+            for evidence_id in ids:
+                st.write(f"- {evidence_id}")
+
+
+def render_ai_request_details(metadata) -> None:
+    usage = metadata.usage if isinstance(metadata.usage, dict) else {}
+    with st.expander("AI Request Details", expanded=False):
+        st.dataframe(
+            [
+                {
+                    "model": metadata.model,
+                    "response_id": metadata.response_id or "N/A",
+                    "generated_at": format_generated_at(metadata.generated_at),
+                    "input_tokens": usage.get("input_tokens", "N/A"),
+                    "output_tokens": usage.get("output_tokens", "N/A"),
+                    "reasoning_tokens": metadata.reasoning_tokens
+                    if metadata.reasoning_tokens is not None
+                    else "N/A",
+                    "cached_input_tokens": metadata.cached_input_tokens
+                    if metadata.cached_input_tokens is not None
+                    else "N/A",
+                    "total_tokens": usage.get("total_tokens", "N/A"),
+                }
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+
 def read_watchlist_for_ui() -> list[str]:
     try:
         return list_watchlist()
@@ -753,8 +1096,8 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, historical_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Historical Trends", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, historical_tab, ai_research_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Historical Trends", "AI Research", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
@@ -765,6 +1108,9 @@ def main() -> None:
 
     with historical_tab:
         render_historical_trends()
+
+    with ai_research_tab:
+        render_ai_research()
 
     with watchlist_tab:
         render_watchlist()
