@@ -229,7 +229,15 @@ Incomplete reason handling is intentionally explicit:
 
 `content_filter` must not be treated as token shortage. The live-smoke policy is to report this domain error and stop; no automatic retry is performed by the service.
 
-`DEFAULT_MAX_OUTPUT_TOKENS` remains `1200` until a preserved `incomplete_details.reason == "max_output_tokens"` confirms output budget exhaustion. `max_output_tokens` is a ceiling, not a request for the model to spend that many tokens.
+The second live smoke test preserved incomplete diagnostics and confirmed:
+
+- status: `incomplete`
+- reason: `max_output_tokens`
+- input tokens: `3515`
+- output tokens: `1152`
+- configured `max_output_tokens`: `1200`
+
+Because the provider exhausted the 1200-token output ceiling before completing the strict structured response, `DEFAULT_MAX_OUTPUT_TOKENS` was raised from `1200` to `2400`. This is MVP headroom for strict JSON completion, not an instruction for the model to produce a longer report. `max_output_tokens` is a ceiling, not a request for the model to spend that many tokens.
 
 ## Runtime Validation Policy
 

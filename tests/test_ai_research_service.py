@@ -222,6 +222,8 @@ class AIResearchServiceTestCase(unittest.TestCase):
         )
 
     def test_config_uses_openai_model_override_or_default(self):
+        self.assertEqual(DEFAULT_MAX_OUTPUT_TOKENS, 2400)
+
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(get_ai_research_config().model, DEFAULT_OPENAI_MODEL)
             self.assertEqual(get_ai_research_config().max_output_tokens, DEFAULT_MAX_OUTPUT_TOKENS)
@@ -263,6 +265,7 @@ class AIResearchServiceTestCase(unittest.TestCase):
         self.assertEqual(answer.metadata.response_id, "resp_test_123")
         self.assertEqual(answer.metadata.model, DEFAULT_OPENAI_MODEL)
         self.assertEqual(answer.findings[0].evidence_ids, ["current:revenue_growth"])
+        self.assertEqual(client.calls[0]["max_output_tokens"], 2400)
         self.assertEqual(client.calls[0]["response_format"]["type"], "json_schema")
         self.assertTrue(client.calls[0]["response_format"]["strict"])
         self.assertNotIn("tools", client.calls[0])

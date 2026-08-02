@@ -1,5 +1,24 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 05 Batch A Output Token Budget Fix
+
+### Completed Features
+
+- 將 `DEFAULT_MAX_OUTPUT_TOKENS` 從 `1200` 調整為 `2400`。
+- 調整理由來自第二次 live smoke validation 的可診斷結果：`status = incomplete`、`incomplete_details.reason = max_output_tokens`、`input_tokens = 3515`、`output_tokens = 1152`、`total_tokens = 4667`，且當時 configured `max_output_tokens = 1200`。
+- `2400` 提供約 2x MVP headroom，避免 strict structured response 在完成前被截斷；這是 output ceiling，不是要求模型一定輸出 2400 tokens。
+- 保留既有 concise developer instructions：summary 2-4 short sentences、findings 3-5 concise items、limitations / missing_information / next_steps up to 3 concise items each。
+
+### Safety Notes
+
+- 本 patch 只修改 output token budget，未修改 `ResearchContext`、selector、Structured Output schema、grounding validation、numeric validation、forbidden-output validation、citation policy、OpenAI model、UI 或 SQLite。
+- `AIIncompleteResponseError` diagnostics 保留不變，未來若 2400 仍不足，仍可保留 response ID、reason 與 usage。
+- 本 patch 沒有執行新的 live OpenAI request，也沒有 push。
+
+### Testing Notes
+
+- AI service tests 明確確認 `DEFAULT_MAX_OUTPUT_TOKENS == 2400`，且 production generation path 會把 `max_output_tokens = 2400` 傳入 client boundary。
+
 ## 2026-08-02 — Sprint 05 Batch A Incomplete Response Diagnostics Patch
 
 ### Completed Features
@@ -10,7 +29,7 @@
 - `reason == "content_filter"` 會明確表示 provider safety interruption，不會誤判成 token shortage。
 - `incomplete_details` 或 usage 缺失時，回傳 generic safe incomplete error，不輸出 raw provider response。
 - Developer instructions 小幅收斂 structured answer 長度：summary 2-4 short sentences、findings 3-5 concise items、limitations / missing_information / next_steps up to 3 concise items each。
-- `DEFAULT_MAX_OUTPUT_TOKENS` 維持 `1200`，因第一次 live smoke test 的舊版程式未保留 `incomplete_details.reason`，目前不能確認 root cause 是 token budget。
+- `DEFAULT_MAX_OUTPUT_TOKENS` 當時維持 `1200`，因第一次 live smoke test 的舊版程式未保留 `incomplete_details.reason`，當時不能確認 root cause 是 token budget。
 
 ### Safety Notes
 
