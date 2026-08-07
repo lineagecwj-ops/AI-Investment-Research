@@ -117,6 +117,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical daily price normalization and cache：`src/historical_price_service.py`
 - Technical indicator feature calculation：`src/technical_indicator_service.py`
 - Signal and historical outcome definition：`src/signal_outcome_service.py`
+- Historical backtest aggregation：`src/backtest_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -127,6 +128,7 @@ Historical Price Data audit 詳見 `docs/HISTORICAL_PRICE_DATA_AUDIT.md`。
 Historical Price Foundation 詳見 `docs/HISTORICAL_PRICE_FOUNDATION.md`。
 Technical Indicator Foundation 詳見 `docs/TECHNICAL_INDICATOR_FOUNDATION.md`。
 Signal & Outcome Framework 詳見 `docs/SIGNAL_OUTCOME_FRAMEWORK.md`。
+Historical Backtest Engine 詳見 `docs/HISTORICAL_BACKTEST_ENGINE.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -151,6 +153,14 @@ Sprint 06 Batch C 新增 deterministic signal / historical outcome foundation。
 Signal layer 只用 signal date 當下的 `TechnicalIndicatorSnapshot` 評估條件，並區分 `MATCH`、`NO_MATCH`、`NOT_EVALUABLE`。Historical outcome layer 才能使用 signal date 之後的 future trading bars，產生 `HIT`、`MISS`、`INCOMPLETE` 或 `NOT_EVALUABLE` 的歷史標籤。
 
 本層目前只支援 raw-high breakout 與 close-return target 的 MVP outcome，不計算 Historical Hit Rate、不產生 probability、confidence、scanner、ranking、dashboard、AI prediction 或投資建議。
+
+## Historical Backtest Engine
+
+Sprint 06 Batch D 新增 deterministic historical backtest aggregation foundation。
+
+Backtest engine 會從 `HistoricalPriceSeries`、`TechnicalIndicatorSeries`、`SignalDefinition` 與 `OutcomeDefinition` 建立 raw signal events、套用指定 overlap policy，並把 Batch C 的 `HistoricalOutcomeResult` 聚合為 `HistoricalBacktestReport`。
+
+Historical Hit Rate（歷史命中率）的 denominator 固定為 `HIT + MISS`，排除 `INCOMPLETE` 與 `NOT_EVALUABLE`。本層不做 future probability、scanner ranking、dashboard、AI prediction、position sizing、transaction cost、stop loss、exit rule 或 strategy P&L。
 
 ## Grounded AI Research Foundation
 

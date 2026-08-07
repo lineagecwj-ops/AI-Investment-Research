@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.11
+v0.12
 
 ---
 
@@ -32,7 +32,6 @@ historical_price_service.py
     └── HistoricalPriceSeries / HistoricalPriceBar
     └── 12-hour SQLite historical price cache
     └── Coverage state for full-history and explicit range requests
-    └── Future Backtest Engine
 
 technical_indicator_service.py
     └── HistoricalPriceSeries
@@ -47,9 +46,15 @@ technical_indicator_service.py
         ↓
         HistoricalOutcomeResult
         ↓
-        future Backtest Aggregation
+        backtest_service.py
         ↓
-        Historical Hit Rate
+        HistoricalBacktestCase
+        ↓
+        HistoricalBacktestReport
+        ↓
+        future Opportunity Scanner
+        ↓
+        future Historical Case Explorer
 
 signal_outcome_service.py
     └── TechnicalIndicatorSeries / TechnicalIndicatorSnapshot
@@ -62,9 +67,9 @@ signal_outcome_service.py
         ↓
         HistoricalOutcomeResult
         ↓
-        future Backtest Aggregation
+        backtest_service.py
         ↓
-        Historical Hit Rate
+        HistoricalBacktestReport
 
 watchlist_service.py
     └── JSON watchlist
@@ -144,6 +149,19 @@ signal_outcome_service.py
     └── HIT / MISS / INCOMPLETE / NOT_EVALUABLE outcome statuses
     └── Overlapping signal cooldown as analysis-time filtering only
     └── No hit-rate aggregation, probability, scanner, dashboard, AI, or persistence
+
+backtest_service.py
+    └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
+    └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range
+    └── Raw signal count from find_signal_events()
+    └── Filtered signal count after date range and ALLOW_ALL / COOLDOWN policy
+    └── HistoricalBacktestCase preserving SignalEvent and HistoricalOutcomeResult identity
+    └── HistoricalBacktestReport with HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts
+    └── Historical Hit Rate denominator fixed as HIT + MISS
+    └── Return aggregates using non-empty metric values only, with sample counts
+    └── Trading-bar hit-index aggregation for HIT cases
+    └── Stable deterministic backtest_id and case_id
+    └── No probability, ranking, scanner, dashboard, AI, transaction simulation, or persistence
 
 symbol_utils.py
     └── Stock symbol normalization

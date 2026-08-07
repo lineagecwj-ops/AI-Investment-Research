@@ -1,5 +1,35 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 06 Batch D Historical Backtest Engine
+
+### Completed Features
+
+- 新增 `src/backtest_service.py`，建立 deterministic Historical Backtest Engine，輸入既有 `HistoricalPriceSeries`、`TechnicalIndicatorSeries`、`SignalDefinition`、`OutcomeDefinition` 與 `BacktestConfig`。
+- 新增 frozen `BacktestConfig`，明確保存 `overlap_policy`、`cooldown_bars`、`start_date` 與 `end_date`；`COOLDOWN` 必須有正數 cooldown，`ALLOW_ALL` 不接受 ambiguous cooldown。
+- 新增 frozen `HistoricalBacktestCase`，保存 `SignalEvent` 與 `HistoricalOutcomeResult`，case status 直接來自 outcome status，不重算。
+- 新增 frozen `HistoricalBacktestReport`，保存 raw / filtered signal counts、HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts、resolved count、Historical Hit Rate、return aggregates、hit-bar aggregates、sample counts、raw events、evaluated events 與 cases。
+- Historical Hit Rate denominator 固定為 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 不進 denominator。
+- Early `HIT` 即使 full horizon 尚未完成，也進 resolved denominator；但缺少完整-window 的 MFE / MAE / end return 仍不進 return aggregate。
+- Return aggregation 僅使用非 `None` metric；不把缺值補 `0`。MFE 使用 `max_close_return`，MAE 使用 `max_adverse_return` 並保留負號，end return 使用 `end_of_window_return`。
+- Hit timing 使用 trading bar index，不平均 calendar days。
+- Date range 只 filter signal dates；outcome evaluation 仍可使用 backtest `end_date` 之後的 future bars。
+- `COOLDOWN` 重用 Batch C `apply_signal_cooldown()`，不重新發明 overlap filtering。
+- 新增 deterministic `backtest_id` 與 `case_id`，不包含 `generated_at` 或 random UUID。
+- 新增 `get_backtest_case_price_window()`，供未來 Historical Case Explorer 使用；這是 review helper，不讓 future bars 回流 signal features。
+
+### Safety Notes
+
+- 本 Batch 不新增 dashboard、scanner、ranking、AI prediction、future probability、confidence、likelihood、position sizing、transaction cost、stop loss、exit rule、portfolio return 或 SQLite persistence。
+- `HIT` / `MISS` 是 historical outcome label，不是 winning trade / losing trade，也不是 Buy / Sell / Hold recommendation。
+- `ALLOW_ALL` 可能包含高度相鄰或重疊樣本；`COOLDOWN` 只能降低 overlap，不能保證統計獨立。
+- 若只用目前可查或仍上市股票回測，可能有 survivorship bias；Yahoo coverage、adjusted-close semantics、raw high / low basis 與 provisional latest daily bar 仍是 data-source limitations。
+- 未來若加入 fundamentals，必須使用 point-in-time availability，不能用今天已知財報回填歷史 signal date。
+- Batch D 是 descriptive historical in-sample aggregation，尚未做 train/test split、walk-forward、out-of-sample validation 或 probability calibration。
+
+### Testing Notes
+
+- 新增 `tests/test_backtest_service.py`，覆蓋 empty、all hit、all miss、mixed denominator、incomplete exclusion、not evaluable exclusion、only incomplete、early hit、return mean / median、sample counts、hit bar median、case property splits、case sorting、stable IDs、config validation、symbol mismatch、technical date mismatch、ALLOW_ALL、COOLDOWN、date range、outcome beyond end date、no-signal report 與 case window helper。
+
 ## 2026-08-08 — Sprint 06 Batch C Signal & Outcome Definition
 
 ### Push Blocker Fix
