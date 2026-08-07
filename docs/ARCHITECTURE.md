@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.9
+v0.10
 
 ---
 
@@ -26,6 +26,14 @@ v0.9
        database.py          Yahoo Finance API
             │
             └── SQLite stock cache
+
+historical_price_service.py
+    └── Yahoo daily OHLCV normalization
+    └── HistoricalPriceSeries / HistoricalPriceBar
+    └── 12-hour SQLite historical price cache
+    └── Coverage state for full-history and explicit range requests
+    └── Future Technical Feature Layer
+    └── Future Backtest Engine
 
 watchlist_service.py
     └── JSON watchlist
@@ -74,12 +82,17 @@ models.py
     └── Stock
     └── HistoricalFinancialPeriod
     └── HistoricalFinancialSeries
+    └── HistoricalPriceBar
+    └── HistoricalPriceSeries
 
 research_metrics.py
     └── Deterministic research metric helpers
 
 historical_financial_service.py
     └── Yahoo annual financial statement normalization + historical fundamentals service
+
+historical_price_service.py
+    └── Yahoo daily price history normalization + no-look-ahead price helpers
 
 symbol_utils.py
     └── Stock symbol normalization
@@ -391,6 +404,36 @@ Responsibilities:
 
 ---
 
+### historical_price_service.py
+
+Responsibilities:
+
+- Retrieve Yahoo Finance daily price history through `Ticker.history()`
+- Use `auto_adjust=False` and `actions=True`
+- Normalize Yahoo daily rows into immutable `HistoricalPriceBar` objects
+- Return chronological `HistoricalPriceSeries` objects
+- Normalize timezone-aware Yahoo daily indexes to provider-local `datetime.date`
+- Preserve raw OHLC, adjusted close, volume, dividends, and stock splits
+- Validate retained bars for finite positive prices, price relationships, and non-negative volume
+- Collapse identical duplicate dates and deterministically keep the last conflicting duplicate while recording quality issues
+- Use 12-hour price-history cache before refreshing Yahoo
+- Use fetch-state coverage metadata so fresh partial cache does not satisfy full-history or wider explicit range requests
+- Return stale cache with `is_stale=True` when Yahoo refresh fails and a covered stale range exists
+- Provide `get_analysis_close()`, `slice_price_series_as_of()`, and `get_recent_bars()` helpers
+
+Non-responsibilities:
+
+- Technical indicators
+- Signals
+- Outcomes
+- Backtests
+- Charts
+- Scanner UI
+- AI / LLM generation
+- Future probability or calibrated probability
+
+---
+
 ### database.py
 
 Responsibilities:
@@ -401,6 +444,9 @@ Responsibilities:
 - Return fresh cached Stock data when `fetched_at` is within 24 hours
 - Persist historical fundamentals in a separate `historical_financials` table
 - Return fresh cached historical fundamentals when `fetched_at` is within 7 days
+- Persist daily historical prices in a separate `historical_prices` table
+- Persist price-history coverage metadata in `historical_price_fetch_state`
+- Return fresh cached historical prices when requested rows are within 12 hours and range coverage is sufficient
 - Preserve stale historical cache rows if Yahoo refresh fails
 - Keep SQL persistence details outside `main.py` and `models.py`
 
@@ -435,6 +481,8 @@ Responsibilities:
     - Stock
     - HistoricalFinancialPeriod
     - HistoricalFinancialSeries
+    - HistoricalPriceBar
+    - HistoricalPriceSeries
 
 ### research_metrics.py
 
@@ -684,6 +732,34 @@ app.py Streamlit layout and native charts
 ```
 
 Historical Trends is a presentation layer. `app.py` does not parse Yahoo financial statement DataFrames, handle row aliases, execute SQL, calculate margins, derive Free Cash Flow, or calculate YoY itself.
+
+## Historical Price Foundation Flow
+
+```
+Future quantitative research caller
+   │
+   ▼
+historical_price_service.py get_historical_prices()
+   │
+   ├── symbol_utils.py normalize_stock_symbol()
+   ├── database.py historical_prices / historical_price_fetch_state
+   └── Yahoo Finance Ticker.history() when cache is missing, expired, or range-incomplete
+   │
+   ▼
+HistoricalPriceSeries
+   │
+   ├── get_analysis_close()
+   ├── slice_price_series_as_of()
+   └── get_recent_bars()
+   │
+   ▼
+Future Technical Feature Layer
+   │
+   ▼
+Future Backtest Engine
+```
+
+Historical Price Foundation is not connected to Streamlit UI in Batch A. It is separate from current `Stock` snapshot cache and annual `HistoricalFinancialSeries` fundamentals.
 
 Historical Trends keeps these presentation semantics:
 

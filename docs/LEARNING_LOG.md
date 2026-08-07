@@ -1,5 +1,45 @@
 # Learning Log
 
+## 2026-08-02 — Sprint 06 Batch A Historical Price Data Foundation
+
+### Completed Features
+
+- 新增 `HistoricalPriceBar` 與 frozen `HistoricalPriceSeries`，讓 daily price history 和 current `Stock` snapshot 分離；日線 identity 固定為 `symbol + trading_date`。
+- 新增 `src/historical_price_service.py`，使用 Yahoo `Ticker.history()` 取得 daily OHLCV，採 `auto_adjust=False`、`actions=True`，保存 raw OHLC、`adjusted_close`、volume、dividends、stock splits。
+- 新增 `HistoricalPriceQuality` audit summary，normalization 會過濾 NaN、inf、string numeric、bool、非正價格、價格關係違反與負 volume；volume `0` 保留。
+- Duplicate trading date 採 deterministic 策略：identical duplicate collapse，conflicting duplicate 記 quality issue 並保留最後一筆 provider row。
+- 新增 `historical_prices` SQLite table，primary key 為 `(symbol, trading_date)`，upsert refresh 不會刪除 provider 本次沒有回傳的舊 bars。
+- 新增 `historical_price_fetch_state`，區分 cache freshness 與 range coverage completeness；`start=None` 代表 default full history，必須有 full-history fetch state 才能用 cache 滿足。
+- 新增 12-hour historical price cache TTL，獨立於 current stock 24-hour cache 與 historical fundamentals 7-day cache。
+- 新增 stale fallback：Yahoo refresh 失敗且 covered stale cache 存在時，回傳 `is_stale=True` 的 `HistoricalPriceSeries`。
+- 新增 `get_analysis_close()`，未來 technical analysis close contract 為 `adjusted_close if available else close`。
+- 新增 `slice_price_series_as_of()`，任何 as-of research 只回傳 `trading_date <= as_of_date` 的 bars，作為 no-look-ahead 基礎。
+- 新增 `get_recent_bars()`，依實際 trading bars 數量回傳最近 N 筆，不用 calendar days 假裝 trading-day count。
+- 新增文件 `docs/HISTORICAL_PRICE_DATA_AUDIT.md` 與 `docs/HISTORICAL_PRICE_FOUNDATION.md`，並更新 README / Architecture。
+
+### Audit Notes
+
+- Live Yahoo audit 顯示 `2330.TW`、`2454.TW`、`6488.TWO` daily index 為 `Asia/Taipei`，`NVDA`、`AAPL` 為 `America/New_York`；domain model 只取 provider-local `.date()`，不做 UTC conversion，避免美股日期 shift。
+- `auto_adjust=False` 回傳 `Open`、`High`、`Low`、`Close`、`Adj Close`、`Volume`、`Dividends`、`Stock Splits`；`auto_adjust=True` 會移除 `Adj Close` 並讓 OHLC 已調整。
+- AAPL 2020 split 與 NVDA 2024 split audit 確認 `auto_adjust=True` close 與 `Adj Close` 對齊；因此 Batch A 保留 raw OHLC + adjusted close，不自行計算調整因子。
+- Live audit 有零成交量 rows，尤其台股與 `.TWO`，因此 `volume = 0` 不視為 invalid；負 volume 才過濾。
+
+### Safety Notes
+
+- 本 Batch 未新增 RSI、MACD、moving average、ATR、Bollinger、signal、outcome label、Historical Hit Rate、probability、backtest、scanner、chart、candlestick、AI price prediction 或 Buy / Sell / Hold recommendation。
+- Batch A 不判定 current-session latest daily bar 是否完成，因 Yahoo daily history 沒有可靠 market-state metadata；未來 backtest 應由 caller 提供 completed-session `end` 或導入 market-calendar-aware freshness。
+- Historical Hit Rate 未來仍只能稱為 historical hit rate；在 out-of-sample、walk-forward validation 與 probability calibration 前，不得稱為 future probability。
+
+### Testing Notes
+
+- 新增 `tests/test_historical_price_service.py`，覆蓋 chronological normalization、timezone date normalization、empty frame、NaN / inf / non-positive price、price relationship、negative vs zero volume、string numeric / bool coercion、duplicate dates、MultiIndex rejection、analysis close、as-of no-look-ahead、recent N trading bars、Yahoo adapter call shape、network error mapping、cache hit、symbol normalization、stale fallback 與 no-cache provider failure。
+- 擴充 `tests/test_database.py`，覆蓋 historical price table / fetch-state table creation、insert/read、range read、12-hour TTL、stale read、upsert、non-destructive refresh、coverage completeness、full-history state、latest date helper、legacy additive migration。
+
+### Recovery Review Notes
+
+- Sprint 06 Batch A recovery review confirmed `historical_price_fetch_state` should represent coverage, not freshness for every retained row. Freshness is now evaluated from the requested rows' oldest `fetched_at`, so a partial refresh cannot make older coverage appear fresh.
+- Boundary tests now explicitly cover `None`, bool price values, missing required price fields, negative `adjusted_close`, and missing optional `Open`.
+
 ## 2026-08-02 — Sprint 05 Batch C Grounded Follow-up Research Workflow
 
 ### Completed Features
