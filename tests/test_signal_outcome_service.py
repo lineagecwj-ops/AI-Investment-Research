@@ -162,6 +162,54 @@ class SignalOutcomeServiceTestCase(unittest.TestCase):
         self.assertEqual(match.status, SignalEvaluationStatus.NOT_EVALUABLE)
         self.assertFalse(match.matched)
 
+    def test_missing_required_feature_not_in_conditions_is_not_evaluable(self):
+        signal_definition = self.signal(
+            self.condition("analysis_close", SignalConditionOperator.GREATER_THAN, 0.0),
+            required=("analysis_close", "sma_200"),
+        )
+
+        match = evaluate_signal_conditions(self.snapshot(sma_200=None), signal_definition)
+
+        self.assertEqual(match.status, SignalEvaluationStatus.NOT_EVALUABLE)
+        self.assertFalse(match.matched)
+        self.assertEqual(match.evaluated_conditions[0].status, SignalEvaluationStatus.MATCH)
+        self.assertTrue(match.evaluated_conditions[0].matched)
+
+    def test_required_feature_present_allows_condition_match(self):
+        signal_definition = self.signal(
+            self.condition("analysis_close", SignalConditionOperator.GREATER_THAN, 0.0),
+            required=("analysis_close", "sma_200"),
+        )
+
+        match = evaluate_signal_conditions(self.snapshot(sma_200=95.0), signal_definition)
+
+        self.assertEqual(match.status, SignalEvaluationStatus.MATCH)
+        self.assertTrue(match.matched)
+
+    def test_required_feature_missing_takes_precedence_over_condition_failure(self):
+        signal_definition = self.signal(
+            self.condition("analysis_close", SignalConditionOperator.LESS_THAN, 0.0),
+            required=("analysis_close", "sma_200"),
+        )
+
+        match = evaluate_signal_conditions(self.snapshot(sma_200=None), signal_definition)
+
+        self.assertEqual(match.status, SignalEvaluationStatus.NOT_EVALUABLE)
+        self.assertFalse(match.matched)
+        self.assertEqual(match.evaluated_conditions[0].status, SignalEvaluationStatus.NO_MATCH)
+        self.assertFalse(match.evaluated_conditions[0].matched)
+
+    def test_non_finite_required_feature_not_in_conditions_is_not_evaluable(self):
+        signal_definition = self.signal(
+            self.condition("analysis_close", SignalConditionOperator.GREATER_THAN, 0.0),
+            required=("analysis_close", "sma_200"),
+        )
+
+        match = evaluate_signal_conditions(self.snapshot(sma_200=float("inf")), signal_definition)
+
+        self.assertEqual(match.status, SignalEvaluationStatus.NOT_EVALUABLE)
+        self.assertFalse(match.matched)
+
     def test_unknown_metric_is_not_evaluable(self):
         signal_definition = self.signal(
             self.condition("not_a_metric", SignalConditionOperator.GREATER_THAN, 1.0)
@@ -285,6 +333,22 @@ class SignalOutcomeServiceTestCase(unittest.TestCase):
 
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].signal_date, date(2025, 1, 10))
+
+    def test_find_signal_events_excludes_missing_required_feature_events(self):
+        technical_series = TechnicalIndicatorSeries(
+            symbol="TEST",
+            snapshots=(self.snapshot(date(2025, 1, 10), sma_200=None),),
+            generated_at=FETCHED_AT,
+            source_price_fetched_at=FETCHED_AT,
+        )
+        signal_definition = self.signal(
+            self.condition("analysis_close", SignalConditionOperator.GREATER_THAN, 0.0),
+            required=("analysis_close", "sma_200"),
+        )
+
+        events = find_signal_events(technical_series, signal_definition)
+
+        self.assertEqual(events, tuple())
 
     def test_audit_counts_match_no_match_and_not_evaluable(self):
         technical_series = TechnicalIndicatorSeries(
@@ -478,6 +542,21 @@ class SignalOutcomeServiceTestCase(unittest.TestCase):
         self.assertEqual(result.close_target_hit_bar_index, 2)
         self.assertFalse(result.intraday_target_hit)
 
+    def test_close_return_target_invalid_signal_analysis_close_is_not_evaluable(self):
+        base_event = self.event(reference_high=5000.0, analysis_close=100.0)
+        event = SignalEvent(
+            **{
+                field.name: (0.0 if field.name == "signal_analysis_close" else getattr(base_event, field.name))
+                for field in fields(SignalEvent)
+            }
+        )
+        series = self.price_series((self.bar(date(2025, 1, 13), 105.0),))
+
+        result = evaluate_historical_outcome(event, series, CLOSE_RETURN_5PCT_WITHIN_20D_V1)
+
+        self.assertEqual(result.status, OutcomeEvaluationStatus.NOT_EVALUABLE)
+        self.assertFalse(result.close_target_hit)
+
     def test_missing_reference_high_is_not_evaluable_for_raw_breakout(self):
         event = self.event(reference_high=None)
         series = self.price_series((self.bar(date(2025, 1, 13), 101.0, high=101.0),))
@@ -582,6 +661,34 @@ class SignalOutcomeServiceTestCase(unittest.TestCase):
         )
 
         self.assertEqual(len(kept), 2)
+
+    def test_signal_cooldown_is_deterministic_for_unsorted_input(self):
+        events = (
+            self.event(signal_date=date(2025, 1, 10)),
+            self.event(signal_date=date(2025, 1, 1)),
+            self.event(signal_date=date(2025, 1, 5)),
+            self.event(signal_date=date(2025, 1, 2)),
+        )
+        calendar = (
+            date(2025, 1, 1),
+            date(2025, 1, 2),
+            date(2025, 1, 3),
+            date(2025, 1, 5),
+            date(2025, 1, 6),
+            date(2025, 1, 7),
+            date(2025, 1, 8),
+            date(2025, 1, 9),
+            date(2025, 1, 10),
+        )
+
+        unsorted_kept = apply_signal_cooldown(events, calendar, cooldown_bars=3)
+        sorted_kept = apply_signal_cooldown(tuple(sorted(events, key=lambda event: event.signal_date)), calendar, cooldown_bars=3)
+
+        self.assertEqual(
+            [event.signal_date for event in unsorted_kept],
+            [event.signal_date for event in sorted_kept],
+        )
+        self.assertEqual([event.signal_date for event in unsorted_kept], [date(2025, 1, 1), date(2025, 1, 10)])
 
     def test_sample_signal_definition_has_stable_neutral_id(self):
         self.assertEqual(TECHNICAL_EXAMPLE_SIGNAL_V1.id, "technical_example_v1")

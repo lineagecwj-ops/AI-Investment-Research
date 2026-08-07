@@ -54,6 +54,8 @@ The signal date bar is Day 0 and is excluded from future outcome windows.
 
 It must not contain probability, score, confidence, recommendation, target price, or Historical Hit Rate fields.
 
+If any `minimum_required_features` value is missing or non-finite, the whole signal evaluation is `NOT_EVALUABLE`, even when all explicit conditions are individually matched.
+
 Signal IDs must be stable and versioned, such as `technical_example_v1`. If a future version changes the condition semantics, it should use a new ID, such as `technical_example_v2`.
 
 ## Condition Evaluation

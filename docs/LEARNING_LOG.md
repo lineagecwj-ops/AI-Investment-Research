@@ -2,6 +2,12 @@
 
 ## 2026-08-08 — Sprint 06 Batch C Signal & Outcome Definition
 
+### Push Blocker Fix
+
+- 修正 `minimum_required_features` completeness precedence：任一 minimum required feature 缺失或 non-finite 時，final `SignalMatch.status` 必須是 `NOT_EVALUABLE`、`matched=False`，即使 explicit conditions 全部 individually `MATCH`。
+- 新增 required feature 不在 conditions、required feature present、required missing + condition failure、non-finite required feature、`find_signal_events()` 排除 `NOT_EVALUABLE`、invalid signal analysis close return target、cooldown unsorted input determinism regression coverage。
+- 本修正只調整 signal completeness propagation，未修改 RAW_HIGH_BREAKOUT、CLOSE_RETURN_TARGET、HIT / MISS / INCOMPLETE、MFE / MAE、horizon 或 cooldown semantics。
+
 ### Completed Features
 
 - 新增 `SignalConditionOperator`、`SignalEvaluationStatus`、`OverlappingSignalPolicy`、`OutcomeType` 與 `OutcomeEvaluationStatus`，明確分離 signal 評估狀態與 historical outcome 標籤。

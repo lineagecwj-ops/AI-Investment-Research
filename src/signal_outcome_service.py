@@ -92,18 +92,16 @@ def evaluate_signal_conditions(
     signal_definition: SignalDefinition,
 ) -> SignalMatch:
     required_status = _evaluate_required_features(snapshot, signal_definition)
-    if required_status is SignalEvaluationStatus.NOT_EVALUABLE:
-        evaluated_conditions = tuple(
-            _evaluate_condition(snapshot, condition)
-            for condition in signal_definition.conditions
-        )
-        return _signal_match(snapshot, signal_definition, evaluated_conditions)
-
     evaluated_conditions = tuple(
         _evaluate_condition(snapshot, condition)
         for condition in signal_definition.conditions
     )
-    return _signal_match(snapshot, signal_definition, evaluated_conditions)
+    return _signal_match(
+        snapshot,
+        signal_definition,
+        evaluated_conditions,
+        required_status=required_status,
+    )
 
 
 def find_signal_events(
@@ -280,8 +278,12 @@ def _signal_match(
     snapshot: TechnicalIndicatorSnapshot,
     signal_definition: SignalDefinition,
     evaluated_conditions: tuple[EvaluatedSignalCondition, ...],
+    *,
+    required_status: SignalEvaluationStatus = SignalEvaluationStatus.MATCH,
 ) -> SignalMatch:
-    if any(
+    if required_status is SignalEvaluationStatus.NOT_EVALUABLE:
+        status = SignalEvaluationStatus.NOT_EVALUABLE
+    elif any(
         condition.status is SignalEvaluationStatus.NOT_EVALUABLE
         for condition in evaluated_conditions
     ):
