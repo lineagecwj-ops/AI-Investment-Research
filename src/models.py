@@ -159,3 +159,84 @@ class HistoricalPriceSeries:
     is_stale: bool = False
 
     source: str = "Yahoo Finance"
+
+
+@dataclass(frozen=True)
+class TechnicalIndicatorSnapshot:
+
+    symbol: str
+
+    trading_date: date
+
+    analysis_close: float
+
+    sma_5: float | None
+    sma_10: float | None
+    sma_20: float | None
+    sma_60: float | None
+    sma_120: float | None
+    sma_200: float | None
+
+    ema_12: float | None
+    ema_26: float | None
+
+    rsi_14: float | None
+
+    macd: float | None
+    macd_signal: float | None
+    macd_histogram: float | None
+
+    atr_14: float | None
+    atr_14_pct: float | None
+
+    volume_sma_20: float | None
+    volume_ratio_20: float | None
+
+    return_5d: float | None
+    return_20d: float | None
+    return_60d: float | None
+    return_volatility_20d: float | None
+
+    high_20d: float | None
+    high_60d: float | None
+    high_252d: float | None
+    low_20d: float | None
+    low_60d: float | None
+
+    prior_high_20d: float | None
+    prior_high_60d: float | None
+    prior_high_252d: float | None
+    prior_low_20d: float | None
+    prior_low_60d: float | None
+
+    distance_to_prior_20d_high: float | None
+    distance_to_prior_60d_high: float | None
+    distance_to_prior_52_week_high: float | None
+
+    is_above_prior_20d_high: bool | None
+    is_above_prior_60d_high: bool | None
+    is_above_prior_52_week_high: bool | None
+
+    close_above_sma20: bool | None
+    close_above_sma60: bool | None
+    sma20_above_sma60: bool | None
+    sma60_above_sma120: bool | None
+
+    sma20_change_5d: float | None
+    sma60_change_5d: float | None
+
+    position_in_prior_60d_range: float | None
+
+
+@dataclass(frozen=True)
+class TechnicalIndicatorSeries:
+
+    symbol: str
+
+    snapshots: tuple[TechnicalIndicatorSnapshot, ...]
+
+    generated_at: datetime
+
+    source_price_fetched_at: datetime
+
+    source_price_is_stale: bool = False
