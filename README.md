@@ -118,6 +118,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Technical indicator feature calculation：`src/technical_indicator_service.py`
 - Signal and historical outcome definition：`src/signal_outcome_service.py`
 - Historical backtest aggregation：`src/backtest_service.py`
+- Swing opportunity scanner foundation：`src/swing_scanner_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -129,6 +130,7 @@ Historical Price Foundation 詳見 `docs/HISTORICAL_PRICE_FOUNDATION.md`。
 Technical Indicator Foundation 詳見 `docs/TECHNICAL_INDICATOR_FOUNDATION.md`。
 Signal & Outcome Framework 詳見 `docs/SIGNAL_OUTCOME_FRAMEWORK.md`。
 Historical Backtest Engine 詳見 `docs/HISTORICAL_BACKTEST_ENGINE.md`。
+Swing Opportunity Scanner 詳見 `docs/SWING_OPPORTUNITY_SCANNER.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -161,6 +163,14 @@ Sprint 06 Batch D 新增 deterministic historical backtest aggregation foundatio
 Backtest engine 會從 `HistoricalPriceSeries`、`TechnicalIndicatorSeries`、`SignalDefinition` 與 `OutcomeDefinition` 建立 raw signal events、套用指定 overlap policy，並把 Batch C 的 `HistoricalOutcomeResult` 聚合為 `HistoricalBacktestReport`。
 
 Historical Hit Rate（歷史命中率）的 denominator 固定為 `HIT + MISS`，排除 `INCOMPLETE` 與 `NOT_EVALUABLE`。本層不做 future probability、scanner ranking、dashboard、AI prediction、position sizing、transaction cost、stop loss、exit rule 或 strategy P&L。
+
+## Swing Opportunity Scanner
+
+Sprint 06 Batch E 新增 deterministic Swing Opportunity Scanner foundation。
+
+Scanner 接受 caller 提供的一批 symbols，使用最新 available `TechnicalIndicatorSnapshot` 評估指定 `SignalDefinition`，只把目前 `MATCH` 的股票建立為 `SwingOpportunityCandidate`。每個 candidate 會附上相同 config 下的 `HistoricalBacktestReport`、Historical Hit Rate、resolved sample size、MFE / MAE / end-return aggregates、overlap policy、date range、data freshness 與 provisional latest-bar limitation。
+
+Scanner 排序是 versioned research-priority ordering，不是 buy rank、prediction score、hidden composite score 或上漲機率。`NO_MATCH` 只代表目前不符合該 signal definition，`NOT_EVALUABLE` 只代表資料不足或 feature 不可用。
 
 ## Grounded AI Research Foundation
 

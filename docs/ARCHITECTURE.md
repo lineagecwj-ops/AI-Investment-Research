@@ -52,7 +52,13 @@ technical_indicator_service.py
         ↓
         HistoricalBacktestReport
         ↓
-        future Opportunity Scanner
+        swing_scanner_service.py
+        ↓
+        SwingOpportunityCandidate
+        ↓
+        SwingScannerResult
+        ↓
+        future Scanner Dashboard
         ↓
         future Historical Case Explorer
 
@@ -162,6 +168,16 @@ backtest_service.py
     └── Trading-bar hit-index aggregation for HIT cases
     └── Stable deterministic backtest_id and case_id
     └── No probability, ranking, scanner, dashboard, AI, transaction simulation, or persistence
+
+swing_scanner_service.py
+    └── Deterministic current technical scanner for caller-provided symbol universes
+    └── SwingScannerConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, backtest date range, and preferred sample minimum
+    └── Per-symbol flow: price history, technical series, latest snapshot, current signal evaluation
+    └── Backtest runs only for current MATCH symbols and reuses the existing TechnicalIndicatorSeries
+    └── SwingOpportunityCandidate preserving current SignalMatch, HistoricalBacktestReport metrics, freshness, overlap context, sample-size status, and limitations
+    └── SwingScannerResult preserving matched candidates, NO_MATCH symbols and lightweight failed-condition details, NOT_EVALUABLE audits, isolated failures, generated_at, and count helpers
+    └── Versioned transparent research ranking with rank components and no hidden composite score
+    └── No recommendation, buy list, market-wide crawler, dashboard, fundamentals, AI ranking, target price, or transaction simulation
 
 symbol_utils.py
     └── Stock symbol normalization

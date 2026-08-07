@@ -1,5 +1,38 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 06 Batch E Swing Opportunity Scanner
+
+### Completed Features
+
+- 新增 `src/swing_scanner_service.py`，建立 deterministic Swing Opportunity Scanner service，輸入 caller-provided symbols 與 `SwingScannerConfig`。
+- 新增 frozen `SwingScannerConfig`，保存 `SignalDefinition`、`OutcomeDefinition`、`overlap_policy`、`cooldown_bars`、backtest signal-date range、`minimum_resolved_samples`、`force_refresh`，並提供 deterministic `scanner_config_id`。
+- 新增 frozen `SwingOpportunityCandidate`，保存 current `SignalMatch`、latest trading date、latest technical snapshot、`HistoricalBacktestReport`、Historical Hit Rate、resolved / HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts、raw / filtered signal counts、median / average MFE、MAE、end return、hit bars、freshness、overlap context、sample-size status、rank components 與 limitations。
+- 新增 frozen `SwingScannerResult`，保存 requested symbols、unique normalized symbols、matched candidates、NO_MATCH symbols 與 lightweight failed-condition details、NOT_EVALUABLE audits、isolated failures、timezone-aware UTC `generated_at` 與 count helpers。
+- 新增 `SampleSizeStatus`：`NO_RESOLVED_SAMPLES`、`BELOW_PREFERRED_MINIMUM`、`MEETS_PREFERRED_MINIMUM`。Preferred minimum 是 research display threshold，不是 confidence model。
+- Scanner 每支股票先建立 price history、technical series、latest snapshot 與 current signal evaluation；只有 latest `MATCH` 才執行 historical backtest。
+- MATCH candidate 的 backtest 會重用同一個 `TechnicalIndicatorSeries`，避免 NO_MATCH 股票或 MATCH 股票重複計算不必要 backtest work。
+- Per-symbol failure isolation：單一 symbol provider / data / config failure 會保存 `SwingScanFailure`，其他 symbols 繼續掃描；failure message 只保存安全第一行，不保存 traceback。
+- 新增 versioned research ranking policy `swing_research_rank_v1`，使用 transparent tier + lexicographic ordering，不產生 hidden composite number。
+- Ranking V1 先依 sample-size tier，再依 Historical Hit Rate、resolved count、median MAE、median MFE、median end return、symbol 排序；`None` hit rate 排最後，MAE 以原始負數 descending 排序。
+- Candidate 和 result 均保存 latest daily bar may be provisional limitation；stale price series 會傳到 candidate limitation。
+- 新增 `docs/SWING_OPPORTUNITY_SCANNER.md`，並更新 README / Architecture。
+
+### Safety Notes
+
+- Current signal evidence 和 historical backtest statistics 明確分離；Historical Hit Rate 不會回流改變 current MATCH / NO_MATCH / NOT_EVALUABLE。
+- `100% / n=3` 不應直接比 `70% / n=100` 更優先；Batch E 用 sample-size tier 避免 small sample 在 ranking 中過度主導。
+- Research ranking 只是 candidate inspection priority，不是 prediction score、buy rank、expected return rank、AI ranking 或機率模型。
+- `NO_MATCH` 只表示 latest snapshot 不符合指定 `SignalDefinition`，不是 negative forecast，也不是股票不好。
+- `NOT_EVALUABLE` 和 `NO_MATCH` 分開保存，避免資料不足被誤解為條件失敗。
+- `ALLOW_ALL` 可能含有相鄰或重疊樣本；`COOLDOWN` 只能降低 nearby repeated signals，不能保證統計獨立。
+- Yahoo latest daily bar 可能是 current-session provisional bar；scanner 不宣稱 real-time signal 或 completed-session signal。
+- 本 Batch 不新增 dashboard、chart、case explorer、fundamentals、full-market universe crawler、watchlist automation、AI model、portfolio sizing、target price、transaction simulation 或 parameter optimization。
+
+### Testing Notes
+
+- 新增 `tests/test_swing_scanner_service.py`，覆蓋 empty universe、duplicate normalization、MATCH backtest once、NO_MATCH no backtest、NO_MATCH failed-condition summary、NOT_EVALUABLE no backtest、empty technical series、failure isolation、safe failure message、blank symbol failure、all no-match、all-fail result、count invariant、metric copy-through、current match traceability、stale propagation、provisional warning、shared backtest config、sample-size statuses、zero resolved history、small sample retention、ranking tiers / hit-rate / resolved / MAE / MFE / end-return / symbol tie-breaks、input-order independence、one-based research rank、rank policy version、rank components、config ID determinism、overlap limitations、config validation、frozen candidate、UTC timestamp 與 no probability / confidence score fields。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_swing_scanner_service`，43 tests passed。
+
 ## 2026-08-08 — Sprint 06 Batch D Historical Backtest Engine
 
 ### Completed Features
