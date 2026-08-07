@@ -119,3 +119,43 @@ class HistoricalFinancialSeries:
     def __post_init__(self):
         if self.periods is None:
             self.periods = []
+
+
+@dataclass(frozen=True)
+class HistoricalPriceBar:
+
+    symbol: str
+
+    trading_date: date
+
+    open: float | None
+
+    high: float
+
+    low: float
+
+    close: float
+
+    adjusted_close: float | None
+
+    volume: int | None
+
+    dividends: float | None = None
+
+    stock_splits: float | None = None
+
+
+@dataclass(frozen=True)
+class HistoricalPriceSeries:
+
+    symbol: str
+
+    currency: str | None
+
+    bars: tuple[HistoricalPriceBar, ...]
+
+    fetched_at: datetime
+
+    is_stale: bool = False
+
+    source: str = "Yahoo Finance"
