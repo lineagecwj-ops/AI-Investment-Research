@@ -32,8 +32,18 @@ historical_price_service.py
     └── HistoricalPriceSeries / HistoricalPriceBar
     └── 12-hour SQLite historical price cache
     └── Coverage state for full-history and explicit range requests
-    └── Future Technical Feature Layer
     └── Future Backtest Engine
+
+technical_indicator_service.py
+    └── HistoricalPriceSeries
+        ↓
+        TechnicalIndicatorService
+        ↓
+        TechnicalIndicatorSeries
+        ↓
+        future Signal Snapshot
+        ↓
+        future Outcome / Backtest
 
 watchlist_service.py
     └── JSON watchlist
@@ -84,6 +94,8 @@ models.py
     └── HistoricalFinancialSeries
     └── HistoricalPriceBar
     └── HistoricalPriceSeries
+    └── TechnicalIndicatorSnapshot
+    └── TechnicalIndicatorSeries
 
 research_metrics.py
     └── Deterministic research metric helpers
@@ -93,6 +105,11 @@ historical_financial_service.py
 
 historical_price_service.py
     └── Yahoo daily price history normalization + no-look-ahead price helpers
+
+technical_indicator_service.py
+    └── Deterministic technical feature calculation from historical price bars
+    └── Causal SMA / EMA / RSI / MACD / ATR / volume / return / prior-window features
+    └── No signal, score, outcome, probability, scanner, chart, or persistence
 
 symbol_utils.py
     └── Stock symbol normalization

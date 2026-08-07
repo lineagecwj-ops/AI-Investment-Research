@@ -1,5 +1,29 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 06 Batch B Technical Indicator Foundation
+
+### Completed Features
+
+- 新增 `TechnicalIndicatorSnapshot` 與 frozen `TechnicalIndicatorSeries`，讓 technical feature domain model 與 pandas DataFrame 分離。
+- 新增 `src/technical_indicator_service.py`，從 `HistoricalPriceSeries` deterministic 計算 SMA5 / 10 / 20 / 60 / 120 / 200、EMA12 / EMA26、RSI14、MACD、ATR14、volume SMA / ratio、5D / 20D / 60D return、20D return volatility、rolling high / low、prior high / low、distance、range position 與中性 boolean facts。
+- close-only 指標一律使用 Batch A `get_analysis_close()`，也就是 `adjusted_close if available else close`。
+- ATR、rolling high / low、prior high / low 採 raw high / low；ATR previous close 採 raw close，避免在 high / low 尚未有明確 provider-adjusted basis 時自行產生 unsupported adjusted high / low。
+- `volume_ratio_20` 固定為 current volume / previous 20 trading bars average volume，denominator 不包含今日。
+- prior-window features 透過 `shift(1)` 排除 current bar；52-week technical features 明確採 252 trading bars approximation。
+- `build_technical_indicator_snapshot()` 先用 `slice_price_series_as_of()`，因此非交易日 as-of 會使用當時最後可用交易 bar，早於最早資料則回傳 `None`。
+
+### Safety Notes
+
+- 本 Batch 只產生 features / measurements，不產生 Buy / Sell / Hold、bullish / bearish score、opportunity score、probability、hit rate、success / failure label、future return、target price、scanner、backtest、chart、news、sentiment 或 fundamental merge。
+- Full-series implementation 只使用 causal rolling / EMA / `shift(1)`；禁止 backfill、future shift、centered windows。
+- Latest Yahoo daily bar 仍可能是 current-session partial bar；latest technical snapshot 可能是 provisional，future backtest 應使用 completed-session policy。
+- Technical indicators 不寫入 SQLite；本 Batch 未新增 technical indicator table 或 Dashboard tab。
+
+### Testing Notes
+
+- 新增 `tests/test_technical_indicator_service.py`，覆蓋 immutable domain model、registry labels、SMA full-window warm-up、EMA `adjust=False` warm-up、Wilder RSI reference / edge cases、MACD reference、ATR raw OHLC / raw close basis、volume ratio denominator 排除今日、returns by trading bars、sample return volatility、prior high 排除今日、52-week 252-bar approximation、as-of non-trading date、before-earliest `None`、full-series vs as-of consistency、future data mutation、append future bars、insufficient history、non-finite output guard、中性欄位命名與 source-level no-backfill / no-negative-shift guard。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_technical_indicator_service`，35 tests passed。
+
 ## 2026-08-02 — Sprint 06 Batch A Historical Price Data Foundation
 
 ### Completed Features

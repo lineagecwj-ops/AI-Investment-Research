@@ -115,6 +115,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical interpretation：`src/historical_research_service.py`
 - Historical fundamentals normalization and cache：`src/historical_financial_service.py`
 - Historical daily price normalization and cache：`src/historical_price_service.py`
+- Technical indicator feature calculation：`src/technical_indicator_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -123,6 +124,7 @@ Grounded AI Research foundation 詳見 `docs/AI_GROUNDED_RESEARCH.md`。
 AI Research Dashboard integration 詳見 `docs/AI_RESEARCH_DASHBOARD.md`。
 Historical Price Data audit 詳見 `docs/HISTORICAL_PRICE_DATA_AUDIT.md`。
 Historical Price Foundation 詳見 `docs/HISTORICAL_PRICE_FOUNDATION.md`。
+Technical Indicator Foundation 詳見 `docs/TECHNICAL_INDICATOR_FOUNDATION.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -133,6 +135,12 @@ Sprint 06 Batch A 新增 daily historical price foundation，供未來 Quantitat
 目前範圍只包含 Yahoo daily OHLCV normalization、SQLite cache、12-hour price-history TTL、range coverage state、stale fallback、data-quality filtering、corporate-action fields、as-of slicing 與 recent N trading-bars helper。
 
 此 foundation 不包含 RSI、MACD、moving average signal、backtest、scanner、candlestick chart、AI price prediction、Historical Hit Rate 或 Future Probability。未來 technical analysis 的 close contract 為 `adjusted_close if available else close`，並且任何 as-of research 必須只使用 `trading_date <= as_of_date` 的 bars。
+
+## Technical Indicator Foundation
+
+Sprint 06 Batch B 新增 deterministic technical indicator foundation，從 `HistoricalPriceSeries` 計算 SMA、EMA、RSI、MACD、ATR、volume ratio、return、prior high / low 與 distance features。
+
+本層只產生 technical features / measurements，不產生 Buy / Sell / Hold、technical score、probability、hit rate、success / failure outcome、scanner 或 backtest。所有 as-of technical snapshot 都必須遵守 no-look-ahead，只使用 `trading_date <= as_of_date` 的 price bars。
 
 ## Grounded AI Research Foundation
 
