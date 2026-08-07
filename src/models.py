@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 from datetime import datetime
+from enum import Enum
 
 
 @dataclass
@@ -240,3 +241,200 @@ class TechnicalIndicatorSeries:
     source_price_fetched_at: datetime
 
     source_price_is_stale: bool = False
+
+
+class SignalConditionOperator(Enum):
+
+    GREATER_THAN = ">"
+    GREATER_THAN_OR_EQUAL = ">="
+    LESS_THAN = "<"
+    LESS_THAN_OR_EQUAL = "<="
+    EQUAL = "=="
+    BETWEEN = "between"
+
+
+class SignalEvaluationStatus(Enum):
+
+    MATCH = "MATCH"
+    NO_MATCH = "NO_MATCH"
+    NOT_EVALUABLE = "NOT_EVALUABLE"
+
+
+class OverlappingSignalPolicy(Enum):
+
+    ALLOW_ALL = "ALLOW_ALL"
+    COOLDOWN = "COOLDOWN"
+
+
+class OutcomeType(Enum):
+
+    RAW_HIGH_BREAKOUT = "RAW_HIGH_BREAKOUT"
+    CLOSE_RETURN_TARGET = "CLOSE_RETURN_TARGET"
+
+
+class OutcomeEvaluationStatus(Enum):
+
+    HIT = "HIT"
+    MISS = "MISS"
+    INCOMPLETE = "INCOMPLETE"
+    NOT_EVALUABLE = "NOT_EVALUABLE"
+
+
+@dataclass(frozen=True)
+class TechnicalSignalCondition:
+
+    metric: str
+
+    operator: SignalConditionOperator
+
+    value: float | bool | tuple[float, float] | None = None
+
+    secondary_metric: str | None = None
+
+
+@dataclass(frozen=True)
+class EvaluatedSignalCondition:
+
+    metric: str
+
+    actual_value: float | bool | None
+
+    operator: SignalConditionOperator
+
+    expected_value: float | bool | tuple[float, float] | None
+
+    secondary_metric: str | None
+
+    secondary_actual_value: float | bool | None
+
+    status: SignalEvaluationStatus
+
+    matched: bool | None
+
+
+@dataclass(frozen=True)
+class SignalDefinition:
+
+    id: str
+
+    name: str
+
+    conditions: tuple[TechnicalSignalCondition, ...]
+
+    minimum_required_features: tuple[str, ...]
+
+    description: str
+
+
+@dataclass(frozen=True)
+class SignalMatch:
+
+    symbol: str
+
+    trading_date: date
+
+    signal_id: str
+
+    status: SignalEvaluationStatus
+
+    matched: bool
+
+    evaluated_conditions: tuple[EvaluatedSignalCondition, ...]
+
+    feature_snapshot: TechnicalIndicatorSnapshot
+
+
+@dataclass(frozen=True)
+class SignalEvent:
+
+    symbol: str
+
+    signal_id: str
+
+    signal_date: date
+
+    signal_analysis_close: float
+
+    signal_raw_close: float | None
+
+    reference_high: float | None
+
+    reference_low: float | None
+
+    evaluation_status: SignalEvaluationStatus
+
+    feature_snapshot: TechnicalIndicatorSnapshot
+
+    evaluated_conditions: tuple[EvaluatedSignalCondition, ...]
+
+
+@dataclass(frozen=True)
+class SignalEvaluationAudit:
+
+    signal_id: str
+
+    evaluated_snapshots: int
+
+    matched: int
+
+    not_matched: int
+
+    not_evaluable: int
+
+
+@dataclass(frozen=True)
+class OutcomeDefinition:
+
+    id: str
+
+    outcome_type: OutcomeType
+
+    horizon_bars: int = 20
+
+    reference_metric: str | None = None
+
+    target_return: float | None = None
+
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class HistoricalOutcomeResult:
+
+    symbol: str
+
+    signal_id: str
+
+    signal_date: date
+
+    outcome_definition_id: str
+
+    status: OutcomeEvaluationStatus
+
+    horizon_bars: int
+
+    available_future_bars: int
+
+    reference_high: float | None
+
+    intraday_target_hit: bool
+
+    intraday_target_hit_date: date | None
+
+    intraday_target_hit_bar_index: int | None
+
+    close_target_hit: bool
+
+    close_target_hit_date: date | None
+
+    close_target_hit_bar_index: int | None
+
+    max_close_return: float | None
+
+    max_close_return_date: date | None
+
+    max_adverse_return: float | None
+
+    max_adverse_return_date: date | None
+
+    end_of_window_return: float | None
