@@ -1,19 +1,23 @@
 import logging
 import sqlite3
 from datetime import UTC
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
-from models import Stock
 from models import HistoricalFinancialPeriod
 from models import HistoricalFinancialSeries
+from models import HistoricalPriceBar
+from models import HistoricalPriceSeries
+from models import Stock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "stocks.db"
 CACHE_TTL = timedelta(hours=24)
 HISTORICAL_CACHE_TTL = timedelta(days=7)
+HISTORICAL_PRICE_CACHE_TTL = timedelta(hours=12)
 SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP = "1970-01-01T00:00:00+00:00"
 
 
@@ -135,6 +139,57 @@ CREATE TABLE IF NOT EXISTS historical_financials (
 )
 """
 
+HISTORICAL_PRICE_COLUMNS = {
+    "symbol": "TEXT NOT NULL",
+    "trading_date": "TEXT NOT NULL",
+    "open": "REAL",
+    "high": "REAL NOT NULL",
+    "low": "REAL NOT NULL",
+    "close": "REAL NOT NULL",
+    "adjusted_close": "REAL",
+    "volume": "INTEGER",
+    "dividends": "REAL",
+    "stock_splits": "REAL",
+    "currency": "TEXT",
+    "fetched_at": "TEXT NOT NULL",
+}
+
+CREATE_HISTORICAL_PRICES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS historical_prices (
+    symbol TEXT NOT NULL,
+    trading_date TEXT NOT NULL,
+    open REAL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    adjusted_close REAL,
+    volume INTEGER,
+    dividends REAL,
+    stock_splits REAL,
+    currency TEXT,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY(symbol, trading_date)
+)
+"""
+
+HISTORICAL_PRICE_FETCH_STATE_COLUMNS = {
+    "symbol": "TEXT PRIMARY KEY",
+    "full_history_fetched": "INTEGER NOT NULL DEFAULT 0",
+    "earliest_date": "TEXT",
+    "latest_date": "TEXT",
+    "fetched_at": "TEXT NOT NULL",
+}
+
+CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS historical_price_fetch_state (
+    symbol TEXT PRIMARY KEY,
+    full_history_fetched INTEGER NOT NULL DEFAULT 0,
+    earliest_date TEXT,
+    latest_date TEXT,
+    fetched_at TEXT NOT NULL
+)
+"""
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -148,8 +203,12 @@ def initialize_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
+        migrate_historical_prices_table(connection)
+        migrate_historical_price_fetch_state_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.commit()
@@ -197,6 +256,34 @@ def migrate_historical_financials_table(connection: sqlite3.Connection) -> None:
     )
 
 
+def migrate_historical_prices_table(connection: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(historical_prices)").fetchall()
+    }
+
+    for column, column_type in HISTORICAL_PRICE_COLUMNS.items():
+        if column in existing_columns:
+            continue
+        connection.execute(f"ALTER TABLE historical_prices ADD COLUMN {column} {column_type}")
+
+
+def migrate_historical_price_fetch_state_table(connection: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute(
+            "PRAGMA table_info(historical_price_fetch_state)"
+        ).fetchall()
+    }
+
+    for column, column_type in HISTORICAL_PRICE_FETCH_STATE_COLUMNS.items():
+        if column in existing_columns:
+            continue
+        connection.execute(
+            f"ALTER TABLE historical_price_fetch_state ADD COLUMN {column} {column_type}"
+        )
+
+
 def invalidate_stock_cache_after_schema_migration(
     connection: sqlite3.Connection,
 ) -> None:
@@ -222,8 +309,12 @@ def save_stock(
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
+        migrate_historical_prices_table(connection)
+        migrate_historical_price_fetch_state_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.execute(
@@ -405,8 +496,12 @@ def save_historical_financials(
     try:
         connection.execute(CREATE_STOCKS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
+        connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
+        migrate_historical_prices_table(connection)
+        migrate_historical_price_fetch_state_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
 
@@ -564,6 +659,323 @@ def historical_period_from_row(row: sqlite3.Row) -> HistoricalFinancialPeriod:
         total_equity=row["total_equity"],
         cash_and_cash_equivalents=row["cash_and_cash_equivalents"],
     )
+
+
+def save_historical_prices(
+    series: HistoricalPriceSeries,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    fetched_at: datetime | None = None,
+    full_history_fetched: bool = False,
+) -> None:
+    if not series.symbol:
+        raise ValueError("Historical price series symbol is required before saving.")
+
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime_to_cache_value(fetched_at or series.fetched_at or utc_now())
+
+    connection = sqlite3.connect(path)
+    try:
+        initialize_historical_price_tables(connection)
+        for bar in series.bars:
+            connection.execute(
+                """
+                INSERT INTO historical_prices (
+                    symbol,
+                    trading_date,
+                    open,
+                    high,
+                    low,
+                    close,
+                    adjusted_close,
+                    volume,
+                    dividends,
+                    stock_splits,
+                    currency,
+                    fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(symbol, trading_date) DO UPDATE SET
+                    open = excluded.open,
+                    high = excluded.high,
+                    low = excluded.low,
+                    close = excluded.close,
+                    adjusted_close = excluded.adjusted_close,
+                    volume = excluded.volume,
+                    dividends = excluded.dividends,
+                    stock_splits = excluded.stock_splits,
+                    currency = excluded.currency,
+                    fetched_at = excluded.fetched_at
+                """,
+                historical_price_bar_to_row_values(bar, series.currency, timestamp),
+            )
+        if series.bars:
+            upsert_historical_price_fetch_state(
+                connection,
+                symbol=series.symbol,
+                earliest_date=series.bars[0].trading_date,
+                latest_date=series.bars[-1].trading_date,
+                fetched_at=timestamp,
+                full_history_fetched=full_history_fetched,
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def initialize_historical_price_tables(connection: sqlite3.Connection) -> None:
+    connection.execute(CREATE_STOCKS_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+    schema_changed = migrate_stocks_table(connection)
+    migrate_historical_financials_table(connection)
+    migrate_historical_prices_table(connection)
+    migrate_historical_price_fetch_state_table(connection)
+    if schema_changed:
+        invalidate_stock_cache_after_schema_migration(connection)
+
+
+def upsert_historical_price_fetch_state(
+    connection: sqlite3.Connection,
+    *,
+    symbol: str,
+    earliest_date: date,
+    latest_date: date,
+    fetched_at: str,
+    full_history_fetched: bool,
+) -> None:
+    existing = connection.execute(
+        """
+        SELECT earliest_date, latest_date, full_history_fetched
+        FROM historical_price_fetch_state
+        WHERE symbol = ?
+        """,
+        (symbol,),
+    ).fetchone()
+    if existing is not None:
+        existing_earliest = parse_cache_date(existing[0])
+        existing_latest = parse_cache_date(existing[1])
+        earliest_date = min(
+            value for value in [existing_earliest, earliest_date] if value is not None
+        )
+        latest_date = max(
+            value for value in [existing_latest, latest_date] if value is not None
+        )
+        full_history_fetched = bool(full_history_fetched or existing[2])
+
+    connection.execute(
+        """
+        INSERT INTO historical_price_fetch_state (
+            symbol,
+            full_history_fetched,
+            earliest_date,
+            latest_date,
+            fetched_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(symbol) DO UPDATE SET
+            full_history_fetched = excluded.full_history_fetched,
+            earliest_date = excluded.earliest_date,
+            latest_date = excluded.latest_date,
+            fetched_at = excluded.fetched_at
+        """,
+        (
+            symbol,
+            1 if full_history_fetched else 0,
+            earliest_date.isoformat(),
+            latest_date.isoformat(),
+            fetched_at,
+        ),
+    )
+
+
+def get_cached_historical_prices(
+    symbol: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    now: datetime | None = None,
+    ttl: timedelta = HISTORICAL_PRICE_CACHE_TTL,
+    include_expired: bool = False,
+    require_full_history: bool = False,
+) -> HistoricalPriceSeries | None:
+    initialize_database(db_path)
+
+    if not historical_price_cache_covers_range(
+        symbol,
+        db_path=db_path,
+        start=start,
+        end=end,
+        require_full_history=require_full_history,
+    ):
+        return None
+
+    connection = sqlite3.connect(Path(db_path))
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            f"""
+            SELECT
+                {", ".join(HISTORICAL_PRICE_COLUMNS)}
+            FROM historical_prices
+            WHERE symbol = ?
+              AND (? IS NULL OR trading_date >= ?)
+              AND (? IS NULL OR trading_date <= ?)
+            ORDER BY trading_date ASC
+            """,
+            (
+                symbol,
+                start.isoformat() if start else None,
+                start.isoformat() if start else None,
+                end.isoformat() if end else None,
+                end.isoformat() if end else None,
+            ),
+        ).fetchall()
+    finally:
+        connection.close()
+
+    if not rows:
+        return None
+
+    fetched_at_values = [
+        parse_cache_datetime(row["fetched_at"])
+        for row in rows
+        if row["fetched_at"]
+    ]
+    fetched_at = min(fetched_at_values) if fetched_at_values else utc_now()
+    is_stale = is_cache_expired(fetched_at, now=now, ttl=ttl)
+    if is_stale and not include_expired:
+        return None
+
+    currency = next((row["currency"] for row in rows if row["currency"]), None)
+    return HistoricalPriceSeries(
+        symbol=symbol,
+        currency=currency,
+        bars=tuple(historical_price_bar_from_row(row) for row in rows),
+        fetched_at=fetched_at,
+        is_stale=is_stale,
+    )
+
+
+def historical_price_cache_covers_range(
+    symbol: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    require_full_history: bool = False,
+) -> bool:
+    state = get_historical_price_fetch_state(symbol, db_path=db_path)
+    if state is None:
+        return False
+
+    earliest = state["earliest_date"]
+    latest = state["latest_date"]
+    if earliest is None or latest is None:
+        return False
+    if require_full_history and not state["full_history_fetched"]:
+        return False
+    if start is not None and earliest > start:
+        return False
+    if end is not None and latest < end:
+        return False
+    return True
+
+
+def get_historical_price_fetch_state(
+    symbol: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> dict | None:
+    initialize_database(db_path)
+
+    connection = sqlite3.connect(Path(db_path))
+    try:
+        row = connection.execute(
+            """
+            SELECT full_history_fetched, earliest_date, latest_date, fetched_at
+            FROM historical_price_fetch_state
+            WHERE symbol = ?
+            """,
+            (symbol,),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    if row is None:
+        return None
+
+    return {
+        "full_history_fetched": bool(row[0]),
+        "earliest_date": parse_cache_date(row[1]),
+        "latest_date": parse_cache_date(row[2]),
+        "fetched_at": parse_cache_datetime(row[3]),
+    }
+
+
+def get_latest_historical_price_date(
+    symbol: str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+) -> date | None:
+    initialize_database(db_path)
+
+    connection = sqlite3.connect(Path(db_path))
+    try:
+        row = connection.execute(
+            """
+            SELECT MAX(trading_date)
+            FROM historical_prices
+            WHERE symbol = ?
+            """,
+            (symbol,),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    return parse_cache_date(row[0]) if row and row[0] else None
+
+
+def historical_price_bar_to_row_values(
+    bar: HistoricalPriceBar,
+    currency: str | None,
+    fetched_at: str,
+) -> tuple:
+    return (
+        bar.symbol,
+        bar.trading_date.isoformat(),
+        bar.open,
+        bar.high,
+        bar.low,
+        bar.close,
+        bar.adjusted_close,
+        bar.volume,
+        bar.dividends,
+        bar.stock_splits,
+        currency,
+        fetched_at,
+    )
+
+
+def historical_price_bar_from_row(row: sqlite3.Row) -> HistoricalPriceBar:
+    return HistoricalPriceBar(
+        symbol=row["symbol"],
+        trading_date=datetime.fromisoformat(row["trading_date"]).date(),
+        open=row["open"],
+        high=row["high"],
+        low=row["low"],
+        close=row["close"],
+        adjusted_close=row["adjusted_close"],
+        volume=row["volume"],
+        dividends=row["dividends"],
+        stock_splits=row["stock_splits"],
+    )
+
+
+def parse_cache_date(value: str | None) -> date | None:
+    if value is None:
+        return None
+    return datetime.fromisoformat(value).date()
 
 
 def datetime_to_cache_value(value: datetime) -> str:
