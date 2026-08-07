@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.10
+v0.11
 
 ---
 
@@ -41,9 +41,30 @@ technical_indicator_service.py
         ↓
         TechnicalIndicatorSeries
         ↓
-        future Signal Snapshot
+        signal_outcome_service.py
         ↓
-        future Outcome / Backtest
+        SignalEvent
+        ↓
+        HistoricalOutcomeResult
+        ↓
+        future Backtest Aggregation
+        ↓
+        Historical Hit Rate
+
+signal_outcome_service.py
+    └── TechnicalIndicatorSeries / TechnicalIndicatorSnapshot
+        ↓
+        Signal Evaluation
+        ↓
+        SignalEvent
+        ↓
+        Historical Outcome Evaluation
+        ↓
+        HistoricalOutcomeResult
+        ↓
+        future Backtest Aggregation
+        ↓
+        Historical Hit Rate
 
 watchlist_service.py
     └── JSON watchlist
@@ -96,6 +117,9 @@ models.py
     └── HistoricalPriceSeries
     └── TechnicalIndicatorSnapshot
     └── TechnicalIndicatorSeries
+    └── SignalDefinition / TechnicalSignalCondition / SignalMatch
+    └── SignalEvent
+    └── OutcomeDefinition / HistoricalOutcomeResult
 
 research_metrics.py
     └── Deterministic research metric helpers
@@ -110,6 +134,16 @@ technical_indicator_service.py
     └── Deterministic technical feature calculation from historical price bars
     └── Causal SMA / EMA / RSI / MACD / ATR / volume / return / prior-window features
     └── No signal, score, outcome, probability, scanner, chart, or persistence
+
+signal_outcome_service.py
+    └── Deterministic signal condition evaluation from TechnicalIndicatorSnapshot only
+    └── MATCH / NO_MATCH / NOT_EVALUABLE distinction for missing technical features
+    └── SignalEvent creation with frozen signal-date feature snapshot and reference levels
+    └── Historical outcome labeling from future trading bars after signal date
+    └── RAW_HIGH_BREAKOUT and CLOSE_RETURN_TARGET MVP outcomes
+    └── HIT / MISS / INCOMPLETE / NOT_EVALUABLE outcome statuses
+    └── Overlapping signal cooldown as analysis-time filtering only
+    └── No hit-rate aggregation, probability, scanner, dashboard, AI, or persistence
 
 symbol_utils.py
     └── Stock symbol normalization

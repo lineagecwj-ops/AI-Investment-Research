@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 06 Batch C Signal & Outcome Definition
+
+### Completed Features
+
+- 新增 `SignalConditionOperator`、`SignalEvaluationStatus`、`OverlappingSignalPolicy`、`OutcomeType` 與 `OutcomeEvaluationStatus`，明確分離 signal 評估狀態與 historical outcome 標籤。
+- 新增 frozen signal domain models：`TechnicalSignalCondition`、`EvaluatedSignalCondition`、`SignalDefinition`、`SignalMatch`、`SignalEvent` 與 `SignalEvaluationAudit`。
+- 新增 frozen outcome domain models：`OutcomeDefinition` 與 `HistoricalOutcomeResult`。
+- 新增 `src/signal_outcome_service.py`，提供 pure deterministic `evaluate_signal_conditions()`，只讀 signal-date `TechnicalIndicatorSnapshot`，不讀 future bars、不查 DB、不呼叫 network、不使用 AI。
+- condition model 支援 `>`、`>=`、`<`、`<=`、`==` 與 inclusive `between`，並支援 metric-to-metric comparison，例如 `sma_20 > sma_60`；不使用 `eval()`。
+- missing feature policy 明確區分 `NOT_EVALUABLE`，避免把資料不足誤當 `False`。
+- `SignalEvent` 只由 `MATCH` 建立，並 freeze `signal_analysis_close`、`signal_raw_close`、`reference_high`、`reference_low`、feature snapshot 與 condition trace。
+- 新增 `get_future_bars_after()`，future outcome window 嚴格從 `trading_date > signal_date` 開始，依 trading bars 計數，不使用 calendar days。
+- 新增 `RAW_HIGH_BREAKOUT` outcome：future raw high strict `>` frozen raw prior high，equal high 不算突破，只保存 first hit。
+- 新增 `CLOSE_RETURN_TARGET` outcome：future analysis close / signal analysis close - 1 `>= target_return`，只在 analysis-close basis 上運算。
+- 新增 `HIT` / `MISS` / `INCOMPLETE` / `NOT_EVALUABLE` semantics；early hit 即使 horizon 未滿也可 resolved as `HIT`，未 hit 且 horizon 不足才是 `INCOMPLETE`。
+- MFE / MAE / end-of-window return 只在完整 horizon 可用時填值，避免把 observed-so-far 誤解為完整窗口。
+- 新增 `apply_signal_cooldown()` 作為 analysis-time filtering helper；raw event extraction 預設保留全部事件，不永久刪除 overlapping raw events。
+- 新增中性 sample signal `technical_example_v1`、raw-high sample outcome `raw_high_breakout_60d_within_20d_v1` 與 close-return sample outcome `close_return_5pct_within_20d_v1`，ID 固定且具版本語意。
+
+### Safety Notes
+
+- 本 Batch 不計算 Historical Hit Rate、success_count、success_rate、probability、confidence、expected win rate、scanner、ranking、dashboard、AI prediction、fundamental filter、portfolio logic、Buy / Sell / Hold 或 target recommendation。
+- Raw-high breakout 僅比較 raw future high 與 frozen raw prior high；Batch C 不把 raw prior high 與 analysis close 混成 close-breakout boolean。
+- Close return metrics 僅使用 analysis close basis，和 raw high / low basis 分開。
+- Historical outcome 可以看 future bars，但只產生歷史標籤，不得回流修改 signal feature snapshot 或 signal event。
+- 未來 Batch D 的 Historical Hit Rate denominator 應只包含 `HIT + MISS`，排除 `INCOMPLETE` 與 `NOT_EVALUABLE`；Batch C 只文件化，不計算聚合百分比。
+
+### Testing Notes
+
+- 新增 `tests/test_signal_outcome_service.py`，覆蓋 all-match、condition failure、missing required feature、unknown metric、metric-vs-metric、inclusive between、boolean equality、bool ordered comparison rejection、non-finite defensive handling、unsupported between shape、condition traceability、SignalEvent freeze、non-match event rejection、event extraction and same-day de-duplication、audit counts、future window extraction、strict raw-high breakout、equal high miss、20-bar horizon no-peek、0 future bars incomplete、early-hit resolution、incomplete metrics empty、MFE / MAE / end return、close-return basis、missing reference `NOT_EVALUABLE`、completion helper、batch evaluator without aggregation、cooldown trading-bar distance、raw vs filtered event preservation、sample stable IDs、future mutation no-look-ahead、different future outcome labels, invalid horizon, and frozen domain models。
+- Targeted tests：`.venv/bin/python -m unittest tests.test_signal_outcome_service`，37 tests passed。
+
 ## 2026-08-08 — Sprint 06 Batch B Technical Indicator Foundation
 
 ### Completed Features

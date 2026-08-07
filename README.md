@@ -116,6 +116,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical fundamentals normalization and cache：`src/historical_financial_service.py`
 - Historical daily price normalization and cache：`src/historical_price_service.py`
 - Technical indicator feature calculation：`src/technical_indicator_service.py`
+- Signal and historical outcome definition：`src/signal_outcome_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -125,6 +126,7 @@ AI Research Dashboard integration 詳見 `docs/AI_RESEARCH_DASHBOARD.md`。
 Historical Price Data audit 詳見 `docs/HISTORICAL_PRICE_DATA_AUDIT.md`。
 Historical Price Foundation 詳見 `docs/HISTORICAL_PRICE_FOUNDATION.md`。
 Technical Indicator Foundation 詳見 `docs/TECHNICAL_INDICATOR_FOUNDATION.md`。
+Signal & Outcome Framework 詳見 `docs/SIGNAL_OUTCOME_FRAMEWORK.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -141,6 +143,14 @@ Sprint 06 Batch A 新增 daily historical price foundation，供未來 Quantitat
 Sprint 06 Batch B 新增 deterministic technical indicator foundation，從 `HistoricalPriceSeries` 計算 SMA、EMA、RSI、MACD、ATR、volume ratio、return、prior high / low 與 distance features。
 
 本層只產生 technical features / measurements，不產生 Buy / Sell / Hold、technical score、probability、hit rate、success / failure outcome、scanner 或 backtest。所有 as-of technical snapshot 都必須遵守 no-look-ahead，只使用 `trading_date <= as_of_date` 的 price bars。
+
+## Signal & Outcome Framework
+
+Sprint 06 Batch C 新增 deterministic signal / historical outcome foundation。
+
+Signal layer 只用 signal date 當下的 `TechnicalIndicatorSnapshot` 評估條件，並區分 `MATCH`、`NO_MATCH`、`NOT_EVALUABLE`。Historical outcome layer 才能使用 signal date 之後的 future trading bars，產生 `HIT`、`MISS`、`INCOMPLETE` 或 `NOT_EVALUABLE` 的歷史標籤。
+
+本層目前只支援 raw-high breakout 與 close-return target 的 MVP outcome，不計算 Historical Hit Rate、不產生 probability、confidence、scanner、ranking、dashboard、AI prediction 或投資建議。
 
 ## Grounded AI Research Foundation
 
