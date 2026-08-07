@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from datetime import UTC
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
@@ -16,13 +17,20 @@ if str(SRC_PATH) not in sys.path:
 
 from database import get_cached_stock
 from database import get_cached_historical_financials
+from database import get_cached_historical_prices
+from database import get_historical_price_fetch_state
+from database import get_latest_historical_price_date
 from database import HISTORICAL_CACHE_TTL
+from database import HISTORICAL_PRICE_CACHE_TTL
 from database import initialize_database
 from database import SCHEMA_MIGRATION_EXPIRED_CACHE_TIMESTAMP
 from database import save_historical_financials
+from database import save_historical_prices
 from database import save_stock
 from models import HistoricalFinancialPeriod
 from models import HistoricalFinancialSeries
+from models import HistoricalPriceBar
+from models import HistoricalPriceSeries
 from models import Stock
 
 
@@ -94,6 +102,25 @@ class DatabaseTestCase(unittest.TestCase):
             connection.close()
 
         self.assertIsNotNone(table)
+
+    def test_initialize_database_creates_historical_prices_table(self):
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+                ("table", "historical_prices"),
+            ).fetchone()
+            state_table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+                ("table", "historical_price_fetch_state"),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertIsNotNone(table)
+        self.assertIsNotNone(state_table)
 
     def test_save_and_read_stock_from_fresh_cache(self):
         save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
@@ -329,6 +356,267 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertIsNotNone(stock)
         self.assertEqual(stock.current_price, 200.75)
 
+    def test_save_and_read_historical_prices_from_fresh_cache(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        cached = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(hours=1),
+            require_full_history=True,
+        )
+
+        self.assertIsNotNone(cached)
+        self.assertFalse(cached.is_stale)
+        self.assertEqual(cached.currency, "USD")
+        self.assertEqual([bar.trading_date.isoformat() for bar in cached.bars], ["2025-01-02", "2025-01-03"])
+        self.assertEqual(cached.bars[-1].adjusted_close, 125.0)
+        self.assertEqual(cached.bars[-1].volume, 1100)
+
+    def test_historical_price_range_read_filters_at_database_boundary(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        cached = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            start=date(2025, 1, 3),
+            end=date(2025, 1, 3),
+            now=self.now,
+        )
+
+        self.assertEqual(len(cached.bars), 1)
+        self.assertEqual(cached.bars[0].trading_date, date(2025, 1, 3))
+
+    def test_historical_price_cache_uses_independent_twelve_hour_ttl(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        fresh = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now + HISTORICAL_PRICE_CACHE_TTL - timedelta(seconds=1),
+            require_full_history=True,
+        )
+        expired = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now + HISTORICAL_PRICE_CACHE_TTL,
+            require_full_history=True,
+        )
+
+        self.assertIsNotNone(fresh)
+        self.assertIsNone(expired)
+
+    def test_expired_historical_price_cache_can_be_returned_as_stale(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        stale = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now + timedelta(hours=13),
+            include_expired=True,
+            require_full_history=True,
+        )
+
+        self.assertIsNotNone(stale)
+        self.assertTrue(stale.is_stale)
+
+    def test_historical_price_upsert_updates_same_symbol_and_date(self):
+        save_historical_prices(
+            self.sample_price_series(close_2025_01_03=125.0),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+        save_historical_prices(
+            self.sample_price_series(close_2025_01_03=130.0),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        cached = get_cached_historical_prices("NVDA", self.db_path, now=self.now)
+
+        self.assertEqual(len(cached.bars), 2)
+        self.assertEqual(cached.bars[-1].close, 130.0)
+
+    def test_historical_price_upsert_does_not_delete_omitted_old_bar(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now - timedelta(hours=1),
+            full_history_fetched=True,
+        )
+        save_historical_prices(
+            HistoricalPriceSeries(
+                symbol="NVDA",
+                currency="USD",
+                bars=(
+                    HistoricalPriceBar(
+                        symbol="NVDA",
+                        trading_date=date(2025, 1, 3),
+                        open=126.0,
+                        high=132.0,
+                        low=125.0,
+                        close=130.0,
+                        adjusted_close=130.0,
+                        volume=1200,
+                    ),
+                ),
+                fetched_at=self.now,
+            ),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=False,
+        )
+
+        cached = get_cached_historical_prices("NVDA", self.db_path, now=self.now)
+
+        self.assertEqual([bar.trading_date for bar in cached.bars], [date(2025, 1, 2), date(2025, 1, 3)])
+        self.assertEqual(cached.bars[-1].close, 130.0)
+
+    def test_partial_historical_price_refresh_does_not_make_older_coverage_fresh(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now - timedelta(hours=13),
+            full_history_fetched=True,
+        )
+        save_historical_prices(
+            HistoricalPriceSeries(
+                symbol="NVDA",
+                currency="USD",
+                bars=(
+                    HistoricalPriceBar(
+                        symbol="NVDA",
+                        trading_date=date(2025, 1, 3),
+                        open=126.0,
+                        high=132.0,
+                        low=125.0,
+                        close=130.0,
+                        adjusted_close=130.0,
+                        volume=1200,
+                    ),
+                ),
+                fetched_at=self.now,
+            ),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=False,
+        )
+
+        full_history_cache = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now,
+            require_full_history=True,
+        )
+        refreshed_day_cache = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            start=date(2025, 1, 3),
+            end=date(2025, 1, 3),
+            now=self.now,
+        )
+
+        self.assertIsNone(full_history_cache)
+        self.assertIsNotNone(refreshed_day_cache)
+        self.assertEqual(refreshed_day_cache.bars[0].close, 130.0)
+
+    def test_historical_price_coverage_requires_explicit_start(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=False,
+        )
+
+        covered = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            start=date(2025, 1, 2),
+            now=self.now,
+        )
+        not_covered = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            start=date(2024, 12, 31),
+            now=self.now,
+        )
+
+        self.assertIsNotNone(covered)
+        self.assertIsNone(not_covered)
+
+    def test_historical_price_full_history_requires_fetch_state(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=False,
+        )
+
+        full_history_cache = get_cached_historical_prices(
+            "NVDA",
+            self.db_path,
+            now=self.now,
+            require_full_history=True,
+        )
+
+        self.assertIsNone(full_history_cache)
+
+    def test_historical_price_fetch_state_and_latest_date_are_persisted(self):
+        save_historical_prices(
+            self.sample_price_series(),
+            self.db_path,
+            fetched_at=self.now,
+            full_history_fetched=True,
+        )
+
+        state = get_historical_price_fetch_state("NVDA", self.db_path)
+        latest = get_latest_historical_price_date("NVDA", self.db_path)
+
+        self.assertTrue(state["full_history_fetched"])
+        self.assertEqual(state["earliest_date"], date(2025, 1, 2))
+        self.assertEqual(state["latest_date"], date(2025, 1, 3))
+        self.assertEqual(latest, date(2025, 1, 3))
+
+    def test_old_historical_price_table_migration_adds_missing_columns(self):
+        self.create_old_historical_prices_table()
+
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(historical_prices)").fetchall()
+            }
+        finally:
+            connection.close()
+
+        self.assertIn("adjusted_close", columns)
+        self.assertIn("stock_splits", columns)
+        self.assertIn("currency", columns)
+
     def insert_old_cache_row(self, fetched_at: str) -> None:
         connection = sqlite3.connect(self.db_path)
         try:
@@ -435,6 +723,28 @@ class DatabaseTestCase(unittest.TestCase):
         finally:
             connection.close()
 
+    def create_old_historical_prices_table(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE historical_prices (
+                    symbol TEXT NOT NULL,
+                    trading_date TEXT NOT NULL,
+                    open REAL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume INTEGER,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY(symbol, trading_date)
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
     def sample_historical_series(self, revenue_2025=1200.0):
         return HistoricalFinancialSeries(
             symbol="NVDA",
@@ -461,6 +771,39 @@ class DatabaseTestCase(unittest.TestCase):
                     total_debt=500.0,
                 ),
             ],
+        )
+
+    def sample_price_series(self, close_2025_01_03=125.0):
+        return HistoricalPriceSeries(
+            symbol="NVDA",
+            currency="USD",
+            bars=(
+                HistoricalPriceBar(
+                    symbol="NVDA",
+                    trading_date=date(2025, 1, 2),
+                    open=100.0,
+                    high=110.0,
+                    low=95.0,
+                    close=105.0,
+                    adjusted_close=104.5,
+                    volume=1000,
+                    dividends=0.0,
+                    stock_splits=0.0,
+                ),
+                HistoricalPriceBar(
+                    symbol="NVDA",
+                    trading_date=date(2025, 1, 3),
+                    open=120.0,
+                    high=130.0,
+                    low=115.0,
+                    close=close_2025_01_03,
+                    adjusted_close=close_2025_01_03,
+                    volume=1100,
+                    dividends=0.0,
+                    stock_splits=0.0,
+                ),
+            ),
+            fetched_at=self.now,
         )
 
 
