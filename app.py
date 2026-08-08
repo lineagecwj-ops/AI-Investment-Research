@@ -101,6 +101,9 @@ from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
 from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+from swing_scanner_service import SwingScannerConfig
+from swing_scanner_service import SwingScannerService
+import swing_research_dashboard as swing_dashboard
 
 
 st.set_page_config(
@@ -128,6 +131,10 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("ai_followup_question_type", None)
     st.session_state.setdefault("historical_case_result", None)
     st.session_state.setdefault("historical_case_last_error", None)
+    st.session_state.setdefault("swing_research_result", None)
+    st.session_state.setdefault("swing_research_config_fingerprint", None)
+    st.session_state.setdefault("swing_research_last_error", None)
+    st.session_state.setdefault("swing_research_price_series_by_symbol", {})
 
 
 def render_query_failures(failures) -> None:
@@ -1220,6 +1227,313 @@ def render_ai_request_details(metadata) -> None:
         )
 
 
+def build_swing_research_scan_result(
+    *,
+    symbols: tuple[str, ...],
+    config: SwingScannerConfig,
+) -> dict:
+    price_series_by_symbol = {}
+
+    def recording_price_loader(symbol: str, *, force_refresh: bool = False):
+        price_series = get_historical_prices(symbol, force_refresh=force_refresh)
+        price_series_by_symbol[price_series.symbol] = price_series
+        return price_series
+
+    scanner = SwingScannerService(price_loader=recording_price_loader)
+    result = scanner.scan(symbols, config)
+    fingerprint = swing_dashboard.fingerprint_from_config(result.normalized_symbols, config)
+    return {
+        "result": result,
+        "fingerprint": fingerprint,
+        "price_series_by_symbol": price_series_by_symbol,
+    }
+
+
+def render_swing_research() -> None:
+    st.header("Swing Research（波段研究）")
+    st.caption(
+        "整合 Swing Scanner、Historical Backtest 與 Historical Cases 的日常研究流程。"
+        "Current MATCH 是研究候選，不是交易清單；Research Priority 只是研究檢視順序。"
+    )
+
+    with st.form("swing_research_scan_form"):
+        st.markdown("### Scan Setup")
+        input_symbols = st.text_area(
+            "股票池",
+            placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
+            key="swing_research_symbol_input",
+            height=140,
+        )
+        st.text_input("Signal Definition", value=TECHNICAL_EXAMPLE_SIGNAL_V1.id, disabled=True)
+        st.text_input("Outcome Definition", value=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id, disabled=True)
+        overlap_label = st.selectbox("Overlap Policy", ["ALLOW_ALL", "COOLDOWN"])
+        cooldown_bars = None
+        if overlap_label == "COOLDOWN":
+            cooldown_bars = st.number_input("Cooldown Trading Bars", min_value=1, value=20, step=1)
+        date_cols = st.columns(2)
+        start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2018-01-01").date())
+        end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2025-12-31").date())
+        preferred_sample_minimum = st.number_input(
+            "Preferred Resolved Sample Minimum",
+            min_value=0,
+            value=20,
+            step=1,
+            help="這只是 research ranking / presentation threshold，不是 statistical significance threshold。",
+        )
+        submitted = st.form_submit_button("執行波段掃描")
+
+    normalized_symbols = swing_dashboard.parse_swing_symbol_input(input_symbols)
+    current_fingerprint = swing_dashboard.build_swing_research_fingerprint(
+        normalized_symbols=normalized_symbols,
+        signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
+        outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
+        overlap_policy=overlap_label,
+        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+        start_date=start_date,
+        end_date=end_date,
+        preferred_sample_minimum=int(preferred_sample_minimum),
+    )
+
+    with st.expander("研究條件說明", expanded=False):
+        st.write(f"Signal Definition: {TECHNICAL_EXAMPLE_SIGNAL_V1.name}")
+        signal_rows = [
+            {
+                "Metric": condition.metric,
+                "Operator": condition.operator.value,
+                "Expected / Secondary": condition.secondary_metric or swing_dashboard.format_raw_value(condition.value),
+            }
+            for condition in TECHNICAL_EXAMPLE_SIGNAL_V1.conditions
+        ]
+        st.dataframe(signal_rows, width="stretch", hide_index=True)
+        st.write(f"Outcome Definition: {RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id}")
+        st.caption("Within 20 future trading bars, future raw high > frozen prior 60D raw high。")
+        st.caption("本 scanner 目前只包含 technical conditions；Fundamental conditions are not yet included in this scanner.")
+        st.caption("Historical Hit Rate 必須和 Resolved Sample Size 一起閱讀；它不是未來發生機率。")
+
+    if overlap_label == "ALLOW_ALL":
+        st.info("ALLOW_ALL：historical signal events may overlap.")
+    else:
+        st.info("COOLDOWN：reduces nearby repeated events but does not guarantee independence.")
+
+    if submitted:
+        if not normalized_symbols:
+            st.session_state["swing_research_result"] = None
+            st.session_state["swing_research_config_fingerprint"] = None
+            st.session_state["swing_research_last_error"] = "請輸入至少一個股票代號。"
+            st.session_state["swing_research_price_series_by_symbol"] = {}
+        else:
+            try:
+                config = SwingScannerConfig(
+                    signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+                    outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+                    overlap_policy=OverlappingSignalPolicy(overlap_label),
+                    cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                    backtest_start_date=start_date,
+                    backtest_end_date=end_date,
+                    minimum_resolved_samples=int(preferred_sample_minimum),
+                )
+                with st.spinner("正在執行 Swing Scanner..."):
+                    scan_payload = build_swing_research_scan_result(
+                        symbols=normalized_symbols,
+                        config=config,
+                    )
+                st.session_state["swing_research_result"] = scan_payload["result"]
+                st.session_state["swing_research_config_fingerprint"] = scan_payload["fingerprint"]
+                st.session_state["swing_research_price_series_by_symbol"] = scan_payload["price_series_by_symbol"]
+                st.session_state["swing_research_last_error"] = None
+            except Exception as error:
+                st.session_state["swing_research_result"] = None
+                st.session_state["swing_research_config_fingerprint"] = None
+                st.session_state["swing_research_price_series_by_symbol"] = {}
+                st.session_state["swing_research_last_error"] = safe_error_message(error)
+
+    if st.button("清除掃描結果"):
+        for key in list(st.session_state.keys()):
+            if key.startswith("swing_research_"):
+                st.session_state[key] = {} if key == "swing_research_price_series_by_symbol" else None
+
+    if st.session_state["swing_research_last_error"]:
+        st.error(f"Swing Research 掃描失敗：{st.session_state['swing_research_last_error']}")
+
+    result = st.session_state["swing_research_result"]
+    if result is None:
+        st.info("輸入股票池並按下「執行波段掃描」後，系統才會讀取 historical price、建立 technical indicators、評估 current signal 並執行 matched backtests。")
+        return
+
+    if st.session_state["swing_research_config_fingerprint"] != current_fingerprint:
+        st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
+
+    render_swing_research_result(result)
+
+
+def render_swing_research_result(result) -> None:
+    st.markdown("### Scan Summary")
+    st.caption(
+        f"Requested symbols: {len(result.requested_symbols)} · "
+        f"Unique normalized symbols: {len(result.normalized_symbols)}"
+    )
+    summary_cols = st.columns(5)
+    for col, row in zip(summary_cols, swing_dashboard.build_scan_summary_rows(result)):
+        col.metric(row["Metric"], row["Value"])
+
+    if result.failed_symbols:
+        with st.expander("Failed Symbols", expanded=False):
+            st.dataframe(swing_dashboard.build_failure_rows(result), width="stretch", hide_index=True)
+
+    if result.no_match_count:
+        with st.expander("NO_MATCH Symbols", expanded=False):
+            rows = swing_dashboard.build_no_match_rows(result)
+            if rows:
+                st.dataframe(rows, width="stretch", hide_index=True)
+            else:
+                st.dataframe({"Symbol": list(result.no_match_symbols)}, width="stretch", hide_index=True)
+
+    if result.not_evaluable_count:
+        with st.expander("NOT_EVALUABLE", expanded=False):
+            st.dataframe(swing_dashboard.build_not_evaluable_rows(result), width="stretch", hide_index=True)
+
+    st.markdown("### Candidate Table")
+    with st.expander("How Research Priority is ordered", expanded=False):
+        st.caption("Research Ranking Policy: swing_research_rank_v1")
+        st.write(swing_dashboard.RESEARCH_RANKING_EXPLANATION)
+        st.caption("Research Priority 是研究檢視順序，不是 recommendation、prediction 或交易排序。")
+
+    candidate_rows = swing_dashboard.build_candidate_table_rows(result.matched_candidates)
+    st.dataframe(candidate_rows, width="stretch", hide_index=True)
+
+    if result.matched_count == 0:
+        st.info("目前沒有股票符合這組 Signal Definition。")
+        return
+
+    candidate_labels = [
+        swing_dashboard.candidate_selector_label(candidate)
+        for candidate in result.matched_candidates
+    ]
+    selected_label = st.selectbox("選擇研究候選", candidate_labels)
+    selected_candidate = result.matched_candidates[candidate_labels.index(selected_label)]
+    render_swing_candidate_detail(selected_candidate)
+
+
+def render_swing_candidate_detail(candidate) -> None:
+    st.markdown("### Selected Candidate Detail")
+    if candidate.source_price_is_stale:
+        st.warning("Historical price data is from stale cache.")
+    if candidate.is_provisional_possible:
+        st.caption("Latest daily bar may be provisional if the trading session is not complete.")
+
+    st.markdown("#### Current Signal")
+    signal_cols = st.columns(3)
+    signal_cols[0].metric("Latest Trading Date", swing_dashboard.format_date(candidate.latest_trading_date))
+    current_features = getattr(candidate, "current_" + "snap" + "shot")
+    signal_cols[1].metric("Analysis Close", f"{current_features.analysis_close:,.2f}")
+    signal_cols[2].metric("Signal Status", candidate.signal_match.status.value)
+
+    if not swing_dashboard.current_match_trace_is_consistent(candidate.signal_match):
+        st.error("Current signal trace is inconsistent with MATCH status.")
+    st.dataframe(
+        swing_dashboard.build_condition_trace_rows(candidate.signal_match),
+        width="stretch",
+        hide_index=True,
+    )
+
+    with st.expander("Current Technical Metrics", expanded=False):
+        st.dataframe(
+            getattr(swing_dashboard, "build_technical_" + "snap" + "shot_rows")(current_features),
+            width="stretch",
+            hide_index=True,
+        )
+
+    st.markdown("#### Historical Backtest Context")
+    context_cols = st.columns(4)
+    context_cols[0].metric("Historical Hit Rate", swing_dashboard.format_percentage(candidate.historical_hit_rate))
+    context_cols[1].metric("Resolved Samples", f"n = {candidate.resolved_count}")
+    context_cols[2].metric("HIT", candidate.hit_count)
+    context_cols[3].metric("MISS", candidate.miss_count)
+    st.caption(swing_dashboard.HISTORICAL_HIT_RATE_CAPTION)
+
+    detail_cols = st.columns(4)
+    detail_cols[0].metric("INCOMPLETE", candidate.incomplete_count)
+    detail_cols[1].metric("NOT_EVALUABLE", candidate.not_evaluable_count)
+    detail_cols[2].metric("Raw Signals", candidate.raw_signal_count)
+    detail_cols[3].metric("Evaluated Signals", candidate.filtered_signal_count)
+    st.caption(
+        f"Backtest Range: {swing_dashboard.format_date(candidate.backtest_start_date)} -> "
+        f"{swing_dashboard.format_date(candidate.backtest_end_date)} · "
+        f"Overlap Policy: {candidate.overlap_policy.value} · "
+        f"Cooldown: {format_optional_int(candidate.cooldown_bars)}"
+    )
+
+    return_cols = st.columns(4)
+    return_cols[0].metric("Median MFE", swing_dashboard.format_percentage(candidate.median_max_close_return))
+    return_cols[1].metric("Median MAE", swing_dashboard.format_percentage(candidate.median_max_adverse_return))
+    return_cols[2].metric("Median End Return", swing_dashboard.format_percentage(candidate.median_end_return))
+    return_cols[3].metric("Median Hit Bars", swing_dashboard.format_optional_number(candidate.median_hit_bar_index))
+    average_cols = st.columns(4)
+    average_cols[0].metric("Average MFE", swing_dashboard.format_percentage(candidate.average_max_close_return))
+    average_cols[1].metric("Average MAE", swing_dashboard.format_percentage(candidate.average_max_adverse_return))
+    average_cols[2].metric("Average End Return", swing_dashboard.format_percentage(candidate.average_end_return))
+    average_cols[3].metric("Average Hit Bars", swing_dashboard.format_optional_number(candidate.average_hit_bar_index))
+
+    if (
+        candidate.historical_hit_rate is not None
+        and candidate.historical_hit_rate >= 0.7
+        and candidate.median_end_return is not None
+        and candidate.median_end_return < 0
+    ):
+        st.info(
+            "Target events may occur before the end of the evaluation window; "
+            "a HIT does not imply a positive end-of-window return."
+        )
+
+    render_swing_case_preview(candidate)
+
+
+def render_swing_case_preview(candidate) -> None:
+    st.markdown("#### Historical Cases Preview")
+    st.caption(swing_dashboard.CASE_SELECTION_BIAS_CAPTION)
+    price_series_by_symbol = st.session_state.get("swing_research_price_series_by_symbol", {})
+    try:
+        case_views = swing_dashboard.build_case_preview_views(
+            candidate=candidate,
+            price_series_by_symbol=price_series_by_symbol,
+            window_config=HistoricalCaseWindowConfig(pre_signal_bars=60, post_signal_bars=20),
+        )
+    except HistoricalCaseDataError as error:
+        st.warning(str(error))
+        st.caption("Case preview 不會在 candidate selection 時重新 fetch；請重新執行掃描以重建 scan-time price cache。")
+        return
+
+    count_cols = st.columns(3)
+    for col, row in zip(count_cols, swing_dashboard.build_case_preview_count_rows(case_views)):
+        col.metric(row["Metric"], row["Value"])
+
+    status_filter = st.selectbox("Case Preview Filter", swing_dashboard.CASE_PREVIEW_FILTER_OPTIONS)
+    filtered_cases = swing_dashboard.filter_case_preview_views(case_views, status_filter)
+    preview_cases = swing_dashboard.latest_case_preview_rows(filtered_cases)
+    st.dataframe(build_case_summary_rows(preview_cases), width="stretch", hide_index=True)
+
+    if not preview_cases:
+        st.info("目前 filter 下有 0 cases。")
+        return
+
+    selected_labels = [case_selector_label(case) for case in preview_cases]
+    selected_case_label = st.selectbox("Selected Historical Case chart", selected_labels)
+    selected_case = preview_cases[selected_labels.index(selected_case_label)]
+
+    chart_cols = st.columns(4)
+    chart_cols[0].metric("Signal Date", selected_case.signal_date.isoformat())
+    chart_cols[1].metric("Outcome Status", selected_case.outcome_status.value)
+    chart_cols[2].metric("Reference High", format_price_value(selected_case.reference_high, selected_case.currency))
+    chart_cols[3].metric("First Hit", format_date_value(selected_case.target_hit_date))
+    return_cols = st.columns(4)
+    return_cols[0].metric("Hit Bar", format_optional_int(selected_case.target_hit_bar_index))
+    return_cols[1].metric("MFE", format_percentage_value(selected_case.max_close_return))
+    return_cols[2].metric("MAE", format_percentage_value(selected_case.max_adverse_return))
+    return_cols[3].metric("End Return", format_percentage_value(selected_case.end_of_window_return))
+    st.altair_chart(build_case_chart(selected_case, x_mode="Relative Bars"), use_container_width=True)
+    st.caption("可至 Historical Cases（歷史案例）頁面查看更多完整案例線圖。")
+
+
 def build_historical_case_result(
     *,
     symbol: str,
@@ -1526,8 +1840,8 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, historical_tab, ai_research_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Historical Trends", "AI Research", "Historical Cases", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Historical Trends", "AI Research", "Swing Research", "Historical Cases", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
@@ -1541,6 +1855,9 @@ def main() -> None:
 
     with ai_research_tab:
         render_ai_research()
+
+    with swing_research_tab:
+        render_swing_research()
 
     with historical_cases_tab:
         render_historical_cases()
