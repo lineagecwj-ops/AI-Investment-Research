@@ -234,6 +234,37 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertNotIn("推薦池", combined_source)
         self.assertNotIn("高勝率", combined_source)
 
+    def test_oos_validation_dashboard_ui_exists_and_preserves_semantics(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        helper_source = (SRC_PATH / "oos_validation_dashboard.py").read_text(encoding="utf-8")
+        oos_page_source = app_source[
+            app_source.index("def render_swing_research() -> None:"):
+            app_source.index("def render_swing_research_result(")
+        ]
+
+        self.assertIn("Out-of-Sample Validation", oos_page_source)
+        self.assertIn("Development", oos_page_source)
+        self.assertIn("Validation", oos_page_source)
+        self.assertIn("Holdout", oos_page_source)
+        self.assertIn("Historical Hit Rate", oos_page_source)
+        self.assertIn("Resolved n", oos_page_source)
+        self.assertIn("Candidate Period Share", oos_page_source)
+        self.assertIn("Research Specification Fingerprint", oos_page_source)
+        self.assertIn('st.session_state.setdefault("oos_validation_result", None)', app_source)
+        self.assertIn('st.session_state.setdefault("oos_validation_fingerprint", None)', app_source)
+        self.assertIn('st.session_state.setdefault("oos_validation_last_error", None)', app_source)
+        self.assertIn('st.session_state.setdefault("oos_validation_source_context", None)', app_source)
+        self.assertIn('"執行樣本外驗證"', oos_page_source)
+        self.assertIn('"清除樣本外驗證結果"', oos_page_source)
+
+        combined_source = oos_page_source + helper_source
+        self.assertNotIn("Validation Score", combined_source)
+        self.assertNotIn("Prediction Accuracy", combined_source)
+        self.assertNotIn("Win Rate", combined_source)
+        self.assertNotIn("Future Probability", combined_source)
+        self.assertNotIn("Buy ", combined_source)
+        self.assertNotIn("Sell ", combined_source)
+
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
         self.assertEqual(format_sector("Financial Services"), "Financial Services（金融服務）")
