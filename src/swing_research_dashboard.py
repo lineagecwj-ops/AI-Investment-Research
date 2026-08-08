@@ -1,6 +1,5 @@
 from datetime import date
 import hashlib
-import re
 
 from historical_case_service import HistoricalCaseDataError
 from historical_case_service import HistoricalCaseWindowConfig
@@ -11,11 +10,12 @@ from models import OutcomeEvaluationStatus
 from models import SignalEvaluationStatus
 from models import SignalMatch
 from models import TechnicalIndicatorSnapshot
-from symbol_utils import normalize_stock_symbol
 from swing_scanner_service import SampleSizeStatus
 from swing_scanner_service import SwingOpportunityCandidate
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerResult
+from universe_dashboard import MANUAL_SOURCE
+from universe_dashboard import parse_universe_symbol_text
 
 
 CASE_PREVIEW_FILTER_OPTIONS = ("Resolved", "HIT", "MISS")
@@ -29,20 +29,13 @@ CASE_SELECTION_BIAS_CAPTION = "請同時查看 HIT 與 MISS；只檢視命中案
 
 
 def parse_swing_symbol_input(user_input: str) -> tuple[str, ...]:
-    symbols = []
-    seen_symbols = set()
-    for raw_symbol in re.split(r"[\s,;，；]+", user_input):
-        symbol = normalize_stock_symbol(raw_symbol)
-        if not symbol or symbol in seen_symbols:
-            continue
-        symbols.append(symbol)
-        seen_symbols.add(symbol)
-    return tuple(symbols)
+    return parse_universe_symbol_text(user_input)
 
 
 def build_swing_research_fingerprint(
     *,
     normalized_symbols: tuple[str, ...],
+    source_type: str = MANUAL_SOURCE,
     signal_id: str,
     outcome_id: str,
     overlap_policy: str,
@@ -53,6 +46,7 @@ def build_swing_research_fingerprint(
 ) -> str:
     identity = "|".join(
         (
+            source_type,
             ",".join(normalized_symbols),
             signal_id,
             outcome_id,
@@ -70,9 +64,12 @@ def build_swing_research_fingerprint(
 def fingerprint_from_config(
     normalized_symbols: tuple[str, ...],
     config: SwingScannerConfig,
+    *,
+    source_type: str = MANUAL_SOURCE,
 ) -> str:
     return build_swing_research_fingerprint(
         normalized_symbols=normalized_symbols,
+        source_type=source_type,
         signal_id=config.signal_definition.id,
         outcome_id=config.outcome_definition.id,
         overlap_policy=config.overlap_policy.value,

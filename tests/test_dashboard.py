@@ -154,7 +154,7 @@ class DashboardFormattingTestCase(unittest.TestCase):
         app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
         case_page_source = app_source[
             app_source.index("def render_historical_cases() -> None:"):
-            app_source.index("def read_watchlist_for_ui()")
+            app_source.index("def read_watchlist_for_ui(")
         ]
 
         self.assertNotIn("Research Priority", case_page_source)
@@ -163,6 +163,7 @@ class DashboardFormattingTestCase(unittest.TestCase):
 
     def test_swing_research_tab_uses_explicit_session_result(self):
         app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        universe_source = (SRC_PATH / "universe_dashboard.py").read_text(encoding="utf-8")
 
         self.assertIn('"Swing Research"', app_source)
         self.assertIn('"Historical Cases"', app_source)
@@ -171,14 +172,31 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn('st.session_state.setdefault("swing_research_config_fingerprint", None)', app_source)
         self.assertIn('st.session_state.setdefault("swing_research_last_error", None)', app_source)
         self.assertIn('st.session_state.setdefault("swing_research_price_series_by_symbol", {})', app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_source_context", None)', app_source)
         self.assertIn('submitted = st.form_submit_button("執行波段掃描")', app_source)
         self.assertIn('if submitted:', app_source)
         self.assertIn('if st.button("清除掃描結果"):', app_source)
         self.assertIn("build_swing_research_scan_result(", app_source)
+        self.assertIn("Symbol Source", app_source)
+        self.assertIn("Manual Input", universe_source)
+        self.assertIn("Saved Universe", universe_source)
+
+    def test_universe_management_tab_exists(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        universe_source = (SRC_PATH / "universe_dashboard.py").read_text(encoding="utf-8")
+
+        self.assertIn('"Universes"', app_source)
+        self.assertIn("def render_universe_management() -> None:", app_source)
+        self.assertIn("建立股票池", app_source)
+        self.assertIn("儲存變更", app_source)
+        self.assertIn("刪除股票池", app_source)
+        self.assertIn("我確認要刪除此股票池", app_source)
+        self.assertIn("股票池只是研究標的集合，不代表投資建議或預測。", universe_source)
 
     def test_swing_research_wording_preserves_research_semantics(self):
         app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
         helper_source = (SRC_PATH / "swing_research_dashboard.py").read_text(encoding="utf-8")
+        universe_source = (SRC_PATH / "universe_dashboard.py").read_text(encoding="utf-8")
         swing_page_source = app_source[
             app_source.index("def render_swing_research() -> None:"):
             app_source.index("def build_historical_case_result(")
@@ -188,10 +206,12 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn("Resolved Samples", swing_page_source)
         self.assertIn("Research Priority", swing_page_source)
         self.assertIn("swing_research_price_series_by_symbol", swing_page_source)
-        combined_source = swing_page_source + helper_source
+        combined_source = swing_page_source + helper_source + universe_source
         self.assertNotIn("Buy Rank", combined_source)
         self.assertNotIn("Opportunity Score", combined_source)
         self.assertNotIn("上漲機率", combined_source)
+        self.assertNotIn("推薦池", combined_source)
+        self.assertNotIn("高勝率", combined_source)
 
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")

@@ -97,6 +97,14 @@ from watchlist_service import add_stock
 from watchlist_service import list_watchlist
 from watchlist_service import remove_stock
 from watchlist_service import WatchlistDataError
+from universe_service import create_universe
+from universe_service import delete_universe
+from universe_service import list_universes
+from universe_service import update_universe
+from universe_service import UniverseAlreadyExistsError
+from universe_service import UniverseError
+from universe_service import UniverseNotFoundError
+from universe_service import UniverseValidationError
 from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
@@ -104,6 +112,7 @@ from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
 import swing_research_dashboard as swing_dashboard
+import universe_dashboard as universe_ui
 
 
 st.set_page_config(
@@ -135,6 +144,7 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("swing_research_config_fingerprint", None)
     st.session_state.setdefault("swing_research_last_error", None)
     st.session_state.setdefault("swing_research_price_series_by_symbol", {})
+    st.session_state.setdefault("swing_research_source_context", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1231,6 +1241,7 @@ def build_swing_research_scan_result(
     *,
     symbols: tuple[str, ...],
     config: SwingScannerConfig,
+    source_type: str,
 ) -> dict:
     price_series_by_symbol = {}
 
@@ -1241,7 +1252,11 @@ def build_swing_research_scan_result(
 
     scanner = SwingScannerService(price_loader=recording_price_loader)
     result = scanner.scan(symbols, config)
-    fingerprint = swing_dashboard.fingerprint_from_config(result.normalized_symbols, config)
+    fingerprint = swing_dashboard.fingerprint_from_config(
+        result.normalized_symbols,
+        config,
+        source_type=source_type,
+    )
     return {
         "result": result,
         "fingerprint": fingerprint,
@@ -1256,14 +1271,55 @@ def render_swing_research() -> None:
         "Current MATCH 是研究候選，不是交易清單；Research Priority 只是研究檢視順序。"
     )
 
+    universes = read_universes_for_ui()
+    watchlist_symbols = read_watchlist_for_ui(show_error=False)
+    st.markdown("### Scan Setup")
+    source_options = [
+        universe_ui.MANUAL_SOURCE,
+        universe_ui.WATCHLIST_SOURCE,
+        universe_ui.SAVED_UNIVERSE_SOURCE,
+    ]
+    source_type = st.selectbox(
+        "Symbol Source",
+        source_options,
+        key="swing_research_symbol_source",
+    )
+    selected_universe = None
+    input_symbols = ""
+
     with st.form("swing_research_scan_form"):
-        st.markdown("### Scan Setup")
-        input_symbols = st.text_area(
-            "股票池",
-            placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
-            key="swing_research_symbol_input",
-            height=140,
-        )
+        if source_type == universe_ui.MANUAL_SOURCE:
+            input_symbols = st.text_area(
+                "股票池",
+                placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
+                key="swing_research_symbol_input",
+                height=140,
+            )
+        elif source_type == universe_ui.WATCHLIST_SOURCE:
+            st.caption(f"Watchlist symbols: {len(watchlist_symbols)}")
+            if not watchlist_symbols:
+                st.info("Watchlist 目前沒有股票。")
+        else:
+            if universes:
+                universe_labels = [
+                    universe_ui.universe_selector_label(universe)
+                    for universe in universes
+                ]
+                selected_label = st.selectbox(
+                    "Universe",
+                    universe_labels,
+                    key="swing_research_universe_selector",
+                )
+                selected_universe = universes[universe_labels.index(selected_label)]
+                st.caption(
+                    f"{selected_universe.name} · "
+                    f"{selected_universe.symbol_count} symbols · "
+                    f"Updated At: {universe_ui.format_universe_updated_at(selected_universe)}"
+                )
+                with st.expander("Symbols", expanded=False):
+                    st.write(universe_ui.symbols_to_text(selected_universe.symbols) or "N/A")
+            else:
+                st.info("尚未建立自訂股票池。Manual Input 仍可使用。")
         st.text_input("Signal Definition", value=TECHNICAL_EXAMPLE_SIGNAL_V1.id, disabled=True)
         st.text_input("Outcome Definition", value=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id, disabled=True)
         overlap_label = st.selectbox("Overlap Policy", ["ALLOW_ALL", "COOLDOWN"])
@@ -1282,9 +1338,15 @@ def render_swing_research() -> None:
         )
         submitted = st.form_submit_button("執行波段掃描")
 
-    normalized_symbols = swing_dashboard.parse_swing_symbol_input(input_symbols)
+    normalized_symbols, current_source_context = resolve_swing_research_source(
+        source_type=source_type,
+        input_symbols=input_symbols,
+        watchlist_symbols=watchlist_symbols,
+        selected_universe=selected_universe,
+    )
     current_fingerprint = swing_dashboard.build_swing_research_fingerprint(
         normalized_symbols=normalized_symbols,
+        source_type=source_type,
         signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
         outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
         overlap_policy=overlap_label,
@@ -1319,8 +1381,14 @@ def render_swing_research() -> None:
         if not normalized_symbols:
             st.session_state["swing_research_result"] = None
             st.session_state["swing_research_config_fingerprint"] = None
-            st.session_state["swing_research_last_error"] = "請輸入至少一個股票代號。"
+            if source_type == universe_ui.SAVED_UNIVERSE_SOURCE:
+                st.session_state["swing_research_last_error"] = "股票池目前沒有 symbols。"
+            elif source_type == universe_ui.WATCHLIST_SOURCE:
+                st.session_state["swing_research_last_error"] = "Watchlist 目前沒有 symbols。"
+            else:
+                st.session_state["swing_research_last_error"] = "請輸入至少一個股票代號。"
             st.session_state["swing_research_price_series_by_symbol"] = {}
+            st.session_state["swing_research_source_context"] = None
         else:
             try:
                 config = SwingScannerConfig(
@@ -1336,15 +1404,18 @@ def render_swing_research() -> None:
                     scan_payload = build_swing_research_scan_result(
                         symbols=normalized_symbols,
                         config=config,
+                        source_type=source_type,
                     )
                 st.session_state["swing_research_result"] = scan_payload["result"]
                 st.session_state["swing_research_config_fingerprint"] = scan_payload["fingerprint"]
                 st.session_state["swing_research_price_series_by_symbol"] = scan_payload["price_series_by_symbol"]
+                st.session_state["swing_research_source_context"] = current_source_context
                 st.session_state["swing_research_last_error"] = None
             except Exception as error:
                 st.session_state["swing_research_result"] = None
                 st.session_state["swing_research_config_fingerprint"] = None
                 st.session_state["swing_research_price_series_by_symbol"] = {}
+                st.session_state["swing_research_source_context"] = None
                 st.session_state["swing_research_last_error"] = safe_error_message(error)
 
     if st.button("清除掃描結果"):
@@ -1363,11 +1434,49 @@ def render_swing_research() -> None:
     if st.session_state["swing_research_config_fingerprint"] != current_fingerprint:
         st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
 
-    render_swing_research_result(result)
+    render_swing_research_result(
+        result,
+        st.session_state.get("swing_research_source_context"),
+    )
 
 
-def render_swing_research_result(result) -> None:
+def resolve_swing_research_source(
+    *,
+    source_type: str,
+    input_symbols: str,
+    watchlist_symbols: list[str],
+    selected_universe,
+) -> tuple[tuple[str, ...], dict[str, object]]:
+    if source_type == universe_ui.WATCHLIST_SOURCE:
+        symbols = tuple(watchlist_symbols)
+        return symbols, universe_ui.build_source_context(
+            source_type=source_type,
+            symbols=symbols,
+        )
+    if source_type == universe_ui.SAVED_UNIVERSE_SOURCE and selected_universe is not None:
+        symbols = selected_universe.symbols
+        return symbols, universe_ui.build_source_context(
+            source_type=source_type,
+            symbols=symbols,
+            universe_id=selected_universe.id,
+            universe_name=selected_universe.name,
+        )
+
+    symbols = swing_dashboard.parse_swing_symbol_input(input_symbols)
+    return symbols, universe_ui.build_source_context(
+        source_type=universe_ui.MANUAL_SOURCE,
+        symbols=symbols,
+    )
+
+
+def render_swing_research_result(result, source_context=None) -> None:
     st.markdown("### Scan Summary")
+    if source_context:
+        st.caption(
+            "Source: "
+            f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
+            f"Symbols scanned: {source_context['symbol_count']}"
+        )
     st.caption(
         f"Requested symbols: {len(result.requested_symbols)} · "
         f"Unique normalized symbols: {len(result.normalized_symbols)}"
@@ -1724,12 +1833,134 @@ def render_historical_cases() -> None:
         st.dataframe(build_condition_detail_rows(selected_case), width="stretch", hide_index=True)
 
 
-def read_watchlist_for_ui() -> list[str]:
+def read_watchlist_for_ui(*, show_error: bool = True) -> list[str]:
     try:
         return list_watchlist()
     except WatchlistDataError as error:
-        st.error(f"Watchlist 讀取失敗：{error}")
+        if show_error:
+            st.error(f"Watchlist 讀取失敗：{error}")
         return []
+
+
+def read_universes_for_ui() -> list:
+    try:
+        return list_universes()
+    except UniverseError as error:
+        st.error(f"股票池讀取失敗：{error}")
+        return []
+
+
+def render_universe_management() -> None:
+    st.header("Universes（股票池）")
+    st.caption(universe_ui.UNIVERSE_SEMANTICS_CAPTION)
+
+    universes = read_universes_for_ui()
+
+    create_col, edit_col = st.columns(2)
+    with create_col:
+        st.markdown("### 建立股票池")
+        with st.form("universe_create_form"):
+            name = st.text_input("Name", key="universe_create_name")
+            description = st.text_area(
+                "Description",
+                key="universe_create_description",
+                height=80,
+            )
+            symbol_text = st.text_area(
+                "Symbols",
+                placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
+                key="universe_create_symbols",
+                height=160,
+            )
+            submitted = st.form_submit_button("建立股票池")
+        if submitted:
+            symbols = universe_ui.parse_universe_symbol_text(symbol_text)
+            if universe_ui.should_warn_large_universe(symbols):
+                st.warning("Large universes may take longer to scan.")
+            try:
+                created = create_universe(
+                    name=name,
+                    description=description,
+                    symbols=symbols,
+                )
+                st.success(f"已建立股票池「{created.name}」，共 {created.symbol_count} symbols。")
+            except (UniverseValidationError, UniverseAlreadyExistsError) as error:
+                st.error(str(error))
+            except UniverseError as error:
+                st.error(f"股票池建立失敗：{error}")
+
+    with edit_col:
+        st.markdown("### 編輯股票池")
+        if not universes:
+            st.info("尚未建立自訂股票池。")
+            return
+
+        labels = [universe_ui.universe_selector_label(universe) for universe in universes]
+        selected_label = st.selectbox(
+            "Existing Universe",
+            labels,
+            key="universe_edit_selector",
+        )
+        selected_universe = universes[labels.index(selected_label)]
+        st.caption(
+            f"Updated At: {universe_ui.format_universe_updated_at(selected_universe)}"
+        )
+        defaults = universe_ui.build_universe_form_defaults(selected_universe)
+        with st.form(f"universe_edit_form_{selected_universe.id}"):
+            next_name = st.text_input(
+                "Name",
+                value=defaults["name"],
+                key=f"universe_edit_name_{selected_universe.id}",
+            )
+            next_description = st.text_area(
+                "Description",
+                value=defaults["description"],
+                key=f"universe_edit_description_{selected_universe.id}",
+                height=80,
+            )
+            next_symbols_text = st.text_area(
+                "Symbols",
+                value=defaults["symbols"],
+                key=f"universe_edit_symbols_{selected_universe.id}",
+                height=160,
+            )
+            saved = st.form_submit_button("儲存變更")
+        if saved:
+            symbols = universe_ui.parse_universe_symbol_text(next_symbols_text)
+            if universe_ui.should_warn_large_universe(symbols):
+                st.warning("Large universes may take longer to scan.")
+            try:
+                updated = update_universe(
+                    selected_universe.id,
+                    name=next_name,
+                    description=next_description,
+                    symbols=symbols,
+                )
+                st.success(f"已更新股票池「{updated.name}」，共 {updated.symbol_count} symbols。")
+            except (UniverseValidationError, UniverseAlreadyExistsError) as error:
+                st.error(str(error))
+            except UniverseNotFoundError as error:
+                st.error(str(error))
+            except UniverseError as error:
+                st.error(f"股票池更新失敗：{error}")
+
+        with st.form(f"universe_delete_form_{selected_universe.id}"):
+            confirm_delete = st.checkbox(
+                "我確認要刪除此股票池",
+                key=f"universe_delete_confirm_{selected_universe.id}",
+            )
+            deleted = st.form_submit_button("刪除股票池")
+        if deleted:
+            if not confirm_delete:
+                st.warning("請先勾選確認刪除。")
+            else:
+                try:
+                    delete_universe(selected_universe.id)
+                    st.success(f"已刪除股票池「{selected_universe.name}」。")
+                except UniverseNotFoundError as error:
+                    st.error(str(error))
+                except UniverseError as error:
+                    st.error(f"股票池刪除失敗：{error}")
 
 
 def render_watchlist() -> None:
@@ -1840,8 +2071,8 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Historical Trends", "AI Research", "Swing Research", "Historical Cases", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, universe_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Historical Trends", "AI Research", "Swing Research", "Universes", "Historical Cases", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
@@ -1858,6 +2089,9 @@ def main() -> None:
 
     with swing_research_tab:
         render_swing_research()
+
+    with universe_tab:
+        render_universe_management()
 
     with historical_cases_tab:
         render_historical_cases()

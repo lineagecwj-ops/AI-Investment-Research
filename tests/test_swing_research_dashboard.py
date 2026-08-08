@@ -338,6 +338,58 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertNotEqual(base, changed_range)
         self.assertNotEqual(base, changed_minimum)
 
+    def test_fingerprint_changes_for_source_mode(self):
+        manual = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            source_type="Manual Input",
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        saved_universe = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            source_type="Saved Universe",
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+
+        self.assertNotEqual(manual, saved_universe)
+
+    def test_universe_content_change_changes_fingerprint(self):
+        first = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW", "2454.TW"),
+            source_type="Saved Universe",
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        edited = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW", "2454.TW", "NVDA"),
+            source_type="Saved Universe",
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+
+        self.assertNotEqual(first, edited)
+
     def test_fingerprint_from_config_uses_scanner_config_values(self):
         config = self.config()
         self.assertEqual(
