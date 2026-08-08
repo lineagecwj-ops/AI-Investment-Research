@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 08 Batch B OOS Validation Dashboard
+
+### Completed Features
+
+- 新增 `src/oos_validation_dashboard.py`，負責 OOS dashboard formatters、period summary rows、cross-period comparison rows、percentage-point deltas、symbol presence table、period-local stability rows、chart-ready data、safe failure rows、source snapshot helper 與 deterministic UI request fingerprint。
+- Streamlit `Swing Research` 新增 `Out-of-Sample Validation` scan mode，支援 Manual / Watchlist / Saved Universe source、Development / Validation / Holdout date inputs、Monthly / Weekly replay frequency、Overlap Policy、Cooldown、Historical Start 與 Preferred Resolved Sample Minimum。
+- OOS validation 只在使用者按下 `執行樣本外驗證` 時執行；selector、expander、chart、table 與 rerun 都只 render `oos_validation_*` session-state result。
+- 結果頁顯示 Research Specification Fingerprint、Same Specification Across All Periods、Frozen Research Specification、三段 period summary、Cross-Period Comparison、Factual Observations、Candidate Count chart、Candidate Period Share chart、Historical Hit Rate + Resolved n chart、Outcome Counts、Cross-Period Symbol Presence、period-local Candidate Stability 與 Safe Failure Summary。
+- 新增 `tests/test_oos_validation_dashboard.py`，以 focused tests 鎖住 formatter、zero resolved N/A、n display、comparison order、outcome counts、missing symbols、zero candidates、neutral observations、fingerprint、source snapshot、zero replay dates、safe failures 與 chart data defaults。
+
+### Safety Notes
+
+- Historical Hit Rate 仍是 `HIT / (HIT + MISS)`，畫面固定和 `Resolved n` 一起呈現；zero resolved 顯示 `N/A`。
+- Candidate Period Share 顯示 numerator / denominator / percentage，並明確說明它不是未來機率或訊號品質。
+- Difference columns 只顯示 raw differences；percentage metrics 使用 percentage points，不做 relative change。
+- Dashboard 不建立 validation score、robustness score、hidden score、parameter optimization、AI interpretation、prediction accuracy、Buy / Sell / Hold recommendation 或 strategy P&L。
+- 清除樣本外驗證結果只清 `oos_validation_*` session state，不清 Swing Research、Universes、Watchlist、AI Research 或 price cache。
+- 本 Batch 是 planned V1.0 release review 前的 validation visualization layer，不直接宣布 V1.0 production ready。
+
+### Modified / Added Files
+
+- 新增 `src/oos_validation_dashboard.py`
+- 新增 `tests/test_oos_validation_dashboard.py`
+- 新增 `docs/OOS_VALIDATION_DASHBOARD.md`
+- 修改 `app.py`
+- 修改 `tests/test_dashboard.py`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+- 修改 `docs/OUT_OF_SAMPLE_VALIDATION.md`
+- 修改 `docs/SWING_RESEARCH_DASHBOARD.md`
+
 ## 2026-08-08 — Sprint 08 Batch A Out-of-Sample Validation Foundation
 
 ### Completed Features

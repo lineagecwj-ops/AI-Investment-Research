@@ -121,6 +121,10 @@ out_of_sample_validation_service.py
         HOLDOUT Walk-Forward Replay + period-local Replay Analytics
         ↓
         transparent cross-period raw-fact comparison
+        ↓
+        oos_validation_dashboard.py
+        ↓
+        Streamlit Swing Research Out-of-Sample Validation mode
 
 backtest_service.py
     ↓

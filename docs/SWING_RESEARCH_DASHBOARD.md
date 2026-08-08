@@ -10,6 +10,8 @@ Sprint 07 Batch C adds `Historical Replay` as a second scan mode inside the same
 
 Sprint 07 Batch D adds `Walk-Forward Replay` as a third scan mode. It repeats Single-Date Historical Replay across a date schedule and reports descriptive period / occurrence counts. It is not walk-forward prediction accuracy, strategy validation, or replay performance scoring.
 
+Sprint 08 Batch B adds `Out-of-Sample Validation` as another explicit mode inside the same page. It compares Development / Validation / Holdout OOS results for one frozen research specification. It is descriptive validation visualization, not a validation score, model-selection workflow, optimization tool, prediction engine, or strategy P&L review.
+
 ## Daily Workflow
 
 The intended flow is:
@@ -72,6 +74,24 @@ Selected Replay Period
 Single-Date Historical Replay result detail
 ```
 
+Out-of-Sample Validation flow:
+
+```text
+Scan Mode: Out-of-Sample Validation
+    ↓
+Development / Validation / Holdout ranges + Frequency + Source
+    ↓
+Explicit validation submit
+    ↓
+OutOfSampleValidationResult
+    ↓
+Research Specification Fingerprint
+    ↓
+Period Summary + Cross-Period Comparison
+    ↓
+Period-local Candidate Stability
+```
+
 ## Scan Setup
 
 The page accepts caller-provided symbols from an explicit source selector:
@@ -109,6 +129,19 @@ Historical Replay uses `Replay Date` instead of Current Scan's backtest end date
 
 Walk-Forward Replay uses `Start Date`, `End Date`, `Frequency`, and `Historical Start`. The default frequency is `MONTHLY`. The user must press `執行 Walk-Forward Replay`; changing dates, frequency, period selector, or table state does not run the workflow.
 
+Out-of-Sample Validation uses:
+
+- Development Start / End
+- Validation Start / End
+- Holdout Start / End
+- Replay Frequency
+- Historical Start
+- Overlap Policy
+- Cooldown Bars when applicable
+- Preferred Resolved Sample Minimum
+
+The default split is editable and is not described as optimized. The user must press `執行樣本外驗證`; changing setup fields, expanders, charts, or tables does not run validation.
+
 ## Source Snapshot and Fingerprint
 
 Swing Research stores scan-time source metadata in session state:
@@ -124,9 +157,11 @@ The dashboard fingerprint includes source mode and resolved normalized symbols, 
 
 The fingerprint also includes `scan_mode`. In Historical Replay it includes `replay_date`; in Walk-Forward Replay it includes frequency, replay date range, historical start, and source symbols.
 
+Out-of-Sample Validation uses a separate UI request fingerprint stored as `oos_validation_fingerprint`. It is not the same as the service-level Research Specification Fingerprint. The UI request fingerprint detects stale displayed results when the user changes dashboard inputs without pressing `執行樣本外驗證`.
+
 Switching Manual Input, Watchlist, or Saved Universe does not automatically scan.
 
-Switching between Current, Historical Replay, and Walk-Forward Replay does not automatically scan. If a stored result came from another mode, the UI displays a mode mismatch warning.
+Switching between Current, Historical Replay, Walk-Forward Replay, and Out-of-Sample Validation does not automatically scan. If a stored Swing result came from another mode, the UI displays a mode mismatch warning. If OOS validation inputs changed, the UI displays that the current result came from a previous validation setup.
 
 ## Current Signal
 
@@ -200,6 +235,10 @@ HIT / (HIT + MISS)
 The dashboard must show Historical Hit Rate together with Resolved Samples. If there are no resolved samples, Historical Hit Rate is `N/A`, not `0%`.
 
 Historical Hit Rate is not future probability, expected chance, confidence, likelihood, prediction, or recommendation.
+
+In Out-of-Sample Validation mode, Historical Hit Rate is always displayed with `Resolved n` for each period. If `Resolved n == 0`, the dashboard displays `N/A`, not `0%`.
+
+The OOS comparison table displays percentage differences as percentage points, for example `+33.78 percentage points`, and does not display relative change in the MVP.
 
 ## Historical Context As Of
 

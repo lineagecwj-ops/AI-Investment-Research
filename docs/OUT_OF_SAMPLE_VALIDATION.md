@@ -157,7 +157,7 @@ The service does not solve survivorship bias or data-vendor quality limitations.
 
 ## Non-Goals
 
-This foundation does not provide:
+The service foundation does not provide:
 
 - probability model
 - future probability
@@ -171,6 +171,5 @@ This foundation does not provide:
 - transaction costs
 - stop loss optimization
 - AI ranking
-- full validation dashboard
 
-Sprint 08 Batch B may build a dashboard on top of this foundation, but Batch A stops at service, models, tests, docs, and read-only validation.
+Sprint 08 Batch B adds a dashboard on top of this foundation. The dashboard remains descriptive: it displays Development / Validation / Holdout comparison, Research Specification Fingerprint, Historical Hit Rate + Resolved n, Candidate Period Share, outcome counts and period-local stability, but it still does not create a validation score, prediction model, optimization workflow, recommendation, or strategy P&L.
