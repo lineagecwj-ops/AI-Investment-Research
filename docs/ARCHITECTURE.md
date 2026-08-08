@@ -58,7 +58,9 @@ technical_indicator_service.py
         ↓
         SwingScannerResult
         ↓
-        future Scanner Dashboard
+        swing_research_dashboard.py
+        ↓
+        Streamlit Swing Research tab
 
 backtest_service.py
     ↓
@@ -67,6 +69,18 @@ backtest_service.py
     historical_case_dashboard.py
     ↓
     Streamlit Historical Cases tab
+
+SwingScannerResult
+    ↓
+    swing_research_dashboard.py
+    ↓
+    Candidate Detail
+    ↓
+    HistoricalBacktestReport
+    ↓
+    HistoricalCaseService
+    ↓
+    Historical Cases Preview
 
 signal_outcome_service.py
     └── TechnicalIndicatorSeries / TechnicalIndicatorSnapshot
@@ -185,6 +199,12 @@ swing_scanner_service.py
     └── Versioned transparent research ranking with rank components and no hidden composite score
     └── No recommendation, buy list, market-wide crawler, dashboard, fundamentals, AI ranking, target price, or transaction simulation
 
+swing_research_dashboard.py
+    └── Swing Research Dashboard presentation helpers
+    └── Multi-line stock-pool parsing, scan fingerprinting, display formatters, scan summary rows, candidate table rows, condition trace rows, technical snapshot rows, NO_MATCH / NOT_EVALUABLE / failure rows, and case preview helpers
+    └── Builds HistoricalCaseView preview only from candidate HistoricalBacktestReport plus scan-time session price-series cache
+    └── No Yahoo fetch, SQLite access, OpenAI calls, scanner execution, backtest execution, signal recalculation, outcome recalculation, recommendation, probability, fundamentals, or persistence
+
 historical_case_service.py
     └── Deterministic historical case explorer data builder
     └── HistoricalCaseWindowConfig with pre/post trading-bar windows
@@ -233,6 +253,7 @@ Responsibilities:
 - Render grounded findings, selected evidence, limitations, missing data, validation status, and safe provider metadata
 - Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
 - Render Historical Cases tab through explicit submit only; keep case report / views in `st.session_state`, and rerender filters, sorting, selected case, x-axis mode, and expanders without refetching or rerunning backtests
+- Render Swing Research tab through explicit scan submit only; store `SwingScannerResult`, scan fingerprint, last error, and scan-time price-series cache under `swing_research_*`; rerender candidate selection and case preview without refetching prices or rerunning scanner / backtest
 
 ---
 

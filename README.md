@@ -99,6 +99,7 @@ Dashboard 目前提供：
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
+- `Swing Research`：波段研究整合頁；按下執行後才掃描使用者輸入的股票池，顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率或交易指令。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
@@ -134,6 +135,7 @@ Signal & Outcome Framework 詳見 `docs/SIGNAL_OUTCOME_FRAMEWORK.md`。
 Historical Backtest Engine 詳見 `docs/HISTORICAL_BACKTEST_ENGINE.md`。
 Swing Opportunity Scanner 詳見 `docs/SWING_OPPORTUNITY_SCANNER.md`。
 Historical Case Explorer 詳見 `docs/HISTORICAL_CASE_EXPLORER.md`。
+Swing Research Dashboard 詳見 `docs/SWING_RESEARCH_DASHBOARD.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -184,6 +186,26 @@ Case Explorer 消費 `HistoricalBacktestReport.cases`，為每個歷史 signal/o
 Streamlit `Historical Cases` tab 採 explicit button workflow；只有按下 `建立歷史案例` 才會讀取 historical prices、建立 technical indicators、執行 backtest 並產生 case views。Filter、sort、case selector、expander 與 chart x-axis toggle 只 render `st.session_state` 中既有結果，不會自動重新 fetch 或 rerun backtest。
 
 `HIT` 只代表指定 historical outcome target 在 horizon 內觸發；`MISS` 只代表完整 horizon 內沒有觸發。這不是交易損益分類，也不是 future probability、prediction、Buy / Sell / Hold 或進出場建議。
+
+## Swing Research Dashboard
+
+Sprint 07 Batch A 新增 deterministic Swing Research Dashboard integration。
+
+此頁把既有 Swing Opportunity Scanner、Historical Backtest Engine 與 Historical Case Explorer 串成單一日常研究 workflow：
+
+```text
+輸入股票池
+→ 明確按下執行波段掃描
+→ 查看 MATCH / NO_MATCH / NOT_EVALUABLE / FAILED summary
+→ 查看 Candidate Table
+→ 選擇 current MATCH candidate
+→ 查看 Current Signal、Historical Backtest Context、Technical Snapshot
+→ 查看 Historical Cases Preview 與單張 relative trading-bar chart
+```
+
+Scanner 只在使用者按下 `執行波段掃描` 時執行。候選選取、case preview filter、case selection、expander 與 Streamlit rerun 都只重 render `swing_research_*` session state，不會重新抓 Yahoo 或 rerun scanner。
+
+Historical Hit Rate 必須和 Resolved Samples 一起閱讀。它是歷史條件事件比例，不是未來發生機率、confidence、likelihood、AI prediction 或投資建議。Research Priority 是研究檢視順序，不是 recommendation 或交易排序。
 
 ## Grounded AI Research Foundation
 

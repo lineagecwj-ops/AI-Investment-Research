@@ -1,5 +1,40 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 07 Batch A Swing Research Dashboard Integration
+
+### Completed Features
+
+- 新增 `src/swing_research_dashboard.py`，集中 Swing Research Dashboard 的 display formatter、scan fingerprint、candidate table、condition trace、technical snapshot、NO_MATCH / NOT_EVALUABLE / failure detail 與 Historical Cases Preview helper。
+- Streamlit 新增 `Swing Research` tab，作為 Swing Scanner、Historical Backtest Context 與 Historical Cases Preview 的整合入口；既有 `Historical Cases` tab 保留 standalone access。
+- Scan Setup 支援 multi-line / comma / semicolon 股票池輸入，並沿用 shared symbol normalization。
+- UI 第一版固定使用 `technical_example_v1` 與 `raw_high_breakout_60d_within_20d_v1`，並以 expander 顯示 signal / outcome definition。
+- Scanner 只在使用者明確按下 `執行波段掃描` 時執行；candidate select、case preview filter、case selector、expander 與 Streamlit rerun 都只重 render session result。
+- 新增 `swing_research_*` session namespace：`swing_research_result`、`swing_research_config_fingerprint`、`swing_research_last_error`、`swing_research_price_series_by_symbol`。
+- Scan-time price loader wrapper 收集每支股票的 `HistoricalPriceSeries`，供後續 case preview 使用；candidate select 不重新 fetch Yahoo，也不 rerun scanner / backtest。
+- Candidate table 顯示 Research Priority、Historical Hit Rate、Resolved n、HIT / MISS、Median MFE / MAE / End Return、Median Hit Bars、Sample Status、Overlap Policy 與 stale state。
+- Candidate detail 明確分離 Current Signal、Historical Backtest Context 與 Historical Cases Preview。
+- Current Signal condition trace 直接來自 `candidate.signal_match`，technical snapshot 顯示當前 key technical features。
+- Historical Backtest Context 同時顯示 Historical Hit Rate 與 Resolved Samples，並保留 HIT / MISS / INCOMPLETE / NOT_EVALUABLE、Raw Signals、Evaluated Signals、range、overlap 與 cooldown。
+- Historical Cases Preview 由 `candidate.historical_backtest_report` + scan-time price-series cache 建立 `HistoricalCaseView`，支援 Resolved / HIT / MISS filter，預設 Resolved，最多列最新 5 筆，並重用 `historical_case_dashboard.py` 的 summary rows、case labels 與 Altair chart。
+- 新增 `docs/SWING_RESEARCH_DASHBOARD.md`，並更新 README / Architecture。
+
+### Safety Notes
+
+- Historical Hit Rate 是歷史條件事件比例，不代表未來發生機率；UI 必須同時顯示 Resolved Samples。
+- `100% / n=3` 仍顯示為 small sample context，不因完美比例自動優先於較大的 resolved sample。
+- Research Priority 是研究檢視順序，不是 recommendation、交易排序、hidden score 或 AI ranking。
+- `HIT` 不代表 profitable trade；`MISS` 不代表 losing trade。
+- 高 Historical Hit Rate 可能和負 Median End Return 並存，因為 target event 可能在 evaluation window 結束前發生。
+- `ALLOW_ALL` 可能包含 overlap events；`COOLDOWN` 降低 nearby repeated events，但不保證統計獨立。
+- `清除掃描結果` 只清 `swing_research_*` session state，不碰 SQLite price cache、AI Research、Historical Cases standalone state 或 Watchlist。
+- Zero-match 是有效結果；Dashboard 不自動放寬條件、不提供 nearest match、不調整 threshold。
+- 本 Batch 不新增 technical indicators、signal threshold、outcome definition、probability model、AI ranking、fundamental merge、market-wide crawler、alerts、portfolio action 或下一個 Batch。
+
+### Testing Notes
+
+- 新增 `tests/test_swing_research_dashboard.py`，覆蓋 multi-line parsing、fingerprint sensitivity、formatter、sample status labels、candidate table order / fields、selector label、zero-match summary、condition trace、technical snapshot、NO_MATCH / NOT_EVALUABLE / failure rows、case preview from session price cache、missing price cache no-fetch behavior、Resolved / HIT / MISS filter、case counts、latest-five limit 與 source-level banned wording。
+- 擴充 `tests/test_dashboard.py`，確認 `Swing Research` tab 與 `Historical Cases` tab 同時存在、Swing Research 使用 explicit submit / session result / clear button、必要 wording 存在且禁止 wording 不出現在 Swing Research source 區段。
+
 ## 2026-08-08 — Sprint 06 Batch F Historical Case Explorer
 
 ### Completed Features
