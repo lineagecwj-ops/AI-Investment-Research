@@ -246,6 +246,8 @@ class HistoricalReplayService:
         self,
         symbols,
         config: HistoricalReplayConfig,
+        *,
+        price_series_by_symbol: dict[str, HistoricalPriceSeries] | None = None,
     ) -> HistoricalReplayResult:
         requested_symbols = tuple(symbols)
         normalized_symbols = _normalize_unique_symbols(requested_symbols)
@@ -257,7 +259,11 @@ class HistoricalReplayService:
 
         for symbol in normalized_symbols:
             try:
-                replay_result = self._replay_symbol(symbol, config)
+                replay_result = self._replay_symbol(
+                    symbol,
+                    config,
+                    price_series_by_symbol=price_series_by_symbol,
+                )
             except Exception as exc:
                 failed_symbols.append(_safe_failure(symbol, exc))
                 continue
@@ -292,11 +298,20 @@ class HistoricalReplayService:
             generated_at=datetime.now(UTC),
         )
 
-    def _replay_symbol(self, symbol: str, config: HistoricalReplayConfig):
-        full_price_series = self.price_loader(
-            symbol,
-            force_refresh=config.force_refresh,
-        )
+    def _replay_symbol(
+        self,
+        symbol: str,
+        config: HistoricalReplayConfig,
+        *,
+        price_series_by_symbol: dict[str, HistoricalPriceSeries] | None = None,
+    ):
+        if price_series_by_symbol is not None and symbol in price_series_by_symbol:
+            full_price_series = price_series_by_symbol[symbol]
+        else:
+            full_price_series = self.price_loader(
+                symbol,
+                force_refresh=config.force_refresh,
+            )
         replay_price_series = slice_price_series_as_of(full_price_series, config.replay_date)
         if not replay_price_series.bars:
             return _SymbolReplayResult(
