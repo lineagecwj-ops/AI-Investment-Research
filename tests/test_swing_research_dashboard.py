@@ -36,6 +36,7 @@ from signal_outcome_service import evaluate_signal_conditions
 from swing_research_dashboard import CASE_PREVIEW_LIMIT
 from swing_research_dashboard import CURRENT_SCAN_MODE
 from swing_research_dashboard import HISTORICAL_REPLAY_MODE
+from swing_research_dashboard import WALK_FORWARD_REPLAY_MODE
 from swing_research_dashboard import build_candidate_table_rows
 from swing_research_dashboard import build_case_preview_count_rows
 from swing_research_dashboard import build_case_preview_views
@@ -48,6 +49,10 @@ from swing_research_dashboard import build_replay_summary_rows
 from swing_research_dashboard import build_scan_summary_rows
 from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_technical_snapshot_rows
+from swing_research_dashboard import build_walk_forward_outcome_count_rows
+from swing_research_dashboard import build_walk_forward_summary_rows
+from swing_research_dashboard import build_walk_forward_symbol_summary_rows
+from swing_research_dashboard import build_walk_forward_timeline_rows
 from swing_research_dashboard import candidate_selector_label
 from swing_research_dashboard import current_match_trace_is_consistent
 from swing_research_dashboard import filter_case_preview_views
@@ -59,6 +64,8 @@ from swing_research_dashboard import parse_swing_symbol_input
 from swing_research_dashboard import replay_candidate_selector_label
 from swing_research_dashboard import replay_fingerprint_from_config
 from swing_research_dashboard import sample_status_label
+from swing_research_dashboard import walk_forward_fingerprint_from_config
+from swing_research_dashboard import walk_forward_period_selector_label
 from historical_replay_service import HistoricalReplayConfig
 from historical_replay_service import HistoricalReplayResult
 from historical_replay_service import build_historical_replay_candidate
@@ -68,6 +75,11 @@ from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerResult
 from swing_scanner_service import build_swing_candidate
 from swing_scanner_service import rank_swing_candidates
+from walk_forward_replay_service import WalkForwardReplayConfig
+from walk_forward_replay_service import WalkForwardReplayFrequency
+from walk_forward_replay_service import WalkForwardReplayPeriod
+from walk_forward_replay_service import WalkForwardReplayResult
+from walk_forward_replay_service import summarize_walk_forward_periods
 
 
 FETCHED_AT = datetime(2026, 8, 8, 1, 0, tzinfo=UTC)
@@ -259,6 +271,72 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
             post_replay_outcome=self.outcome(OutcomeEvaluationStatus.HIT, symbol=symbol, signal_date=date(2024, 6, 28)),
             price_series=price_series,
             config=config,
+        )
+
+    def walk_forward_config(self, **overrides):
+        values = {
+            "start_date": date(2024, 1, 1),
+            "end_date": date(2024, 2, 29),
+            "frequency": WalkForwardReplayFrequency.MONTHLY,
+            "signal_definition": self.signal_definition(),
+            "outcome_definition": self.outcome_definition(),
+            "overlap_policy": OverlappingSignalPolicy.ALLOW_ALL,
+            "cooldown_bars": None,
+            "historical_start_date": date(2018, 1, 1),
+            "preferred_resolved_samples": 20,
+        }
+        values.update(overrides)
+        return WalkForwardReplayConfig(**values)
+
+    def walk_forward_result(self):
+        jan = date(2024, 1, 31)
+        feb = date(2024, 2, 29)
+        jan_candidate = replace(self.replay_candidate("AAPL"), requested_replay_date=jan)
+        feb_candidate_a = replace(self.replay_candidate("AAPL"), requested_replay_date=feb)
+        feb_candidate_b = replace(
+            self.replay_candidate("MSFT"),
+            requested_replay_date=feb,
+            post_replay_outcome=self.outcome(OutcomeEvaluationStatus.MISS, symbol="MSFT", signal_date=feb),
+        )
+        periods = (
+            WalkForwardReplayPeriod(
+                requested_replay_date=jan,
+                replay_result=HistoricalReplayResult(
+                    config=self.replay_config(replay_date=jan),
+                    requested_symbols=("AAPL", "MSFT"),
+                    normalized_symbols=("AAPL", "MSFT"),
+                    match_candidates=(jan_candidate,),
+                    no_match_symbols=("MSFT",),
+                    no_match_details=tuple(),
+                    not_evaluable_symbols=tuple(),
+                    failed_symbols=tuple(),
+                    generated_at=GENERATED_AT,
+                ),
+            ),
+            WalkForwardReplayPeriod(
+                requested_replay_date=feb,
+                replay_result=HistoricalReplayResult(
+                    config=self.replay_config(replay_date=feb),
+                    requested_symbols=("AAPL", "MSFT"),
+                    normalized_symbols=("AAPL", "MSFT"),
+                    match_candidates=(feb_candidate_a, feb_candidate_b),
+                    no_match_symbols=tuple(),
+                    no_match_details=tuple(),
+                    not_evaluable_symbols=tuple(),
+                    failed_symbols=tuple(),
+                    generated_at=GENERATED_AT,
+                ),
+            ),
+        )
+        return WalkForwardReplayResult(
+            config=self.walk_forward_config(),
+            requested_symbols=("AAPL", "MSFT"),
+            normalized_symbols=("AAPL", "MSFT"),
+            replay_dates=(jan, feb),
+            period_results=periods,
+            summary=summarize_walk_forward_periods(periods),
+            generated_at=GENERATED_AT,
+            walk_forward_id="walk_forward_test",
         )
 
     def report(self, symbol="TEST", *, hit_rate=0.7, resolved=100, cases=tuple()):
@@ -591,6 +669,95 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertIn("Post-Replay Outcome", labels)
         self.assertIn("First Hit Date", labels)
         self.assertNotIn("Prediction Result", labels)
+
+    def test_walk_forward_fingerprint_uses_range_frequency_and_historical_start(self):
+        config = self.walk_forward_config()
+
+        self.assertEqual(
+            walk_forward_fingerprint_from_config(("AAPL",), config),
+            build_swing_research_fingerprint(
+                normalized_symbols=("AAPL",),
+                scan_mode=WALK_FORWARD_REPLAY_MODE,
+                frequency="MONTHLY",
+                signal_id=config.signal_definition.id,
+                outcome_id=config.outcome_definition.id,
+                overlap_policy=config.overlap_policy.value,
+                cooldown_bars=config.cooldown_bars,
+                start_date=config.start_date,
+                end_date=config.end_date,
+                historical_start_date=config.historical_start_date,
+                preferred_sample_minimum=config.preferred_resolved_samples,
+            ),
+        )
+
+    def test_current_replay_and_walk_forward_fingerprints_are_distinct(self):
+        current = build_swing_research_fingerprint(
+            normalized_symbols=("AAPL",),
+            scan_mode=CURRENT_SCAN_MODE,
+            signal_id=self.signal_definition().id,
+            outcome_id=self.outcome_definition().id,
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        replay = replay_fingerprint_from_config(("AAPL",), self.replay_config())
+        walk_forward = walk_forward_fingerprint_from_config(("AAPL",), self.walk_forward_config())
+
+        self.assertNotEqual(current, replay)
+        self.assertNotEqual(replay, walk_forward)
+        self.assertNotEqual(current, walk_forward)
+
+    def test_walk_forward_summary_rows_use_kpis_without_accuracy(self):
+        rows = build_walk_forward_summary_rows(self.walk_forward_result())
+        labels = [row["Metric"] for row in rows]
+
+        self.assertEqual(
+            labels,
+            [
+                "Replay Periods",
+                "Periods With MATCH",
+                "Periods Without MATCH",
+                "Candidate Occurrences",
+                "Unique Candidate Symbols",
+            ],
+        )
+        self.assertNotIn("Prediction Accuracy", labels)
+
+    def test_walk_forward_outcome_rows_are_counts_only(self):
+        rows = build_walk_forward_outcome_count_rows(self.walk_forward_result())
+        labels = [row["Metric"] for row in rows]
+
+        self.assertIn("Post-Replay HIT Occurrences", labels)
+        self.assertIn("MISS Occurrences", labels)
+        self.assertNotIn("Walk-Forward Hit Rate", labels)
+
+    def test_walk_forward_timeline_rows_show_period_counts_and_candidates(self):
+        rows = build_walk_forward_timeline_rows(self.walk_forward_result())
+
+        self.assertEqual(rows[0]["Replay Date"], "2024-01-31")
+        self.assertEqual(rows[0]["Scanned"], 2)
+        self.assertEqual(rows[0]["MATCH"], 1)
+        self.assertEqual(rows[0]["NO_MATCH"], 1)
+        self.assertEqual(rows[0]["Candidate Symbols"], "AAPL")
+        self.assertEqual(rows[1]["Candidate Symbols"], "AAPL, MSFT")
+
+    def test_walk_forward_period_selector_label_is_concise(self):
+        period = self.walk_forward_result().period_results[0]
+
+        self.assertEqual(walk_forward_period_selector_label(period), "2024-01-31 | MATCH 1")
+
+    def test_walk_forward_symbol_summary_rows_show_candidate_frequency(self):
+        rows = build_walk_forward_symbol_summary_rows(self.walk_forward_result())
+        aapl = rows[0]
+
+        self.assertEqual(aapl["Symbol"], "AAPL")
+        self.assertEqual(aapl["Candidate Occurrences"], 2)
+        self.assertEqual(aapl["First Seen"], "2024-01-31")
+        self.assertEqual(aapl["Last Seen"], "2024-02-29")
+        self.assertIn("Post-Replay HIT", aapl)
+        self.assertNotIn("Hit Probability", aapl)
 
     def test_candidate_selector_shows_hit_rate_and_resolved_n(self):
         self.assertEqual(
