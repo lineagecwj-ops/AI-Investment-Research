@@ -1,4 +1,5 @@
 import sys
+from datetime import date
 from pathlib import Path
 
 import altair as alt
@@ -115,11 +116,17 @@ from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 from signal_outcome_service import build_signal_event
 from historical_replay_service import HistoricalReplayConfig
 from historical_replay_service import HistoricalReplayService
+from out_of_sample_validation_service import OutOfSampleValidationConfig
+from out_of_sample_validation_service import OutOfSampleValidationError
+from out_of_sample_validation_service import OutOfSampleValidationService
+from out_of_sample_validation_service import ValidationPeriod
+from out_of_sample_validation_service import ValidationPeriodRole
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
 from walk_forward_replay_service import WalkForwardReplayConfig
 from walk_forward_replay_service import WalkForwardReplayFrequency
 from walk_forward_replay_service import WalkForwardReplayService
+import oos_validation_dashboard as oos_dashboard
 import swing_research_dashboard as swing_dashboard
 import universe_dashboard as universe_ui
 
@@ -156,6 +163,10 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("swing_research_source_context", None)
     st.session_state.setdefault("swing_research_result_mode", None)
     st.session_state.setdefault("swing_research_replay_date", None)
+    st.session_state.setdefault("oos_validation_result", None)
+    st.session_state.setdefault("oos_validation_fingerprint", None)
+    st.session_state.setdefault("oos_validation_last_error", None)
+    st.session_state.setdefault("oos_validation_source_context", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1329,6 +1340,35 @@ def build_swing_research_walk_forward_result(
     }
 
 
+def build_oos_validation_result(
+    *,
+    symbols: tuple[str, ...],
+    config: OutOfSampleValidationConfig,
+    source_type: str,
+) -> dict:
+    service = OutOfSampleValidationService()
+    result = service.run_out_of_sample_validation(symbols, config)
+    fingerprint = oos_dashboard.build_oos_validation_request_fingerprint(
+        normalized_symbols=result.normalized_symbols,
+        source_type=source_type,
+        development_start=config.development_period.start_date,
+        development_end=config.development_period.end_date,
+        validation_start=config.validation_period.start_date,
+        validation_end=config.validation_period.end_date,
+        holdout_start=config.holdout_period.start_date,
+        holdout_end=config.holdout_period.end_date,
+        replay_frequency=config.replay_frequency.value,
+        overlap_policy=config.overlap_policy.value,
+        cooldown_bars=config.cooldown_bars,
+        historical_start_date=config.historical_start_date,
+        minimum_resolved_samples=config.minimum_resolved_samples,
+    )
+    return {
+        "result": result,
+        "fingerprint": fingerprint,
+    }
+
+
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
@@ -1345,6 +1385,7 @@ def render_swing_research() -> None:
             swing_dashboard.CURRENT_SCAN_MODE,
             swing_dashboard.HISTORICAL_REPLAY_MODE,
             swing_dashboard.WALK_FORWARD_REPLAY_MODE,
+            oos_dashboard.OOS_VALIDATION_MODE,
         ],
         horizontal=True,
         key="swing_research_scan_mode",
@@ -1405,11 +1446,33 @@ def render_swing_research() -> None:
         frequency_label = None
         walk_forward_start_date = None
         walk_forward_end_date = None
+        development_start_date = None
+        development_end_date = None
+        validation_start_date = None
+        validation_end_date = None
+        holdout_start_date = None
+        holdout_end_date = None
         historical_start_date = None
         if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
             start_date = date_cols[0].date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
             replay_date = date_cols[1].date_input("Replay Date", value=pd.to_datetime("2024-06-30").date())
             end_date = None
+        elif scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+            st.caption("Out-of-Sample Validation 會比較 Development / Validation / Holdout 三段固定規則結果；只有按下執行才會讀取完整 historical price series。")
+            development_cols = st.columns(2)
+            development_start_date = development_cols[0].date_input("Development Start", value=pd.to_datetime("2018-01-01").date())
+            development_end_date = development_cols[1].date_input("Development End", value=pd.to_datetime("2022-12-31").date())
+            validation_cols = st.columns(2)
+            validation_start_date = validation_cols[0].date_input("Validation Start", value=pd.to_datetime("2023-01-01").date())
+            validation_end_date = validation_cols[1].date_input("Validation End", value=pd.to_datetime("2024-12-31").date())
+            holdout_cols = st.columns(2)
+            holdout_start_date = holdout_cols[0].date_input("Holdout Start", value=pd.to_datetime("2025-01-01").date())
+            holdout_end_date = holdout_cols[1].date_input("Holdout End", value=date.today())
+            frequency_label = st.selectbox("Replay Frequency", ["MONTHLY", "WEEKLY"], index=0)
+            historical_start_date = st.date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
+            start_date = development_start_date
+            replay_date = None
+            end_date = holdout_end_date
         elif scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
             walk_forward_start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2024-01-01").date())
             walk_forward_end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2024-06-30").date())
@@ -1431,6 +1494,9 @@ def render_swing_research() -> None:
         )
         st.caption("Current Scan button label: 執行波段掃描")
         submitted = st.form_submit_button(
+            "執行樣本外驗證"
+            if scan_mode == oos_dashboard.OOS_VALIDATION_MODE
+            else
             "執行 Walk-Forward Replay"
             if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE
             else "執行 Replay Scan"
@@ -1444,21 +1510,38 @@ def render_swing_research() -> None:
         watchlist_symbols=watchlist_symbols,
         selected_universe=selected_universe,
     )
-    current_fingerprint = swing_dashboard.build_swing_research_fingerprint(
-        normalized_symbols=normalized_symbols,
-        source_type=source_type,
-        scan_mode=scan_mode,
-        replay_date=replay_date,
-        frequency=frequency_label,
-        signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
-        outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
-        overlap_policy=overlap_label,
-        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
-        start_date=start_date,
-        end_date=end_date,
-        historical_start_date=historical_start_date,
-        preferred_sample_minimum=int(preferred_sample_minimum),
-    )
+    if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+        current_fingerprint = oos_dashboard.build_oos_validation_request_fingerprint(
+            normalized_symbols=normalized_symbols,
+            source_type=source_type,
+            development_start=development_start_date,
+            development_end=development_end_date,
+            validation_start=validation_start_date,
+            validation_end=validation_end_date,
+            holdout_start=holdout_start_date,
+            holdout_end=holdout_end_date,
+            replay_frequency=frequency_label,
+            overlap_policy=overlap_label,
+            cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+            historical_start_date=historical_start_date,
+            minimum_resolved_samples=int(preferred_sample_minimum),
+        )
+    else:
+        current_fingerprint = swing_dashboard.build_swing_research_fingerprint(
+            normalized_symbols=normalized_symbols,
+            source_type=source_type,
+            scan_mode=scan_mode,
+            replay_date=replay_date,
+            frequency=frequency_label,
+            signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
+            outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
+            overlap_policy=overlap_label,
+            cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+            start_date=start_date,
+            end_date=end_date,
+            historical_start_date=historical_start_date,
+            preferred_sample_minimum=int(preferred_sample_minimum),
+        )
 
     with st.expander("研究條件說明", expanded=False):
         st.write(f"Signal Definition: {TECHNICAL_EXAMPLE_SIGNAL_V1.name}")
@@ -1479,6 +1562,11 @@ def render_swing_research() -> None:
             st.caption("Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。")
         if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
             st.caption("Walk-Forward Replay 會依頻率重複執行 Single-Date Historical Replay。Candidate occurrences 是重複觀察，不是獨立樣本，也不是績效評分。")
+        if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+            st.caption("三段 period 使用相同 Frozen Research Specification；Holdout 不參與規則建立與調整。")
+            st.caption(oos_dashboard.HISTORICAL_HIT_RATE_CAPTION)
+            st.caption(oos_dashboard.OUTCOME_CAPTION)
+            st.caption(oos_dashboard.CANDIDATE_SHARE_CAPTION)
 
     if overlap_label == "ALLOW_ALL":
         st.info("ALLOW_ALL：historical signal events may overlap.")
@@ -1487,19 +1575,63 @@ def render_swing_research() -> None:
 
     if submitted:
         if not normalized_symbols:
-            st.session_state["swing_research_result"] = None
-            st.session_state["swing_research_config_fingerprint"] = None
-            if source_type == universe_ui.SAVED_UNIVERSE_SOURCE:
-                st.session_state["swing_research_last_error"] = "股票池目前沒有 symbols。"
-            elif source_type == universe_ui.WATCHLIST_SOURCE:
-                st.session_state["swing_research_last_error"] = "Watchlist 目前沒有 symbols。"
+            if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+                st.session_state["oos_validation_result"] = None
+                st.session_state["oos_validation_fingerprint"] = None
+                st.session_state["oos_validation_source_context"] = None
             else:
-                st.session_state["swing_research_last_error"] = "請輸入至少一個股票代號。"
-            st.session_state["swing_research_price_series_by_symbol"] = {}
-            st.session_state["swing_research_source_context"] = None
+                st.session_state["swing_research_result"] = None
+                st.session_state["swing_research_config_fingerprint"] = None
+            if source_type == universe_ui.SAVED_UNIVERSE_SOURCE:
+                error_message = "股票池目前沒有 symbols。"
+            elif source_type == universe_ui.WATCHLIST_SOURCE:
+                error_message = "Watchlist 目前沒有 symbols。"
+            else:
+                error_message = "請輸入至少一個股票代號。"
+            if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+                st.session_state["oos_validation_last_error"] = error_message
+            else:
+                st.session_state["swing_research_last_error"] = error_message
+                st.session_state["swing_research_price_series_by_symbol"] = {}
+                st.session_state["swing_research_source_context"] = None
         else:
             try:
-                if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
+                if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+                    config = OutOfSampleValidationConfig(
+                        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+                        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+                        development_period=ValidationPeriod(
+                            role=ValidationPeriodRole.DEVELOPMENT,
+                            start_date=development_start_date,
+                            end_date=development_end_date,
+                        ),
+                        validation_period=ValidationPeriod(
+                            role=ValidationPeriodRole.VALIDATION,
+                            start_date=validation_start_date,
+                            end_date=validation_end_date,
+                        ),
+                        holdout_period=ValidationPeriod(
+                            role=ValidationPeriodRole.HOLDOUT,
+                            start_date=holdout_start_date,
+                            end_date=holdout_end_date,
+                        ),
+                        replay_frequency=WalkForwardReplayFrequency(frequency_label),
+                        overlap_policy=OverlappingSignalPolicy(overlap_label),
+                        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                        historical_start_date=historical_start_date,
+                        minimum_resolved_samples=int(preferred_sample_minimum),
+                    )
+                    with st.spinner("正在執行樣本外驗證..."):
+                        scan_payload = build_oos_validation_result(
+                            symbols=normalized_symbols,
+                            config=config,
+                            source_type=source_type,
+                        )
+                    st.session_state["oos_validation_result"] = scan_payload["result"]
+                    st.session_state["oos_validation_fingerprint"] = scan_payload["fingerprint"]
+                    st.session_state["oos_validation_source_context"] = oos_dashboard.build_source_context_copy(current_source_context)
+                    st.session_state["oos_validation_last_error"] = None
+                elif scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
                     config = HistoricalReplayConfig(
                         replay_date=replay_date,
                         signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
@@ -1549,27 +1681,53 @@ def render_swing_research() -> None:
                             config=config,
                             source_type=source_type,
                         )
-                st.session_state["swing_research_result"] = scan_payload["result"]
-                st.session_state["swing_research_config_fingerprint"] = scan_payload["fingerprint"]
-                st.session_state["swing_research_price_series_by_symbol"] = scan_payload["price_series_by_symbol"]
-                st.session_state["swing_research_source_context"] = current_source_context
-                st.session_state["swing_research_result_mode"] = scan_mode
-                st.session_state["swing_research_replay_date"] = replay_date
-                st.session_state["swing_research_last_error"] = None
-            except Exception as error:
-                st.session_state["swing_research_result"] = None
-                st.session_state["swing_research_config_fingerprint"] = None
-                st.session_state["swing_research_price_series_by_symbol"] = {}
-                st.session_state["swing_research_source_context"] = None
-                st.session_state["swing_research_last_error"] = safe_error_message(error)
+                    st.session_state["swing_research_result"] = scan_payload["result"]
+                    st.session_state["swing_research_config_fingerprint"] = scan_payload["fingerprint"]
+                    st.session_state["swing_research_price_series_by_symbol"] = scan_payload["price_series_by_symbol"]
+                    st.session_state["swing_research_source_context"] = current_source_context
+                    st.session_state["swing_research_result_mode"] = scan_mode
+                    st.session_state["swing_research_replay_date"] = replay_date
+                    st.session_state["swing_research_last_error"] = None
+            except (OutOfSampleValidationError, Exception) as error:
+                if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+                    st.session_state["oos_validation_result"] = None
+                    st.session_state["oos_validation_fingerprint"] = None
+                    st.session_state["oos_validation_source_context"] = None
+                    st.session_state["oos_validation_last_error"] = safe_error_message(error)
+                else:
+                    st.session_state["swing_research_result"] = None
+                    st.session_state["swing_research_config_fingerprint"] = None
+                    st.session_state["swing_research_price_series_by_symbol"] = {}
+                    st.session_state["swing_research_source_context"] = None
+                    st.session_state["swing_research_last_error"] = safe_error_message(error)
 
     if st.button("清除掃描結果"):
         for key in list(st.session_state.keys()):
             if key.startswith("swing_research_"):
                 st.session_state[key] = {} if key == "swing_research_price_series_by_symbol" else None
+    if st.button("清除樣本外驗證結果"):
+        for key in list(st.session_state.keys()):
+            if key.startswith("oos_validation_"):
+                st.session_state[key] = None
 
     if st.session_state["swing_research_last_error"]:
         st.error(f"Swing Research 掃描失敗：{st.session_state['swing_research_last_error']}")
+
+    if st.session_state["oos_validation_last_error"]:
+        st.error(f"Out-of-Sample Validation 失敗：{st.session_state['oos_validation_last_error']}")
+
+    if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
+        result = st.session_state["oos_validation_result"]
+        if result is None:
+            st.info("設定三段 period 並按下「執行樣本外驗證」後，系統才會讀取完整 historical price series 並執行 OOS validation。")
+            return
+        if oos_dashboard.stored_result_is_stale(st.session_state["oos_validation_fingerprint"], current_fingerprint):
+            st.warning(oos_dashboard.STORED_RESULT_MISMATCH_MESSAGE)
+        render_oos_validation_result(
+            result,
+            st.session_state.get("oos_validation_source_context"),
+        )
+        return
 
     result = st.session_state["swing_research_result"]
     if result is None:
@@ -1627,6 +1785,161 @@ def resolve_swing_research_source(
         source_type=universe_ui.MANUAL_SOURCE,
         symbols=symbols,
     )
+
+
+def render_oos_validation_result(result, source_context=None) -> None:
+    st.markdown("### Out-of-Sample Validation")
+    st.caption(oos_dashboard.HISTORICAL_HIT_RATE_CAPTION)
+    st.caption(oos_dashboard.OUTCOME_CAPTION)
+    st.caption(oos_dashboard.CANDIDATE_SHARE_CAPTION)
+
+    if source_context:
+        st.caption(
+            "Source Context Copy: "
+            f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
+            f"Symbols: {source_context['symbol_count']}"
+        )
+        with st.expander("Source Symbols Copy", expanded=False):
+            st.write("\n".join(source_context.get("symbols", tuple())) or "N/A")
+
+    spec_cols = st.columns(2)
+    spec_cols[0].metric("Research Specification Fingerprint", result.research_fingerprint)
+    spec_cols[1].metric(
+        "Same Specification Across All Periods",
+        "Yes" if result.all_periods_same_fingerprint else "No",
+    )
+    st.caption("UI request fingerprint 只用於判斷目前畫面設定是否和 session-state result 相同；Research Specification Fingerprint 來自 fixed research specification。")
+
+    with st.expander("Frozen Research Specification", expanded=False):
+        spec = result.frozen_specification
+        st.dataframe(
+            pd.DataFrame([
+                {"Metric": "Signal ID", "Value": spec.signal_definition.id},
+                {"Metric": "Outcome ID", "Value": spec.outcome_definition.id},
+                {"Metric": "Replay Frequency", "Value": spec.replay_frequency.value},
+                {"Metric": "Overlap Policy", "Value": spec.overlap_policy.value},
+                {"Metric": "Cooldown Bars", "Value": swing_dashboard.format_optional_number(spec.cooldown_bars)},
+                {"Metric": "Historical Start", "Value": swing_dashboard.format_date(spec.historical_start_date)},
+                {"Metric": "Preferred Resolved Samples", "Value": spec.minimum_resolved_samples},
+            ]).astype(str),
+            width="stretch",
+            hide_index=True,
+        )
+
+    st.markdown("#### Period Summary")
+    for period_result in oos_dashboard.ordered_period_results(result):
+        with st.container(border=True):
+            st.subheader(oos_dashboard.period_label(period_result))
+            if period_result.role is ValidationPeriodRole.HOLDOUT:
+                st.caption(oos_dashboard.HOLDOUT_CAPTION)
+            metric_cols = st.columns(3)
+            metric_cols[0].metric("Date Range", f"{oos_dashboard.format_date(period_result.start_date)} -> {oos_dashboard.format_date(period_result.end_date)}")
+            metric_cols[1].metric("Replay Periods", period_result.requested_replay_period_count)
+            metric_cols[2].metric("Candidate Period Share", oos_dashboard.format_candidate_period_share(period_result))
+            hit_cols = st.columns(3)
+            hit_cols[0].metric("Historical Hit Rate", oos_dashboard.format_percentage(period_result.historical_hit_rate))
+            hit_cols[1].metric("Resolved n", period_result.resolved_count)
+            hit_cols[2].metric("Candidate Occurrences", period_result.total_candidate_occurrences)
+            if period_result.resolved_count < result.config.minimum_resolved_samples:
+                st.warning(oos_dashboard.SMALL_SAMPLE_WARNING)
+            st.dataframe(
+                pd.DataFrame(oos_dashboard.build_period_summary_rows(period_result)).astype(str),
+                width="stretch",
+                hide_index=True,
+            )
+
+    st.markdown("#### Cross-Period Comparison")
+    st.dataframe(
+        pd.DataFrame(oos_dashboard.build_cross_period_comparison_rows(result)).astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption("Difference columns are raw differences；percentage metrics use percentage points, not relative change.")
+
+    observations = oos_dashboard.build_factual_observations(result)
+    if observations:
+        st.markdown("#### Factual Observations")
+        for observation in observations:
+            st.write(f"- {observation}")
+
+    chart_rows = oos_dashboard.build_candidate_count_chart_rows(result)
+    if chart_rows:
+        st.markdown("#### Candidate Count by Replay Period")
+        chart_df = pd.DataFrame(chart_rows)
+        chart = (
+            alt.Chart(chart_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Replay Date:N", title="Replay Date"),
+                y=alt.Y("Candidate Count:Q", title="Candidate Count"),
+                color=alt.Color("Validation Role:N", title="Validation Role"),
+                tooltip=["Validation Role", "Replay Date", "Candidate Count", "HIT", "MISS", "INCOMPLETE", "NOT_EVALUABLE", "FAILED"],
+            )
+        )
+        st.altair_chart(chart, width="stretch")
+    else:
+        st.info("此 validation result 沒有可顯示的 replay dates。")
+
+    share_df = pd.DataFrame(oos_dashboard.build_candidate_share_chart_rows(result))
+    if not share_df.empty:
+        st.markdown("#### Candidate Period Share by Validation Role")
+        share_chart = (
+            alt.Chart(share_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Validation Role:N", title="Validation Role"),
+                y=alt.Y("Candidate Period Share:Q", title="Candidate Period Share", axis=alt.Axis(format="%")),
+                tooltip=["Validation Role", "Candidate Period Share Label"],
+            )
+        )
+        st.altair_chart(share_chart, width="stretch")
+
+    hit_rate_df = pd.DataFrame(oos_dashboard.build_historical_hit_rate_chart_rows(result))
+    hit_rate_df = hit_rate_df.dropna(subset=["Historical Hit Rate"])
+    if not hit_rate_df.empty:
+        st.markdown("#### Historical Hit Rate + Resolved n")
+        hit_rate_chart = (
+            alt.Chart(hit_rate_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Validation Role:N", title="Validation Role"),
+                y=alt.Y("Historical Hit Rate:Q", title="Historical Hit Rate", axis=alt.Axis(format="%")),
+                tooltip=["Label", "Resolved n"],
+            )
+        )
+        st.altair_chart(hit_rate_chart, width="stretch")
+
+    st.markdown("#### Outcome Counts")
+    st.dataframe(
+        pd.DataFrame(oos_dashboard.build_outcome_count_rows(result)).astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.markdown("#### Cross-Period Symbol Presence")
+    symbol_presence_rows = oos_dashboard.build_cross_period_symbol_presence_rows(result)
+    if symbol_presence_rows:
+        st.dataframe(pd.DataFrame(symbol_presence_rows).astype(str), width="stretch", hide_index=True)
+    else:
+        st.info("三段 period 都沒有 candidate symbols。")
+
+    for period_result in oos_dashboard.ordered_period_results(result):
+        with st.expander(f"{oos_dashboard.period_label(period_result)} Candidate Stability", expanded=False):
+            symbol_rows = oos_dashboard.build_period_symbol_rows(period_result)
+            if symbol_rows:
+                st.dataframe(pd.DataFrame(symbol_rows).astype(str), width="stretch", hide_index=True)
+            else:
+                st.info("此期間沒有 candidates。")
+            timeline_rows = oos_dashboard.build_period_timeline_rows(period_result)
+            if timeline_rows:
+                st.dataframe(pd.DataFrame(timeline_rows).astype(str), width="stretch", hide_index=True)
+            else:
+                st.info("此期間沒有 replay dates。")
+
+    failure_rows = oos_dashboard.build_failure_summary_rows(result)
+    if failure_rows:
+        with st.expander("Safe Failure Summary", expanded=False):
+            st.dataframe(pd.DataFrame(failure_rows).astype(str), width="stretch", hide_index=True)
 
 
 def render_swing_research_result(result, source_context=None) -> None:
