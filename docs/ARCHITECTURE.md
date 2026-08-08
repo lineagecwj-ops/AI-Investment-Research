@@ -99,9 +99,13 @@ walk_forward_replay_service.py
         ↓
         WalkForwardReplaySummary
         ↓
+        replay_analytics_service.py
+        ↓
+        ReplayAnalyticsResult
+        ↓
         swing_research_dashboard.py
         ↓
-        Dashboard Timeline / Period Detail
+        Dashboard Replay Analytics / Period Detail
 
 backtest_service.py
     ↓
@@ -269,6 +273,16 @@ walk_forward_replay_service.py
     └── Aggregates descriptive candidate occurrence counts, unique candidate symbols, post-replay outcome counts, and repeated symbol summaries
     └── Does not compute aggregate walk-forward hit rate, probability, prediction accuracy, parameter optimization, strategy P&L, persistence, or AI ranking
 
+replay_analytics_service.py
+    └── Deterministic descriptive analytics layer for existing WalkForwardReplayResult
+    └── ReplayAnalyticsResult with Stability Summary, Period Summary, Symbol Summary, Candidate Occurrence, Outcome Distribution, and Candidate Set transitions
+    └── Computes Candidate Period Share as periods-with-candidates / total periods or symbol occurrences / total periods
+    └── Computes longest consecutive candidate appearance by replay period ordering, not calendar gaps
+    └── Computes Candidate Set Jaccard Similarity and Candidate Set Turnover between consecutive replay periods
+    └── Preserves zero-match periods and period-level failures in period summaries
+    └── Separates as-of candidate occurrence / Research Priority from Post-Replay Outcome counts
+    └── No Yahoo fetch, HistoricalReplayService call, scanner call, backtest rerun, probability, recommendation, optimization, strategy P&L, persistence, or OpenAI API
+
 historical_case_service.py
     └── Deterministic historical case explorer data builder
     └── HistoricalCaseWindowConfig with pre/post trading-bar windows
@@ -318,6 +332,7 @@ Responsibilities:
 - Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
 - Render Historical Cases tab through explicit submit only; keep case report / views in `st.session_state`, and rerender filters, sorting, selected case, x-axis mode, and expanders without refetching or rerunning backtests
 - Render Swing Research tab through explicit scan submit only; store `SwingScannerResult`, scan fingerprint, last error, and scan-time price-series cache under `swing_research_*`; rerender candidate selection and case preview without refetching prices or rerunning scanner / backtest
+- Render Walk-Forward Replay analytics from the existing session-state `WalkForwardReplayResult`; changing expanders, tables, and selected replay period rerenders stored results without refetching prices, rerunning replay, rerunning scanner, or rerunning backtests
 
 ---
 

@@ -102,6 +102,7 @@ Dashboard 目前提供：
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
 - `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols。Current Scan 顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。Historical Replay 讓使用者指定單一 Replay Date，顯示 Requested Replay Date、各 symbol 的 Actual Trading Date、Historical Hit Rate (As Of) 與獨立的 Post-Replay Outcome 事後驗證。Walk-Forward Replay 會依 Monthly 或 Weekly schedule 重複執行 Single-Date Historical Replay，顯示 period timeline、candidate occurrence counts 與 repeated candidate frequency。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率、prediction accuracy 或交易指令。
+- `Replay Analytics`：在 Walk-Forward Replay 成功結果下方顯示 Stability Summary、Candidate Occurrence、Period Timeline、Candidate Set Stability 與 Post-Replay Outcome Counts。這是 existing replay result 的描述性 analytics，不重新抓 Yahoo、不重新 replay、不重新 backtest，也不提供 future probability、recommendation、strategy P&L 或 optimization。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
@@ -129,6 +130,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical case explorer：`src/historical_case_service.py`、`src/historical_case_dashboard.py`
 - Historical replay mode：`src/historical_replay_service.py`
 - Walk-forward replay mode：`src/walk_forward_replay_service.py`
+- Replay analytics stability review：`src/replay_analytics_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -146,6 +148,7 @@ Swing Research Dashboard 詳見 `docs/SWING_RESEARCH_DASHBOARD.md`。
 Universe Management 詳見 `docs/UNIVERSE_MANAGEMENT.md`。
 Historical Replay Mode 詳見 `docs/HISTORICAL_REPLAY_MODE.md`。
 Walk-Forward Replay 詳見 `docs/WALK_FORWARD_REPLAY.md`。
+Replay Analytics & Stability Review 詳見 `docs/REPLAY_ANALYTICS_STABILITY.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 

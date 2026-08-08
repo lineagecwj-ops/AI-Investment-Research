@@ -287,14 +287,17 @@ Historical Replay renders post-replay verification as a separate outcome block a
 
 Walk-Forward Replay displays:
 
-- Replay Periods
-- Periods With MATCH
-- Periods Without MATCH
-- Candidate Occurrences
+- Total Replay Periods
+- Periods With Candidates
+- Periods Without Candidates
 - Unique Candidate Symbols
+- Total Candidate Occurrences
+- Candidate Period Share
 - Post-Replay outcome occurrence counts
 
 It intentionally does not display Walk-Forward Hit Rate, Win Rate, Prediction Accuracy, or Probability.
+
+Candidate Period Share means the share of replay periods with at least one research candidate. It is not future probability.
 
 ## Period Timeline
 
@@ -322,13 +325,31 @@ Candidate Frequency shows repeated candidate occurrences by symbol:
 
 - Symbol
 - Candidate Occurrences
-- First Seen
-- Last Seen
+- Candidate Period Share
+- First Appearance
+- Last Appearance
+- Longest Consecutive Periods
+- Best / Median / Worst Research Priority
 - Post-Replay HIT
-- MISS
-- INCOMPLETE
+- Post-Replay MISS
+- Post-Replay INCOMPLETE
+- Post-Replay NOT_EVALUABLE
 
 The table is occurrence-based and must not be read as independent-sample probability.
+
+## Candidate Set Stability
+
+Candidate Set Stability compares each consecutive pair of replay periods:
+
+- Previous Replay Date
+- Current Replay Date
+- Previous Candidate Count
+- Current Candidate Count
+- Shared Candidates
+- Candidate Set Similarity
+- Candidate Set Turnover
+
+Similarity is Jaccard similarity across candidate symbol sets. Turnover is `1 - similarity`. These values describe candidate-set stability only and are not portfolio turnover or probability.
 
 ## HIT / MISS Semantics
 

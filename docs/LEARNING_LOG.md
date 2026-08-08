@@ -1,5 +1,45 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 07 Batch E Replay Analytics & Stability Review
+
+### Completed Features
+
+- 新增 `src/replay_analytics_service.py`，提供 deterministic analytics layer，直接消費既有 `WalkForwardReplayResult`。
+- 新增 frozen `ReplayAnalyticsConfig`、`ReplayPeriodSummary`、`ReplaySymbolSummary`、`ReplayCandidateOccurrence`、`ReplayOutcomeDistribution`、`ReplayCandidateSetTransition`、`ReplayStabilitySummary` 與 `ReplayAnalyticsResult`。
+- Period-level analytics 保留所有 replay periods，包含 zero-MATCH periods、candidate symbols、NO_MATCH / NOT_EVALUABLE / FAILED counts 與 Post-Replay Outcome counts。
+- Symbol-level analytics 計算 candidate occurrence count、first / last appearance、Candidate Period Share、longest consecutive candidate periods、Research Priority rank best / median / worst 與 Post-Replay Outcome distribution。
+- Consecutive appearance 使用 walk-forward result 的 replay period ordering，不使用 calendar-day 或 month gap 推斷。
+- Candidate Set Stability 以 consecutive period candidate set 計算 Jaccard Similarity 與 Candidate Set Turnover；兩期皆 empty 時 similarity = 1.0、turnover = 0.0。
+- Swing Research 的 Walk-Forward Replay 結果下方新增 Replay Analytics 區塊：Stability Summary、Candidate Occurrence、Period Timeline、Candidate Set Stability 與 Post-Replay Outcome Counts。
+
+### Design Notes
+
+- Batch E 是 existing replay result 的描述性 analytics layer，不抓 Yahoo、不重新 Historical Replay、不重新 scanner、不重新 backtest、不新增 persistence。
+- Candidate Period Share 是有 candidate 的 replay periods 比例，或單一 symbol 出現於 replay periods 的比例，不是 future probability。
+- Research Priority stability 只反映 replay 當時 candidate ordering；Post-Replay Outcome 不會回頭改 candidate occurrence、candidate dates、consecutive appearance 或 rank history。
+- Post-Replay Outcome Counts 是事後驗證資訊，不建立 aggregate Walk-Forward Hit Rate、success rate、accuracy、win rate、strategy P&L 或 prediction metric。
+- Dashboard table / expander / selector rerun 只 render session-state result 和 analytics helper，不觸發 provider、replay 或 backtest。
+
+### Modified / Added Files
+
+- 新增 `src/replay_analytics_service.py`
+- 新增 `tests/test_replay_analytics_service.py`
+- 新增 `docs/REPLAY_ANALYTICS_STABILITY.md`
+- 修改 `src/swing_research_dashboard.py`
+- 修改 `tests/test_swing_research_dashboard.py`
+- 修改 `app.py`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- Replay Analytics 仍是 session-only，沒有 SQLite persistence。
+- 無 statistical significance testing、confidence intervals 或 out-of-sample model selection。
+- Candidate appearances 可能序列相關，overlapping historical windows 不保證獨立。
+- 結果仍受 selected universe、SignalDefinition、OutcomeDefinition、replay frequency、survivorship bias 與 Yahoo data-source limitations 影響。
+- 本 Batch 不做 probability model、recommendation engine、strategy simulator、parameter optimization、ML / AI ranking、scheduled scan 或下一個 Batch。
+
 ## 2026-08-08 — Sprint 07 Batch D Multi-Date Walk-Forward Replay
 
 ### Completed Features
