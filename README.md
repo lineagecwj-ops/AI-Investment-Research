@@ -39,7 +39,32 @@ AI-Investment-Research 是一個結合 AI 與投資研究的個人專案。
 
 ## 專案狀態
 
-目前版本：v0.1
+目前版本：V1.0 — Daily Swing Research Ready
+
+V1.0 已完成 Daily Swing Research 的正式研究流程基礎：
+
+- Historical Price Foundation
+- Technical Indicator Foundation
+- Signal & Outcome Framework
+- Historical Backtest Engine
+- Swing Opportunity Scanner
+- Historical Case Explorer
+- Swing Research Dashboard
+- Research Universe Management
+- Historical Replay
+- Walk-Forward Replay
+- Replay Analytics
+- Out-of-Sample Validation
+- OOS Validation Dashboard
+
+重要限制：
+
+- 本專案是 research tool，不是 investment recommendation system。
+- Historical Hit Rate 是歷史條件事件比例，不是 future probability。
+- 目前不做 automatic parameter optimization。
+- 目前不計算 strategy P&L。
+- 目前尚未建立 calibrated probability model。
+- Swing scanner 目前尚未合併 fundamental data。
 
 ---
 

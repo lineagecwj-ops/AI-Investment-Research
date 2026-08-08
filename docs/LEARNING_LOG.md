@@ -1,5 +1,21 @@
 # Learning Log
 
+## 2026-08-08 — V1.0 Daily Swing Research Ready
+
+### Release Readiness
+
+- Production readiness review completed for baseline `25029dc1fb46b30710d9b03e0732608e8b34635e`.
+- Full test suite passed with 746 tests.
+- `compileall`, `git diff --check`, secret / runtime safety, DB startup / migration, Streamlit startup, navigation smoke, and Swing Current Scan smoke all passed.
+- No production blocker was found.
+- Current baseline is ready to be designated `V1.0 — Daily Swing Research Ready`.
+
+### Operating Notes
+
+- V1.0 begins the real-world usage period for Daily Swing Research.
+- Future changes should be driven by observed usage, workflow friction, review evidence, and production safety needs rather than feature accumulation.
+- Preserve current signal / outcome / ranking / replay / OOS semantics unless a future usage review identifies a concrete reason to change them.
+
 ## 2026-08-08 — Sprint 08 Batch B OOS Validation Dashboard
 
 ### Completed Features
