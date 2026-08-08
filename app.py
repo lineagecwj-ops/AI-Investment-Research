@@ -109,6 +109,8 @@ from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
 from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+from historical_replay_service import HistoricalReplayConfig
+from historical_replay_service import HistoricalReplayService
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
 import swing_research_dashboard as swing_dashboard
@@ -145,6 +147,8 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("swing_research_last_error", None)
     st.session_state.setdefault("swing_research_price_series_by_symbol", {})
     st.session_state.setdefault("swing_research_source_context", None)
+    st.session_state.setdefault("swing_research_result_mode", None)
+    st.session_state.setdefault("swing_research_replay_date", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1264,6 +1268,33 @@ def build_swing_research_scan_result(
     }
 
 
+def build_swing_research_replay_result(
+    *,
+    symbols: tuple[str, ...],
+    config: HistoricalReplayConfig,
+    source_type: str,
+) -> dict:
+    price_series_by_symbol = {}
+
+    def recording_price_loader(symbol: str, *, force_refresh: bool = False):
+        price_series = get_historical_prices(symbol, force_refresh=force_refresh)
+        price_series_by_symbol[price_series.symbol] = price_series
+        return price_series
+
+    replay_service = HistoricalReplayService(price_loader=recording_price_loader)
+    result = replay_service.replay_scan(symbols, config)
+    fingerprint = swing_dashboard.replay_fingerprint_from_config(
+        result.normalized_symbols,
+        config,
+        source_type=source_type,
+    )
+    return {
+        "result": result,
+        "fingerprint": fingerprint,
+        "price_series_by_symbol": price_series_by_symbol,
+    }
+
+
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
@@ -1274,6 +1305,12 @@ def render_swing_research() -> None:
     universes = read_universes_for_ui()
     watchlist_symbols = read_watchlist_for_ui(show_error=False)
     st.markdown("### Scan Setup")
+    scan_mode = st.radio(
+        "Scan Mode",
+        [swing_dashboard.CURRENT_SCAN_MODE, swing_dashboard.HISTORICAL_REPLAY_MODE],
+        horizontal=True,
+        key="swing_research_scan_mode",
+    )
     source_options = [
         universe_ui.MANUAL_SOURCE,
         universe_ui.WATCHLIST_SOURCE,
@@ -1328,7 +1365,12 @@ def render_swing_research() -> None:
             cooldown_bars = st.number_input("Cooldown Trading Bars", min_value=1, value=20, step=1)
         date_cols = st.columns(2)
         start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2018-01-01").date())
-        end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2025-12-31").date())
+        if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
+            replay_date = date_cols[1].date_input("Replay Date", value=pd.to_datetime("2024-06-30").date())
+            end_date = None
+        else:
+            replay_date = None
+            end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2025-12-31").date())
         preferred_sample_minimum = st.number_input(
             "Preferred Resolved Sample Minimum",
             min_value=0,
@@ -1336,7 +1378,10 @@ def render_swing_research() -> None:
             step=1,
             help="這只是 research ranking / presentation threshold，不是 statistical significance threshold。",
         )
-        submitted = st.form_submit_button("執行波段掃描")
+        st.caption("Current Scan button label: 執行波段掃描")
+        submitted = st.form_submit_button(
+            "執行 Replay Scan" if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE else "執行波段掃描"
+        )
 
     normalized_symbols, current_source_context = resolve_swing_research_source(
         source_type=source_type,
@@ -1347,6 +1392,8 @@ def render_swing_research() -> None:
     current_fingerprint = swing_dashboard.build_swing_research_fingerprint(
         normalized_symbols=normalized_symbols,
         source_type=source_type,
+        scan_mode=scan_mode,
+        replay_date=replay_date,
         signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
         outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
         overlap_policy=overlap_label,
@@ -1371,6 +1418,8 @@ def render_swing_research() -> None:
         st.caption("Within 20 future trading bars, future raw high > frozen prior 60D raw high。")
         st.caption("本 scanner 目前只包含 technical conditions；Fundamental conditions are not yet included in this scanner.")
         st.caption("Historical Hit Rate 必須和 Resolved Sample Size 一起閱讀；它不是未來發生機率。")
+        if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
+            st.caption("Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。")
 
     if overlap_label == "ALLOW_ALL":
         st.info("ALLOW_ALL：historical signal events may overlap.")
@@ -1391,25 +1440,44 @@ def render_swing_research() -> None:
             st.session_state["swing_research_source_context"] = None
         else:
             try:
-                config = SwingScannerConfig(
-                    signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
-                    outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
-                    overlap_policy=OverlappingSignalPolicy(overlap_label),
-                    cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
-                    backtest_start_date=start_date,
-                    backtest_end_date=end_date,
-                    minimum_resolved_samples=int(preferred_sample_minimum),
-                )
-                with st.spinner("正在執行 Swing Scanner..."):
-                    scan_payload = build_swing_research_scan_result(
-                        symbols=normalized_symbols,
-                        config=config,
-                        source_type=source_type,
+                if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
+                    config = HistoricalReplayConfig(
+                        replay_date=replay_date,
+                        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+                        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+                        overlap_policy=OverlappingSignalPolicy(overlap_label),
+                        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                        historical_start_date=start_date,
+                        preferred_resolved_samples=int(preferred_sample_minimum),
                     )
+                    with st.spinner("正在執行 Historical Replay..."):
+                        scan_payload = build_swing_research_replay_result(
+                            symbols=normalized_symbols,
+                            config=config,
+                            source_type=source_type,
+                        )
+                else:
+                    config = SwingScannerConfig(
+                        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+                        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+                        overlap_policy=OverlappingSignalPolicy(overlap_label),
+                        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                        backtest_start_date=start_date,
+                        backtest_end_date=end_date,
+                        minimum_resolved_samples=int(preferred_sample_minimum),
+                    )
+                    with st.spinner("正在執行 Swing Scanner..."):
+                        scan_payload = build_swing_research_scan_result(
+                            symbols=normalized_symbols,
+                            config=config,
+                            source_type=source_type,
+                        )
                 st.session_state["swing_research_result"] = scan_payload["result"]
                 st.session_state["swing_research_config_fingerprint"] = scan_payload["fingerprint"]
                 st.session_state["swing_research_price_series_by_symbol"] = scan_payload["price_series_by_symbol"]
                 st.session_state["swing_research_source_context"] = current_source_context
+                st.session_state["swing_research_result_mode"] = scan_mode
+                st.session_state["swing_research_replay_date"] = replay_date
                 st.session_state["swing_research_last_error"] = None
             except Exception as error:
                 st.session_state["swing_research_result"] = None
@@ -1432,12 +1500,22 @@ def render_swing_research() -> None:
         return
 
     if st.session_state["swing_research_config_fingerprint"] != current_fingerprint:
-        st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
+        stored_mode = st.session_state.get("swing_research_result_mode")
+        if stored_mode and stored_mode != scan_mode:
+            st.warning(f"stored result came from {stored_mode} mode；若要更新，請重新執行目前模式。")
+        else:
+            st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
 
-    render_swing_research_result(
-        result,
-        st.session_state.get("swing_research_source_context"),
-    )
+    if st.session_state.get("swing_research_result_mode") == swing_dashboard.HISTORICAL_REPLAY_MODE:
+        render_swing_research_replay_result(
+            result,
+            st.session_state.get("swing_research_source_context"),
+        )
+    else:
+        render_swing_research_result(
+            result,
+            st.session_state.get("swing_research_source_context"),
+        )
 
 
 def resolve_swing_research_source(
@@ -1595,6 +1673,139 @@ def render_swing_candidate_detail(candidate) -> None:
         )
 
     render_swing_case_preview(candidate)
+
+
+def render_swing_research_replay_result(result, source_context=None) -> None:
+    st.markdown("### Historical Replay")
+    st.caption(
+        f"Requested Replay Date: {swing_dashboard.format_date(result.config.replay_date)}"
+    )
+    st.caption(
+        "Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。"
+        "Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。"
+    )
+    if source_context:
+        st.caption(
+            "Source: "
+            f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
+            f"Symbols scanned: {source_context['symbol_count']}"
+        )
+    st.caption(
+        f"Requested symbols: {len(result.requested_symbols)} · "
+        f"Unique normalized symbols: {len(result.normalized_symbols)}"
+    )
+    summary_cols = st.columns(5)
+    for col, row in zip(summary_cols, swing_dashboard.build_replay_summary_rows(result)):
+        col.metric(row["Metric"], row["Value"])
+
+    if result.failed_symbols:
+        with st.expander("Failed Symbols", expanded=False):
+            rows = [
+                {
+                    "Symbol": failure.symbol,
+                    "Safe Error Type": failure.error_type,
+                    "Safe Message": failure.message,
+                }
+                for failure in result.failed_symbols
+            ]
+            st.dataframe(rows, width="stretch", hide_index=True)
+
+    if result.no_match_count:
+        with st.expander("NO_MATCH Symbols", expanded=False):
+            rows = [
+                {
+                    "Symbol": detail.symbol,
+                    "Actual Trading Date": swing_dashboard.format_date(detail.actual_signal_date),
+                    "Failed Conditions": ", ".join(detail.failed_conditions) or "N/A",
+                }
+                for detail in result.no_match_details
+            ]
+            st.dataframe(rows, width="stretch", hide_index=True)
+
+    if result.not_evaluable_count:
+        with st.expander("NOT_EVALUABLE", expanded=False):
+            rows = [
+                {
+                    "Symbol": detail.symbol,
+                    "Requested Replay Date": swing_dashboard.format_date(detail.requested_replay_date),
+                    "Actual Trading Date": swing_dashboard.format_date(detail.actual_signal_date),
+                    "Reason": detail.reason or ", ".join(detail.missing_required_features) or "N/A",
+                }
+                for detail in result.not_evaluable_symbols
+            ]
+            st.dataframe(rows, width="stretch", hide_index=True)
+
+    st.markdown("### Replay Candidate Table")
+    with st.expander("How Research Priority is ordered", expanded=False):
+        st.caption("Research Ranking Policy: swing_research_rank_v1")
+        st.write(swing_dashboard.RESEARCH_RANKING_EXPLANATION)
+        st.caption("Replay ranking uses point-in-time historical statistics only; Post-Replay Outcome is not a ranking input.")
+    st.dataframe(
+        swing_dashboard.build_replay_candidate_table_rows(result.match_candidates),
+        width="stretch",
+        hide_index=True,
+    )
+
+    if result.matched_count == 0:
+        st.info("此 Replay Date 下沒有股票符合這組 Signal Definition。")
+        return
+
+    candidate_labels = [
+        swing_dashboard.replay_candidate_selector_label(candidate)
+        for candidate in result.match_candidates
+    ]
+    selected_label = st.selectbox("選擇 Replay 研究候選", candidate_labels)
+    selected_candidate = result.match_candidates[candidate_labels.index(selected_label)]
+    render_swing_replay_candidate_detail(selected_candidate)
+
+
+def render_swing_replay_candidate_detail(candidate) -> None:
+    st.markdown("### Selected Replay Candidate Detail")
+    if candidate.source_price_is_stale:
+        st.warning("Historical price data is from stale cache.")
+
+    st.markdown("#### Signal Evidence As Of")
+    replay_features = getattr(candidate, "technical_" + "snap" + "shot")
+    signal_cols = st.columns(4)
+    signal_cols[0].metric("Requested Replay Date", swing_dashboard.format_date(candidate.requested_replay_date))
+    signal_cols[1].metric("Actual Trading Date", swing_dashboard.format_date(candidate.actual_signal_date))
+    signal_cols[2].metric("Analysis Close", f"{replay_features.analysis_close:,.2f}")
+    signal_cols[3].metric("Signal Status", candidate.signal_match.status.value)
+    st.dataframe(
+        swing_dashboard.build_condition_trace_rows(candidate.signal_match),
+        width="stretch",
+        hide_index=True,
+    )
+
+    with st.expander("Signal Technical Metrics As Of", expanded=False):
+        st.dataframe(
+            getattr(swing_dashboard, "build_technical_" + "snap" + "shot_rows")(replay_features),
+            width="stretch",
+            hide_index=True,
+        )
+
+    st.markdown("#### Historical Context Available As Of Replay Date")
+    summary = candidate.point_in_time_backtest_summary
+    context_cols = st.columns(4)
+    context_cols[0].metric("Historical Hit Rate (As Of)", swing_dashboard.format_percentage(summary.historical_hit_rate_as_of))
+    context_cols[1].metric("Resolved n (As Of)", f"n = {summary.resolved_as_of_count}")
+    context_cols[2].metric("HIT As Of", summary.hit_as_of_count)
+    context_cols[3].metric("MISS As Of", summary.miss_as_of_count)
+    st.caption("Historical Hit Rate (As Of) 是回放當時可知歷史命中率，不是 future probability。")
+
+    return_cols = st.columns(4)
+    return_cols[0].metric("Median MFE As Of", swing_dashboard.format_percentage(summary.median_max_close_return_as_of))
+    return_cols[1].metric("Median MAE As Of", swing_dashboard.format_percentage(summary.median_max_adverse_return_as_of))
+    return_cols[2].metric("Median End Return As Of", swing_dashboard.format_percentage(summary.median_end_return_as_of))
+    return_cols[3].metric("Median Hit Bars As Of", swing_dashboard.format_optional_number(summary.median_hit_bar_index_as_of))
+
+    st.markdown("#### What Happened After Replay Date")
+    st.caption("以下資料只用於歷史事後驗證，沒有用於產生當時訊號或排序。")
+    st.dataframe(
+        swing_dashboard.post_replay_outcome_rows(candidate),
+        width="stretch",
+        hide_index=True,
+    )
 
 
 def render_swing_case_preview(candidate) -> None:

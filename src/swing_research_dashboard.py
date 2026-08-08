@@ -18,6 +18,8 @@ from universe_dashboard import MANUAL_SOURCE
 from universe_dashboard import parse_universe_symbol_text
 
 
+CURRENT_SCAN_MODE = "Current"
+HISTORICAL_REPLAY_MODE = "Historical Replay"
 CASE_PREVIEW_FILTER_OPTIONS = ("Resolved", "HIT", "MISS")
 CASE_PREVIEW_LIMIT = 5
 RESEARCH_RANKING_EXPLANATION = (
@@ -36,6 +38,8 @@ def build_swing_research_fingerprint(
     *,
     normalized_symbols: tuple[str, ...],
     source_type: str = MANUAL_SOURCE,
+    scan_mode: str = CURRENT_SCAN_MODE,
+    replay_date: date | None = None,
     signal_id: str,
     outcome_id: str,
     overlap_policy: str,
@@ -46,6 +50,8 @@ def build_swing_research_fingerprint(
 ) -> str:
     identity = "|".join(
         (
+            scan_mode,
+            "" if replay_date is None else replay_date.isoformat(),
             source_type,
             ",".join(normalized_symbols),
             signal_id,
@@ -70,6 +76,7 @@ def fingerprint_from_config(
     return build_swing_research_fingerprint(
         normalized_symbols=normalized_symbols,
         source_type=source_type,
+        scan_mode=CURRENT_SCAN_MODE,
         signal_id=config.signal_definition.id,
         outcome_id=config.outcome_definition.id,
         overlap_policy=config.overlap_policy.value,
@@ -80,7 +87,38 @@ def fingerprint_from_config(
     )
 
 
+def replay_fingerprint_from_config(
+    normalized_symbols: tuple[str, ...],
+    config,
+    *,
+    source_type: str = MANUAL_SOURCE,
+) -> str:
+    return build_swing_research_fingerprint(
+        normalized_symbols=normalized_symbols,
+        source_type=source_type,
+        scan_mode=HISTORICAL_REPLAY_MODE,
+        replay_date=config.replay_date,
+        signal_id=config.signal_definition.id,
+        outcome_id=config.outcome_definition.id,
+        overlap_policy=config.overlap_policy.value,
+        cooldown_bars=config.cooldown_bars,
+        start_date=config.historical_start_date,
+        end_date=None,
+        preferred_sample_minimum=config.preferred_resolved_samples,
+    )
+
+
 def build_scan_summary_rows(result: SwingScannerResult) -> list[dict[str, object]]:
+    return [
+        {"Metric": "Scanned", "Value": result.scanned_count},
+        {"Metric": "MATCH", "Value": result.matched_count},
+        {"Metric": "NO_MATCH", "Value": result.no_match_count},
+        {"Metric": "NOT_EVALUABLE", "Value": result.not_evaluable_count},
+        {"Metric": "FAILED", "Value": result.failure_count},
+    ]
+
+
+def build_replay_summary_rows(result) -> list[dict[str, object]]:
     return [
         {"Metric": "Scanned", "Value": result.scanned_count},
         {"Metric": "MATCH", "Value": result.matched_count},
@@ -111,6 +149,53 @@ def build_candidate_table_rows(
             "Stale?": "Yes" if candidate.source_price_is_stale else "No",
         }
         for candidate in candidates
+    ]
+
+
+def build_replay_candidate_table_rows(candidates) -> list[dict[str, object]]:
+    rows = []
+    for candidate in candidates:
+        summary = candidate.point_in_time_backtest_summary
+        rows.append(
+            {
+                "Research Priority": candidate.research_rank,
+                "Symbol": candidate.symbol,
+                "Requested Replay Date": format_date(candidate.requested_replay_date),
+                "Actual Trading Date": format_date(candidate.actual_signal_date),
+                "Historical Hit Rate (As Of)": format_percentage(summary.historical_hit_rate_as_of),
+                "Resolved n (As Of)": summary.resolved_as_of_count,
+                "HIT As Of": summary.hit_as_of_count,
+                "MISS As Of": summary.miss_as_of_count,
+                "Median MFE As Of": format_percentage(summary.median_max_close_return_as_of),
+                "Median MAE As Of": format_percentage(summary.median_max_adverse_return_as_of),
+                "Median End Return As Of": format_percentage(summary.median_end_return_as_of),
+                "Sample Status": sample_status_label(candidate.sample_size_status),
+                "Post-Replay Outcome": candidate.post_replay_outcome.status.value,
+                "Stale?": "Yes" if candidate.source_price_is_stale else "No",
+            }
+        )
+    return rows
+
+
+def replay_candidate_selector_label(candidate) -> str:
+    summary = candidate.point_in_time_backtest_summary
+    return (
+        f"{candidate.symbol} | "
+        f"{format_percentage(summary.historical_hit_rate_as_of)} | "
+        f"n={summary.resolved_as_of_count} | "
+        f"Actual={format_date(candidate.actual_signal_date)}"
+    )
+
+
+def post_replay_outcome_rows(candidate) -> list[dict[str, str]]:
+    outcome = candidate.post_replay_outcome
+    return [
+        {"Metric": "Post-Replay Outcome", "Value": outcome.status.value},
+        {"Metric": "First Hit Date", "Value": format_date(outcome.intraday_target_hit_date or outcome.close_target_hit_date)},
+        {"Metric": "Hit Bar", "Value": format_optional_number(outcome.intraday_target_hit_bar_index or outcome.close_target_hit_bar_index)},
+        {"Metric": "MFE", "Value": format_percentage(outcome.max_close_return)},
+        {"Metric": "MAE", "Value": format_percentage(outcome.max_adverse_return)},
+        {"Metric": "End Return", "Value": format_percentage(outcome.end_of_window_return)},
     ]
 
 
