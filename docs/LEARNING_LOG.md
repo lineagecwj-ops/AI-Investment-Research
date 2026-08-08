@@ -1,5 +1,21 @@
 # Learning Log
 
+## 2026-08-08 — V1.0 Post-Release UX Technical Condition Detail
+
+### Completed Features
+
+- Current Scan `掃描結果摘要` 後新增 `技術條件明細`，支援 `MATCH` 與 `NO_MATCH` 股票查看完整技術條件。
+- `SwingScannerResult` 新增 scan-time `current_signal_details`，保存既有 `SignalMatch` trace，讓 `NO_MATCH` 也能顯示 actual technical values、V1 thresholds 與 condition PASS / FAIL。
+- 新增 beginner-friendly condition detail helper，顯示 `符合 X / 5 項技術條件`、`趨勢`、`成交量`、`動能`、`接近前高程度`、actual value vs threshold、neutral gap、RSI / volume ratio / distance-to-high visual marker rows、指標說明與 developer traceability。
+- 新增 focused coverage 驗證 `NO_MATCH` detail 不跑 backtest、actual values 來自 scan-time snapshot、PASS / FAIL 來自 scanner condition status、missing metric 顯示 `N/A`、primary rows 不暴露 raw snake_case、helper 不 fetch Yahoo / rerun scanner / rerun backtest、helper 不 mutation result。
+- 新增 `docs/TECHNICAL_CONDITION_DETAIL.md`，並更新 README 與 Swing Research Dashboard 文件。
+
+### Safety Notes
+
+- 本次只做 presentation / education UX；沒有修改 `technical_example_v1`、signal / outcome definition、technical calculation formulas、scanner thresholds、ranking、historical backtest、replay、walk-forward replay、OOS、database schema 或 OpenAI logic。
+- `符合 X / 5` 只是 factual condition count，不是 Buy Score、Opportunity Score、future probability、recommendation 或交易排序。
+- Gap 只顯示距離門檻的中性數值，不轉換成成功機率、買點、預期報酬或建議。
+
 ## 2026-08-08 — V1.0 Daily Swing Research Ready
 
 ### Release Readiness

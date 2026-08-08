@@ -23,6 +23,8 @@ Explicit scanner submit
     ↓
 SwingScannerResult
     ↓
+Technical Condition Detail for MATCH / NO_MATCH
+    ↓
 Candidate table
     ↓
 Selected candidate detail
@@ -166,6 +168,26 @@ Switching between Current, Historical Replay, Walk-Forward Replay, and Out-of-Sa
 ## Current Signal
 
 Current Signal is evaluated only from the latest available `TechnicalIndicatorSnapshot`.
+
+After `掃描結果摘要`, the dashboard shows `技術條件明細`.
+
+The stock selector includes all scan-time current technical evaluations that completed as `MATCH` or `NO_MATCH`. A stock does not need to be a matched candidate before its technical condition detail can be inspected. `NOT_EVALUABLE` and `FAILED` are not displayed as complete technical details.
+
+The detail view shows:
+
+- `符合 X / 5 項技術條件`
+- beginner-friendly categories: `趨勢`, `成交量`, `動能`, `接近前高程度`
+- actual technical values from scan-time `SignalMatch.feature_snapshot`
+- V1 thresholds
+- PASS / FAIL copied from `SignalMatch.evaluated_conditions`
+- neutral gap-to-threshold text
+- factual marker charts for RSI, volume ratio, and distance to prior 60-day high
+- beginner explanations
+- developer traceability for `technical_example_v1`, scanner status, and raw metric names
+
+`X / 5` is a factual count only. It is not a score, recommendation, expected return, or future probability.
+
+The dashboard does not fetch Yahoo, rerun scanner, rerun backtest, rerun replay, or rerun OOS validation when the user changes the technical detail selector.
 
 For a selected candidate, the dashboard shows:
 
