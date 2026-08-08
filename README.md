@@ -99,6 +99,7 @@ Dashboard 目前提供：
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
+- `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
 - `Comparison`：輸入多股票或從 Watchlist 選擇多支股票，使用表格呈現比較資料。
 
@@ -119,6 +120,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Signal and historical outcome definition：`src/signal_outcome_service.py`
 - Historical backtest aggregation：`src/backtest_service.py`
 - Swing opportunity scanner foundation：`src/swing_scanner_service.py`
+- Historical case explorer：`src/historical_case_service.py`、`src/historical_case_dashboard.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -131,6 +133,7 @@ Technical Indicator Foundation 詳見 `docs/TECHNICAL_INDICATOR_FOUNDATION.md`�
 Signal & Outcome Framework 詳見 `docs/SIGNAL_OUTCOME_FRAMEWORK.md`。
 Historical Backtest Engine 詳見 `docs/HISTORICAL_BACKTEST_ENGINE.md`。
 Swing Opportunity Scanner 詳見 `docs/SWING_OPPORTUNITY_SCANNER.md`。
+Historical Case Explorer 詳見 `docs/HISTORICAL_CASE_EXPLORER.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -171,6 +174,16 @@ Sprint 06 Batch E 新增 deterministic Swing Opportunity Scanner foundation。
 Scanner 接受 caller 提供的一批 symbols，使用最新 available `TechnicalIndicatorSnapshot` 評估指定 `SignalDefinition`，只把目前 `MATCH` 的股票建立為 `SwingOpportunityCandidate`。每個 candidate 會附上相同 config 下的 `HistoricalBacktestReport`、Historical Hit Rate、resolved sample size、MFE / MAE / end-return aggregates、overlap policy、date range、data freshness 與 provisional latest-bar limitation。
 
 Scanner 排序是 versioned research-priority ordering，不是 buy rank、prediction score、hidden composite score 或上漲機率。`NO_MATCH` 只代表目前不符合該 signal definition，`NOT_EVALUABLE` 只代表資料不足或 feature 不可用。
+
+## Historical Case Explorer
+
+Sprint 06 Batch F 新增 deterministic Historical Case Explorer。
+
+Case Explorer 消費 `HistoricalBacktestReport.cases`，為每個歷史 signal/outcome case 建立 chart-ready price window、relative trading-bar index、frozen reference high、first hit metadata、MFE / MAE / end return、signal condition trace 與 signal-date technical snapshot summary。
+
+Streamlit `Historical Cases` tab 採 explicit button workflow；只有按下 `建立歷史案例` 才會讀取 historical prices、建立 technical indicators、執行 backtest 並產生 case views。Filter、sort、case selector、expander 與 chart x-axis toggle 只 render `st.session_state` 中既有結果，不會自動重新 fetch 或 rerun backtest。
+
+`HIT` 只代表指定 historical outcome target 在 horizon 內觸發；`MISS` 只代表完整 horizon 內沒有觸發。這不是交易損益分類，也不是 future probability、prediction、Buy / Sell / Hold 或進出場建議。
 
 ## Grounded AI Research Foundation
 

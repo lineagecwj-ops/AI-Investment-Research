@@ -1,5 +1,42 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 06 Batch F Historical Case Explorer
+
+### Completed Features
+
+- 新增 `src/historical_case_service.py`，建立 deterministic Historical Case Explorer service，消費 `HistoricalPriceSeries` 與 `HistoricalBacktestReport`。
+- 新增 frozen `HistoricalCaseWindowConfig`，使用 `pre_signal_bars` / `post_signal_bars` 交易 bar 數，不使用 calendar days，並拒絕負數設定。
+- 新增 frozen `HistoricalCaseView`，保存 case id、symbol、currency、signal / outcome id、signal date、signal analysis / raw close、frozen reference high / low、outcome status、first hit metadata、MFE / MAE / end return、horizon context、window completeness、price points、condition details 與 signal-date technical snapshot summary。
+- 新增 frozen `HistoricalCasePricePoint`，保存 actual OHLCV bars、`analysis_close`、relative trading-bar index、signal marker、first-hit marker 與 before / after signal label。
+- 新增 frozen `HistoricalCaseConditionDetail`，直接從 `SignalEvent.evaluated_conditions` 複製 metric、actual、operator、expected / secondary、status 與 matched，不重新 evaluate。
+- 新增 `build_case_price_window()`，要求 signal date 必須存在於 price series；若不存在 raise `HistoricalCaseDataError`，不找 nearest date。
+- Price window 只回傳實際 provider trading bars；不 forward fill、calendar reindex、weekend / holiday fill、interpolate 或建立 synthetic bars。
+- Relative index 使用 trading-bar index；Friday signal 後的 Monday 是 `+1`，不是 calendar `+3`。
+- Reference high 使用 frozen `SignalEvent.reference_high`；case service 不用 chart window 或 future bars 重新計算 prior high。
+- 新增 `src/historical_case_dashboard.py`，集中處理 Historical Cases UI formatter、case request fingerprint、status filter、sort、case selector label、summary table、condition table、snapshot table 與 Altair chart spec。
+- Chart 第一版使用 line chart：analysis close 主線、raw high 淡線、frozen reference high rule、signal date rule、HIT case first-hit point；MISS 不顯示 first-hit marker。
+- Streamlit 新增 `Historical Cases` tab，使用單一 symbol、`technical_example_v1`、`raw_high_breakout_60d_within_20d_v1`、ALLOW_ALL / COOLDOWN、backtest date range 與 pre/post bars。
+- UI 只有按下 `建立歷史案例` 才讀取 historical prices、建立 technical indicators、執行 backtest 與建立 case views；filter、sort、x-axis toggle、case selector、expander 不會重新 fetch / backtest。
+- Case result 只保存在 `st.session_state`；`清除案例結果` 只清 session result，不刪 SQLite price cache 或其他資料。
+- UI 顯示 Historical Hit Rate context、resolved / HIT / MISS / INCOMPLETE counts、overlap policy、cooldown bars、range context、price-basis explanation、condition trace 與 technical snapshot。
+
+### Safety Notes
+
+- Historical Case Explorer 是歷史案例檢視工具，不是 future prediction、similar-case probability、scanner ranking、Buy / Sell / Hold、target price、entry / exit signal、profit guarantee 或交易模擬。
+- `HIT` 只代表指定 HistoricalOutcomeDefinition 在 horizon 內觸發 target event；不代表 profitable trade。
+- `MISS` 只代表完整 horizon 內 target event 未觸發；不代表 losing trade。
+- `INCOMPLETE` 明確保留，不會被畫成 `MISS`。
+- Historical Hit Rate 是 descriptive historical event rate，不是未來發生機率。
+- MFE / MAE / end return 是 close-based historical return metrics，不是實際交易損益。
+- Service 層保留 raw float，百分比與 rounding 只在 UI formatter 處理。
+- Case Explorer 不重新 evaluate signal conditions、不重新 evaluate historical outcomes、不改 threshold、不做 ranking、不抓 OpenAI、不做 full-market scan、不新增 persistence。
+
+### Testing Notes
+
+- 新增 `tests/test_historical_case_service.py`，覆蓋 config validation、actual-bar window、signal-date required、trading-bar relative index、signal marker、analysis close helper、pre/post completeness、HIT marker、MISS no marker、frozen reference high、condition copy-through、snapshot summary、raw metric preservation、oldest-to-newest order、symbol / signal / outcome / identity mismatch、NOT_EVALUABLE window 與 zero-window behavior。
+- 新增 `tests/test_historical_case_dashboard.py`，覆蓋 percentage / price formatting、snapshot percentage formatting、resolved / status filter、sort、neutral selector label、summary rows、condition rows、snapshot rows、request fingerprint、HIT chart layer、MISS no-hit layer、relative-bar axis 與 actual-date axis。
+- 擴充 `tests/test_dashboard.py`，確認 `Historical Cases` tab、explicit `建立歷史案例` submit、session-state result、clear result 與禁止 scanner / buy-sell wording。
+
 ## 2026-08-08 — Sprint 06 Batch E Swing Opportunity Scanner
 
 ### Completed Features

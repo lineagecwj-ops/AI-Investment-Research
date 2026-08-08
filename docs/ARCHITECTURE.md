@@ -59,8 +59,14 @@ technical_indicator_service.py
         SwingScannerResult
         ↓
         future Scanner Dashboard
-        ↓
-        future Historical Case Explorer
+
+backtest_service.py
+    ↓
+    historical_case_service.py
+    ↓
+    historical_case_dashboard.py
+    ↓
+    Streamlit Historical Cases tab
 
 signal_outcome_service.py
     └── TechnicalIndicatorSeries / TechnicalIndicatorSnapshot
@@ -179,6 +185,20 @@ swing_scanner_service.py
     └── Versioned transparent research ranking with rank components and no hidden composite score
     └── No recommendation, buy list, market-wide crawler, dashboard, fundamentals, AI ranking, target price, or transaction simulation
 
+historical_case_service.py
+    └── Deterministic historical case explorer data builder
+    └── HistoricalCaseWindowConfig with pre/post trading-bar windows
+    └── HistoricalCaseView preserving SignalEvent reference levels, HistoricalOutcomeResult status, first hit, MFE, MAE, and end return
+    └── HistoricalCasePricePoint with relative trading-bar indexes and actual OHLCV bars only
+    └── HistoricalCaseConditionDetail copied from frozen signal evaluated conditions
+    └── Requires signal date to exist in price series; no nearest-date lookup, synthetic bars, outcome recalculation, signal recalculation, probability, ranking, or persistence
+
+historical_case_dashboard.py
+    └── Historical Cases presentation helpers
+    └── Case request fingerprinting, status filtering, deterministic sorting, case table rows, condition / snapshot rows, display formatting, and Altair chart specs
+    └── Chart shows analysis close, raw high trace, frozen reference high, signal marker, and first-hit marker only for HIT cases
+    └── No Yahoo fetch, SQLite access, OpenAI calls, signal calculation, outcome calculation, or scanner ranking
+
 symbol_utils.py
     └── Stock symbol normalization
 ```
@@ -212,6 +232,7 @@ Responsibilities:
 - Render grounded follow-up suggestions, explicit follow-up form, current turn, previous-turn research history, and session request/token counters
 - Render grounded findings, selected evidence, limitations, missing data, validation status, and safe provider metadata
 - Reuse existing core services instead of directly accessing Yahoo Finance, SQLite, or JSON
+- Render Historical Cases tab through explicit submit only; keep case report / views in `st.session_state`, and rerender filters, sorting, selected case, x-axis mode, and expanders without refetching or rerunning backtests
 
 ---
 

@@ -214,9 +214,11 @@ A future scanner dashboard can render `SwingScannerResult`, current signal trace
 
 The dashboard must preserve the same wording boundaries: research candidates, not recommendations.
 
-## Future Case Explorer
+## Historical Case Explorer
 
-Future historical case review can use `HistoricalBacktestReport.cases` and case-window helpers from the backtest layer.
+Sprint 06 Batch F now provides a separate Historical Case Explorer on top of `HistoricalBacktestReport.cases`.
+
+The scanner remains a current MATCH candidate foundation. Historical case review is handled separately so scanner ranking does not become case selection, prediction, or recommendation language.
 
 Batch E does not draw charts or retrieve cases in UI.
 
