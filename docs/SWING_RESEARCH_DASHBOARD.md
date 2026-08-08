@@ -11,7 +11,7 @@ The dashboard is a deterministic research interface. It is not an automatic prof
 The intended flow is:
 
 ```text
-User symbols
+Manual Input / Watchlist / Saved Universe
     ↓
 Explicit scanner submit
     ↓
@@ -30,7 +30,15 @@ Historical Cases Preview
 
 ## Scan Setup
 
-The page accepts a caller-provided stock pool through a multi-line text box.
+The page accepts caller-provided symbols from an explicit source selector:
+
+- Manual Input
+- Watchlist
+- Saved Universe
+
+Manual Input remains available and does not require creating a saved Universe.
+
+Saved Universe selection shows the Universe name, symbol count, updated timestamp, and symbol preview. Selecting a Universe does not run the scanner.
 
 Examples:
 
@@ -44,12 +52,29 @@ AAPL
 
 Whitespace, newline, comma, semicolon, Chinese comma, and Chinese semicolon separators are accepted. Pure numeric symbols are normalized through the shared symbol helper, so `2330` becomes `2330.TW`.
 
+Saved Universe and Watchlist sources resolve to normalized symbols before scanning. Empty sources show a prompt and do not run the scanner.
+
 The first version uses:
 
 - Signal Definition: `technical_example_v1`
 - Outcome Definition: `raw_high_breakout_60d_within_20d_v1`
 
 The service does not hard-code the date range. The UI default is `2018-01-01` to `2025-12-31`.
+
+## Source Snapshot and Fingerprint
+
+Swing Research stores scan-time source metadata in session state:
+
+- `symbol_source_type`
+- `source_universe_id`
+- `source_universe_name`
+- `symbols_snapshot`
+
+The displayed result uses this snapshot, so editing or deleting a Universe later does not mutate an existing scan result.
+
+The dashboard fingerprint includes source mode and resolved normalized symbols, not only a Universe id. If a user scans a Universe with two symbols and later edits it to three symbols, the current configuration differs from the stored result and the UI asks the user to scan again.
+
+Switching Manual Input, Watchlist, or Saved Universe does not automatically scan.
 
 ## Current Signal
 

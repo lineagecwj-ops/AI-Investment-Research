@@ -573,6 +573,7 @@ Responsibilities:
 - Return fresh cached historical fundamentals when `fetched_at` is within 7 days
 - Persist daily historical prices in a separate `historical_prices` table
 - Persist price-history coverage metadata in `historical_price_fetch_state`
+- Persist saved research universes in `research_universes` and ordered membership in `research_universe_symbols`
 - Return fresh cached historical prices when requested rows are within 12 hours and range coverage is sufficient
 - Preserve stale historical cache rows if Yahoo refresh fails
 - Keep SQL persistence details outside `main.py` and `models.py`
@@ -586,6 +587,32 @@ Responsibilities:
 - Persist Watchlist data in `data/watchlist.json`
 - Add, remove, and list normalized stock symbols
 - Handle missing, empty, or invalid watchlist files safely
+
+---
+
+### universe_service.py
+
+Responsibilities:
+
+- Persist multiple named research Universes in SQLite
+- Keep Universe separate from Watchlist
+- Validate required names, optional descriptions, stable ids, timestamps, and symbol membership
+- Normalize and dedupe symbols with first-seen order preservation
+- Provide create, get, list, update, delete, add, remove, and replace APIs
+- Use transactions for multi-table writes
+- Raise domain errors instead of raw SQLite errors for user-facing workflows
+- Never call Yahoo Finance, OpenAI, scanner, backtest, or AI services during CRUD
+
+---
+
+### universe_dashboard.py
+
+Responsibilities:
+
+- Parse Universe symbol text with the shared normalization path
+- Build Universe labels, source snapshots, and source/content fingerprints
+- Keep Streamlit formatting helpers separate from SQLite and network access
+- Preserve scan-time symbol snapshots for Manual Input, Watchlist, and Saved Universe sources
 
 ---
 
@@ -610,6 +637,7 @@ Responsibilities:
     - HistoricalFinancialSeries
     - HistoricalPriceBar
     - HistoricalPriceSeries
+    - ResearchUniverse
 
 ### research_metrics.py
 
@@ -788,6 +816,46 @@ app.py
    ▼
 Display / Query selected symbols through stock_service.py
 ```
+
+## Research Universe Flow
+
+```
+User
+   │
+   ▼
+app.py Universes tab
+   │
+   ▼
+universe_dashboard.py
+   │
+   ▼
+universe_service.py
+   │
+   ▼
+SQLite research_universes / research_universe_symbols
+```
+
+Universe CRUD is local-only and does not call Yahoo Finance, OpenAI, scanner, backtest, or signal services.
+
+## Swing Research Source Flow
+
+```
+Manual Input / Watchlist / Saved Universe
+   │
+   ▼
+Source resolver in app.py
+   │
+   ▼
+scan-time normalized symbols snapshot
+   │
+   ▼
+SwingScannerService
+   │
+   ▼
+SwingScannerResult + source metadata in session state
+```
+
+Watchlist, Universe, and scanner result are separate state concepts. A saved Universe is only a research symbol collection; membership does not imply recommendation, bullishness, prediction, or higher historical hit rate. Scanner result identity includes source mode and resolved symbols, so editing Universe membership after a scan marks the current configuration as different without mutating the stored result.
 
 ---
 

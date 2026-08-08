@@ -1,5 +1,33 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 07 Batch B Universe Management
+
+### Completed Features
+
+- 新增 frozen `ResearchUniverse` domain model，包含 stable `id`、required `name`、optional `description`、ordered normalized `symbols`、UTC `created_at` / `updated_at` 與 `symbol_count`。
+- 新增 SQLite tables：`research_universes` 與 `research_universe_symbols`，由 `initialize_database()` additive 建立，並以 `position` 保存使用者 symbol order。
+- 新增 `src/universe_service.py`，集中 Universe CRUD、domain validation、case-insensitive duplicate name rejection、transactional multi-table writes、explicit membership delete 與 corruption checks。
+- 新增 `src/universe_dashboard.py`，集中 symbol text parser、Universe labels、source snapshot、content fingerprint 與 form helper；不含 SQL、Yahoo、OpenAI 或 scanner calls。
+- Streamlit 新增 `Universes` tab，可建立、編輯、刪除自訂研究股票池；刪除需明確勾選確認。
+- Swing Research `Scan Setup` 新增 `Symbol Source`，支援 Manual Input、Watchlist、Saved Universe；Manual Input 保留原本 multi-line workflow。
+- Swing Research 保存 scan-time source snapshot，包含 source type、Universe id/name 與當次 normalized symbols，避免 Universe 編輯或刪除後改寫舊結果。
+- Scan fingerprint 加入 source mode 與 resolved normalized symbols，Universe membership 改變後會提示目前設定與已存結果不同。
+
+### Safety Notes
+
+- Universe 與 Watchlist 分離：Watchlist 是單一個人觀察清單，Universe 是多個命名 research symbol collections。
+- Universe membership 不代表看多、推薦、Buy list、AI 選股、預測上漲或較高勝率。
+- Universe CRUD 全程 local-only，不呼叫 Yahoo Finance、OpenAI、scanner、backtest、signal 或 outcome services。
+- Empty Universe 允許保存，但 Swing Research 不會對 zero-symbol Universe 執行 scanner。
+- 本 Batch 不新增全市場 crawler、built-in index universe、自動產業分類、AI Universe generation、CSV export、定時掃描或 alerts。
+- 未修改 `swing_research_rank_v1`、`technical_example_v1`、`raw_high_breakout_60d_within_20d_v1` 或 Historical Hit Rate denominator。
+
+### Testing Notes
+
+- 新增 `tests/test_universe_service.py`，覆蓋 table creation、create/read/list/update/add/remove/replace/delete、empty universe、duplicate name、timestamp stability、symbol normalization / dedupe / order、cascade cleanup、not found、validation 與 corrupt data detection。
+- 新增 `tests/test_universe_dashboard.py`，覆蓋 parser、labels、updated-at formatting、source snapshot、source/content fingerprint、form defaults、large-universe warning helper 與 length helper。
+- 擴充 `tests/test_database.py`、`tests/test_swing_research_dashboard.py` 與 `tests/test_dashboard.py`，確認 Universe tables、source-mode fingerprint、content-change fingerprint、Swing Research source selector 與 Universe management entry。
+
 ## 2026-08-08 — Sprint 07 Batch A Swing Research Dashboard Integration
 
 ### Completed Features
