@@ -120,11 +120,47 @@ class TaiwanCompanyNameServiceTestCase(unittest.TestCase):
         )
         clear_company_name_memory_cache()
 
-        with patch("company_name_service.request_json") as mock_request:
-            self.assertEqual(
-                get_localized_company_name("2454.TW", self.cache_path),
-                "聯發科",
-            )
+        # Keep the freshness read on the same deterministic clock as the cache write.
+        with patch("company_name_service.utc_now", return_value=self.now):
+            with patch("company_name_service.request_json") as mock_request:
+                self.assertEqual(
+                    get_localized_company_name("2454.TW", self.cache_path),
+                    "聯發科",
+                )
+
+        mock_request.assert_not_called()
+
+    def test_stale_cache_refreshes_official_sources(self):
+        load_taiwan_company_names(
+            cache_path=self.cache_path,
+            fetch_json=self.fake_official_response,
+            now=self.now,
+        )
+        clear_company_name_memory_cache()
+
+        with patch("company_name_service.utc_now", return_value=self.now.replace(day=9)):
+            with patch("company_name_service.request_json", side_effect=self.fake_official_response) as mock_request:
+                self.assertEqual(
+                    get_localized_company_name("2454.TW", self.cache_path),
+                    "聯發科",
+                )
+
+        self.assertEqual(mock_request.call_count, 2)
+
+    def test_fresh_cache_uses_deterministic_clock_before_ttl(self):
+        load_taiwan_company_names(
+            cache_path=self.cache_path,
+            fetch_json=self.fake_official_response,
+            now=self.now,
+        )
+        clear_company_name_memory_cache()
+
+        with patch("company_name_service.utc_now", return_value=self.now.replace(minute=30)):
+            with patch("company_name_service.request_json") as mock_request:
+                self.assertEqual(
+                    get_localized_company_name("2454.TW", self.cache_path),
+                    "聯發科",
+                )
 
         mock_request.assert_not_called()
 
