@@ -50,6 +50,7 @@ from swing_research_dashboard import build_scan_summary_rows
 from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_technical_snapshot_rows
 from swing_research_dashboard import build_walk_forward_outcome_count_rows
+from swing_research_dashboard import build_replay_analytics_candidate_set_rows
 from swing_research_dashboard import build_walk_forward_summary_rows
 from swing_research_dashboard import build_walk_forward_symbol_summary_rows
 from swing_research_dashboard import build_walk_forward_timeline_rows
@@ -716,11 +717,12 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(
             labels,
             [
-                "Replay Periods",
-                "Periods With MATCH",
-                "Periods Without MATCH",
-                "Candidate Occurrences",
+                "Total Replay Periods",
+                "Periods With Candidates",
+                "Periods Without Candidates",
                 "Unique Candidate Symbols",
+                "Total Candidate Occurrences",
+                "Candidate Period Share",
             ],
         )
         self.assertNotIn("Prediction Accuracy", labels)
@@ -729,16 +731,15 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         rows = build_walk_forward_outcome_count_rows(self.walk_forward_result())
         labels = [row["Metric"] for row in rows]
 
-        self.assertIn("Post-Replay HIT Occurrences", labels)
-        self.assertIn("MISS Occurrences", labels)
+        self.assertIn("Post-Replay HIT", labels)
+        self.assertIn("Post-Replay MISS", labels)
         self.assertNotIn("Walk-Forward Hit Rate", labels)
 
     def test_walk_forward_timeline_rows_show_period_counts_and_candidates(self):
         rows = build_walk_forward_timeline_rows(self.walk_forward_result())
 
         self.assertEqual(rows[0]["Replay Date"], "2024-01-31")
-        self.assertEqual(rows[0]["Scanned"], 2)
-        self.assertEqual(rows[0]["MATCH"], 1)
+        self.assertEqual(rows[0]["Candidates"], 1)
         self.assertEqual(rows[0]["NO_MATCH"], 1)
         self.assertEqual(rows[0]["Candidate Symbols"], "AAPL")
         self.assertEqual(rows[1]["Candidate Symbols"], "AAPL, MSFT")
@@ -754,10 +755,21 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         self.assertEqual(aapl["Symbol"], "AAPL")
         self.assertEqual(aapl["Candidate Occurrences"], 2)
-        self.assertEqual(aapl["First Seen"], "2024-01-31")
-        self.assertEqual(aapl["Last Seen"], "2024-02-29")
+        self.assertEqual(aapl["Candidate Period Share"], "100.00%")
+        self.assertEqual(aapl["First Appearance"], "2024-01-31")
+        self.assertEqual(aapl["Last Appearance"], "2024-02-29")
+        self.assertEqual(aapl["Longest Consecutive Periods"], 2)
         self.assertIn("Post-Replay HIT", aapl)
         self.assertNotIn("Hit Probability", aapl)
+
+    def test_walk_forward_candidate_set_stability_rows_are_descriptive(self):
+        rows = build_replay_analytics_candidate_set_rows(self.walk_forward_result())
+
+        self.assertEqual(rows[0]["Previous Replay Date"], "2024-01-31")
+        self.assertEqual(rows[0]["Current Replay Date"], "2024-02-29")
+        self.assertEqual(rows[0]["Shared Candidates"], 1)
+        self.assertEqual(rows[0]["Candidate Set Similarity"], "50.00%")
+        self.assertEqual(rows[0]["Candidate Set Turnover"], "50.00%")
 
     def test_candidate_selector_shows_hit_rate_and_resolved_n(self):
         self.assertEqual(
