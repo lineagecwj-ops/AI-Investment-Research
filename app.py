@@ -2009,6 +2009,8 @@ def render_swing_research_result(result, source_context=None) -> None:
     for col, row in zip(summary_cols, swing_dashboard.build_scan_summary_rows(result)):
         col.metric(row["Metric"], row["Value"])
 
+    render_swing_technical_condition_detail(result)
+
     if result.failed_symbols:
         with st.expander("掃描失敗的股票", expanded=False):
             st.dataframe(swing_dashboard.build_failure_rows(result), width="stretch", hide_index=True)
@@ -2046,6 +2048,69 @@ def render_swing_research_result(result, source_context=None) -> None:
     selected_label = st.selectbox("選擇研究候選", candidate_labels)
     selected_candidate = result.matched_candidates[candidate_labels.index(selected_label)]
     render_swing_candidate_detail(selected_candidate)
+
+
+def render_swing_technical_condition_detail(result) -> None:
+    st.markdown("### 技術條件明細")
+    st.caption(swing_dashboard.TECHNICAL_DETAIL_CAPTION)
+    detail_matches = swing_dashboard.technical_detail_selector_matches(result)
+    if not detail_matches:
+        st.info("本次掃描沒有可顯示完整技術條件的股票。資料不足或掃描失敗的股票不會被顯示成完整技術評估。")
+        return
+
+    detail_labels = [
+        swing_dashboard.technical_detail_selector_label(signal_match)
+        for signal_match in detail_matches
+    ]
+    selected_label = st.selectbox("查看股票技術狀態", detail_labels, key="swing_technical_detail_selector")
+    selected_match = detail_matches[detail_labels.index(selected_label)]
+    detail = swing_dashboard.build_technical_condition_detail_view(selected_match)
+
+    st.markdown(f"#### {selected_match.symbol}｜目前技術狀態")
+    st.metric("符合技術條件", f"{detail.matched_count} / {detail.total_count}")
+    st.caption("這只是本次掃描條件符合項數，不是股票分數、勝率或推薦。")
+
+    category_cols = st.columns(4)
+    for col, row in zip(category_cols, detail.category_rows):
+        col.metric(row["分類"], row["狀態"])
+        col.caption(row["說明"])
+
+    st.dataframe(
+        pd.DataFrame(detail.condition_rows).astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+
+    visual_df = pd.DataFrame(detail.visualization_rows)
+    if not visual_df.empty:
+        st.markdown("#### 視覺化理解")
+        chart = (
+            alt.Chart(visual_df)
+            .mark_tick(thickness=3, size=28)
+            .encode(
+                x=alt.X("數值:Q", title="目前值與 V1 門檻"),
+                y=alt.Y("指標:N", title=None),
+                color=alt.Color("標記:N", title="標記"),
+                tooltip=["指標", "標記", "說明", "備註"],
+            )
+        )
+        st.altair_chart(chart, width="stretch")
+
+    with st.expander("這些指標代表什麼？", expanded=False):
+        st.dataframe(
+            pd.DataFrame(swing_dashboard.build_beginner_indicator_explanations()).astype(str),
+            width="stretch",
+            hide_index=True,
+        )
+
+    with st.expander("進階／開發者資訊", expanded=False):
+        st.write(f"Signal Definition ID：{selected_match.signal_id}")
+        st.write(f"Scanner Status：{selected_match.status.value}")
+        st.dataframe(
+            pd.DataFrame(swing_dashboard.build_technical_condition_developer_rows(selected_match)).astype(str),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def render_swing_candidate_detail(candidate) -> None:
