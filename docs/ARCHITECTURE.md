@@ -2,7 +2,7 @@
 
 ## Version
 
-v0.12
+v0.13
 
 ---
 
@@ -61,6 +61,32 @@ technical_indicator_service.py
         swing_research_dashboard.py
         ↓
         Streamlit Swing Research tab
+
+historical_replay_service.py
+    └── Full HistoricalPriceSeries
+        ↓
+        slice_price_series_as_of(replay_date)
+        ↓
+        Replay TechnicalIndicatorSeries / latest snapshot
+        ↓
+        Replay SignalMatch
+        ↓
+        PointInTimeBacktestSummary
+        ↓
+        HistoricalReplayCandidate / HistoricalReplayResult
+        ↓
+        swing_research_dashboard.py
+        ↓
+        Streamlit Swing Research Historical Replay mode
+
+historical_replay_service.py post-replay verification
+    └── Full HistoricalPriceSeries
+        ↓
+        Replay-day frozen SignalEvent
+        ↓
+        HistoricalOutcomeResult
+        ↓
+        Separate Post-Replay Outcome block
 
 backtest_service.py
     ↓
@@ -204,6 +230,18 @@ swing_research_dashboard.py
     └── Multi-line stock-pool parsing, scan fingerprinting, display formatters, scan summary rows, candidate table rows, condition trace rows, technical snapshot rows, NO_MATCH / NOT_EVALUABLE / failure rows, and case preview helpers
     └── Builds HistoricalCaseView preview only from candidate HistoricalBacktestReport plus scan-time session price-series cache
     └── No Yahoo fetch, SQLite access, OpenAI calls, scanner execution, backtest execution, signal recalculation, outcome recalculation, recommendation, probability, fundamentals, or persistence
+
+historical_replay_service.py
+    └── Deterministic single-date Historical As-Of Scan / Replay Mode
+    └── HistoricalReplayConfig with replay date, signal / outcome definitions, overlap policy, cooldown, historical start, and preferred resolved samples
+    └── Per-symbol replay flow: full price history, as-of price slicing, replay technical snapshot, replay signal evaluation
+    └── Actual trading date is per symbol and equals the latest bar on or before requested replay date
+    └── PointInTimeBacktestSummary filters historical outcomes by what was knowable at replay date
+    └── Early HIT can enter resolved denominator once target-hit date is known
+    └── MISS, MFE, MAE, and End Return require the full trading-bar horizon to have completed by replay date
+    └── Post-Replay Outcome is stored separately for historical verification only
+    └── Reuses swing_research_rank_v1 with point-in-time inputs only
+    └── No probability, AI prediction, optimization, walk-forward batch, full-market crawler, or persistence
 
 historical_case_service.py
     └── Deterministic historical case explorer data builder

@@ -1,5 +1,47 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 07 Batch C Historical As-Of Replay
+
+### Completed Features
+
+- 新增 `src/historical_replay_service.py`，提供 deterministic single-date Historical Replay scan。
+- 新增 frozen `HistoricalReplayConfig`，保存 replay date、signal / outcome definition、overlap policy、cooldown、historical start date 與 preferred resolved samples。
+- Replay service 接受 caller 已解析的 symbols，不負責 Manual / Watchlist / Saved Universe source resolution。
+- Replay Date 是使用者指定的 calendar date；Actual Trading Date 是每支股票 `trading_date <= replay_date` 的最新 available bar。
+- Replay signal path 使用 `slice_price_series_as_of()` 後的 price series 重建 technical indicators，避免 future bars 影響 replay signal。
+- 新增 `PointInTimeBacktestSummary`：HIT 只在 first target-hit date 已知時進 denominator；MISS 只在完整 trading-bar horizon 已完成時進 denominator；MFE / MAE / End Return 只使用完整 horizon 已知的 cases。
+- Replay MATCH candidate 另建 `post_replay_outcome`，只作為事後驗證，不進入 Historical Hit Rate (As Of)、Resolved n (As Of)、SampleSizeStatus 或 Research Priority。
+- Swing Research 增加 `Scan Mode`：Current / Historical Replay，Replay mode 使用明確 `Replay Date` 與 `執行 Replay Scan`。
+
+### Design Notes
+
+- Replay 比單純 date slicing 更難，因為 historical statistics 自身也會洩漏未來。
+- Early HIT 已經可以知道 outcome status，但完整 horizon 前的 MFE / MAE / End Return 仍不可用。
+- MISS 不能靠 today full-history 倒灌；必須等 replay date 當時已經走完整個 trading-bar horizon。
+- Ranking reuse `swing_research_rank_v1` 是可行的，但 rank inputs 必須全部來自 point-in-time summary。
+- Post-Replay Outcome 是「回放後實際結果」，不是 prediction result 或系統預測成功。
+
+### Modified / Added Files
+
+- 新增 `src/historical_replay_service.py`
+- 新增 `tests/test_historical_replay_service.py`
+- 新增 `docs/HISTORICAL_REPLAY_MODE.md`
+- 修改 `app.py`
+- 修改 `src/swing_research_dashboard.py`
+- 修改 `tests/test_swing_research_dashboard.py`
+- 修改 `tests/test_dashboard.py`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/SWING_RESEARCH_DASHBOARD.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- 本批只支援 single-date replay。
+- 尚未做 monthly / daily walk-forward replay。
+- 尚未做 replay result persistence、DB schema、alert、AI prediction、parameter optimization 或 full market crawler。
+- Replay outcome chart 目前先以獨立 Post-Replay Outcome block 呈現；未來可補 chart，但不得讓 future bars 影響 replay signal / ranking。
+
 ## 2026-08-08 — Sprint 07 Batch B Universe Management
 
 ### Completed Features

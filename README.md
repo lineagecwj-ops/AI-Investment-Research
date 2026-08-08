@@ -101,7 +101,7 @@ Dashboard 目前提供：
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
-- `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols，顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率或交易指令。
+- `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols。Current Scan 顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。Historical Replay 讓使用者指定單一 Replay Date，顯示 Requested Replay Date、各 symbol 的 Actual Trading Date、Historical Hit Rate (As Of) 與獨立的 Post-Replay Outcome 事後驗證。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率或交易指令。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
@@ -127,6 +127,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical backtest aggregation：`src/backtest_service.py`
 - Swing opportunity scanner foundation：`src/swing_scanner_service.py`
 - Historical case explorer：`src/historical_case_service.py`、`src/historical_case_dashboard.py`
+- Historical replay mode：`src/historical_replay_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -142,6 +143,7 @@ Swing Opportunity Scanner 詳見 `docs/SWING_OPPORTUNITY_SCANNER.md`。
 Historical Case Explorer 詳見 `docs/HISTORICAL_CASE_EXPLORER.md`。
 Swing Research Dashboard 詳見 `docs/SWING_RESEARCH_DASHBOARD.md`。
 Universe Management 詳見 `docs/UNIVERSE_MANAGEMENT.md`。
+Historical Replay Mode 詳見 `docs/HISTORICAL_REPLAY_MODE.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -212,6 +214,14 @@ Sprint 07 Batch A 新增 deterministic Swing Research Dashboard integration。
 Scanner 只在使用者按下 `執行波段掃描` 時執行。候選選取、case preview filter、case selection、expander 與 Streamlit rerun 都只重 render `swing_research_*` session state，不會重新抓 Yahoo 或 rerun scanner。
 
 Historical Hit Rate 必須和 Resolved Samples 一起閱讀。它是歷史條件事件比例，不是未來發生機率、confidence、likelihood、AI prediction 或投資建議。Research Priority 是研究檢視順序，不是 recommendation 或交易排序。
+
+## Historical Replay Mode
+
+Sprint 07 Batch C 新增 deterministic Historical As-Of Scan / Replay Mode。
+
+Replay Mode 使用使用者指定的 calendar Replay Date，但每支股票保存自己的 Actual Trading Date，也就是 `trading_date <= replay_date` 的最新可用交易日。Replay signal 只從 as-of sliced price series 重建 technical snapshot；Replay 當時可知的 historical statistics 只包含 replay date 以前已知的 outcomes。Early HIT 可以進入 resolved denominator；MISS 與 MFE / MAE / End Return 必須等完整 trading-bar horizon 已在 replay date 前走完。
+
+Post-Replay Outcome 是獨立事後驗證區塊，不會進入 Research Priority、Historical Hit Rate (As Of)、sample-size status 或其他 ranking inputs。本功能不做 probability、AI prediction、parameter optimization、multi-date walk-forward 或 full market crawler。
 
 ## Universe Management
 

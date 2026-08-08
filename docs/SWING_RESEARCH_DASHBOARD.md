@@ -6,6 +6,8 @@ Sprint 07 Batch A adds a Streamlit `Swing Research` dashboard workflow that inte
 
 The dashboard is a deterministic research interface. It is not an automatic profitable stock finder, recommendation system, trading signal, future probability model, AI ranker, or portfolio execution tool.
 
+Sprint 07 Batch C adds `Historical Replay` as a second scan mode inside the same page. It is a single-date as-of replay workflow, not walk-forward validation or replay performance scoring.
+
 ## Daily Workflow
 
 The intended flow is:
@@ -26,6 +28,26 @@ HistoricalBacktestReport
 HistoricalCaseService
     ↓
 Historical Cases Preview
+```
+
+Historical Replay flow:
+
+```text
+Scan Mode: Historical Replay
+    ↓
+Replay Date + Manual Input / Watchlist / Saved Universe
+    ↓
+Explicit replay submit
+    ↓
+HistoricalReplayResult
+    ↓
+Replay Candidate Table
+    ↓
+Signal Snapshot As Of
+    ↓
+Historical Context Available As Of Replay Date
+    ↓
+Separate Post-Replay Outcome verification
 ```
 
 ## Scan Setup
@@ -61,6 +83,8 @@ The first version uses:
 
 The service does not hard-code the date range. The UI default is `2018-01-01` to `2025-12-31`.
 
+Historical Replay uses `Replay Date` instead of Current Scan's backtest end date. Its historical start date defaults to `2018-01-01`, and each symbol resolves its own actual trading date on or before the requested replay date.
+
 ## Source Snapshot and Fingerprint
 
 Swing Research stores scan-time source metadata in session state:
@@ -74,7 +98,11 @@ The displayed result uses this snapshot, so editing or deleting a Universe later
 
 The dashboard fingerprint includes source mode and resolved normalized symbols, not only a Universe id. If a user scans a Universe with two symbols and later edits it to three symbols, the current configuration differs from the stored result and the UI asks the user to scan again.
 
+The fingerprint also includes `scan_mode`. In Historical Replay it includes `replay_date`; in Current mode it does not.
+
 Switching Manual Input, Watchlist, or Saved Universe does not automatically scan.
+
+Switching between Current and Historical Replay does not automatically scan. If a stored result came from another mode, the UI displays a mode mismatch warning.
 
 ## Current Signal
 
@@ -88,6 +116,19 @@ For a selected candidate, the dashboard shows:
 - condition trace copied from `candidate.signal_match`
 
 The condition trace is not recalculated in the dashboard.
+
+## Historical Replay Signal
+
+Replay signal is displayed as `Signal Snapshot As Of`, not `Current Signal`.
+
+The page shows both:
+
+- Requested Replay Date
+- Actual Trading Date
+
+The actual date can differ by symbol because market calendars differ.
+
+Replay signal features come from a technical series rebuilt from price bars on or before the replay date.
 
 ## Technical Snapshot
 
@@ -136,6 +177,17 @@ The dashboard must show Historical Hit Rate together with Resolved Samples. If t
 
 Historical Hit Rate is not future probability, expected chance, confidence, likelihood, prediction, or recommendation.
 
+## Historical Context As Of
+
+Replay mode displays `Historical Hit Rate (As Of)` and `Resolved n (As Of)`.
+
+These values are built from point-in-time historical statistics:
+
+- HIT is counted only when its first target-hit date was known by the replay date.
+- MISS is counted only when the full trading-bar horizon had completed by the replay date.
+- MFE, MAE, and End Return are aggregated only from cases whose full horizon had completed by the replay date.
+- Future signal dates are excluded from replay historical context.
+
 ## Resolved Samples
 
 Resolved Samples are `HIT + MISS`.
@@ -153,6 +205,8 @@ This does not mean low confidence or unreliable. It only means the resolved samp
 Candidate rows preserve the scanner service order and display it as `Research Priority`.
 
 Research Priority is inspection order. It is not a recommendation, score, expected-return rank, or trading instruction.
+
+In Historical Replay, Research Priority reuses `swing_research_rank_v1`, but the rank inputs are point-in-time values only. Post-Replay Outcome is not a rank input.
 
 ## Sample-Size Tiers
 
@@ -203,6 +257,8 @@ The preview shows counts for:
 
 The default filter is `Resolved`, which includes both HIT and MISS. Users can also filter to HIT or MISS. The preview limits rows to the latest five cases to avoid rendering too many charts.
 
+Historical Replay currently renders post-replay verification as a separate outcome block. Future work can add a replay outcome case chart while preserving the rule that future bars are not used for the replay signal or ranking.
+
 ## HIT / MISS Semantics
 
 `HIT` means the configured historical outcome target occurred within the configured horizon.
@@ -235,6 +291,8 @@ Latest daily bar may be provisional if the trading session is not complete.
 
 The dashboard does not display future probability, calibrated probability, expected chance, confidence, likelihood, or AI prediction.
 
+Historical Replay uses `Historical Hit Rate (As Of)` and `Post-Replay Outcome`; it does not use `Replay Probability` or `Prediction Result`.
+
 Future calibrated probability would require separate out-of-sample validation and calibration work.
 
 ## No Recommendation
@@ -255,12 +313,15 @@ All Swing Research state uses the `swing_research_*` namespace:
 - `swing_research_config_fingerprint`
 - `swing_research_last_error`
 - `swing_research_price_series_by_symbol`
+- `swing_research_source_context`
+- `swing_research_result_mode`
+- `swing_research_replay_date`
 
 No SQLite persistence is added.
 
 ## Rerun Safety
 
-Only pressing `執行波段掃描` runs the scanner and loads prices.
+Only pressing `執行波段掃描` or `執行 Replay Scan` runs the scanner / replay service and loads prices.
 
 These actions only rerender existing session results:
 
