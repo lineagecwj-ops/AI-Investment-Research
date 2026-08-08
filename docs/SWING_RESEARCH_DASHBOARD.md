@@ -6,7 +6,9 @@ Sprint 07 Batch A adds a Streamlit `Swing Research` dashboard workflow that inte
 
 The dashboard is a deterministic research interface. It is not an automatic profitable stock finder, recommendation system, trading signal, future probability model, AI ranker, or portfolio execution tool.
 
-Sprint 07 Batch C adds `Historical Replay` as a second scan mode inside the same page. It is a single-date as-of replay workflow, not walk-forward validation or replay performance scoring.
+Sprint 07 Batch C adds `Historical Replay` as a second scan mode inside the same page. It is a single-date as-of replay workflow.
+
+Sprint 07 Batch D adds `Walk-Forward Replay` as a third scan mode. It repeats Single-Date Historical Replay across a date schedule and reports descriptive period / occurrence counts. It is not walk-forward prediction accuracy, strategy validation, or replay performance scoring.
 
 ## Daily Workflow
 
@@ -50,6 +52,26 @@ Historical Context Available As Of Replay Date
 Separate Post-Replay Outcome verification
 ```
 
+Walk-Forward Replay flow:
+
+```text
+Scan Mode: Walk-Forward Replay
+    ↓
+Start Date + End Date + Frequency + Source
+    ↓
+Explicit walk-forward submit
+    ↓
+WalkForwardReplayResult
+    ↓
+Period Timeline
+    ↓
+Candidate Frequency
+    ↓
+Selected Replay Period
+    ↓
+Single-Date Historical Replay result detail
+```
+
 ## Scan Setup
 
 The page accepts caller-provided symbols from an explicit source selector:
@@ -85,6 +107,8 @@ The service does not hard-code the date range. The UI default is `2018-01-01` to
 
 Historical Replay uses `Replay Date` instead of Current Scan's backtest end date. Its historical start date defaults to `2018-01-01`, and each symbol resolves its own actual trading date on or before the requested replay date.
 
+Walk-Forward Replay uses `Start Date`, `End Date`, `Frequency`, and `Historical Start`. The default frequency is `MONTHLY`. The user must press `執行 Walk-Forward Replay`; changing dates, frequency, period selector, or table state does not run the workflow.
+
 ## Source Snapshot and Fingerprint
 
 Swing Research stores scan-time source metadata in session state:
@@ -98,11 +122,11 @@ The displayed result uses this snapshot, so editing or deleting a Universe later
 
 The dashboard fingerprint includes source mode and resolved normalized symbols, not only a Universe id. If a user scans a Universe with two symbols and later edits it to three symbols, the current configuration differs from the stored result and the UI asks the user to scan again.
 
-The fingerprint also includes `scan_mode`. In Historical Replay it includes `replay_date`; in Current mode it does not.
+The fingerprint also includes `scan_mode`. In Historical Replay it includes `replay_date`; in Walk-Forward Replay it includes frequency, replay date range, historical start, and source symbols.
 
 Switching Manual Input, Watchlist, or Saved Universe does not automatically scan.
 
-Switching between Current and Historical Replay does not automatically scan. If a stored result came from another mode, the UI displays a mode mismatch warning.
+Switching between Current, Historical Replay, and Walk-Forward Replay does not automatically scan. If a stored result came from another mode, the UI displays a mode mismatch warning.
 
 ## Current Signal
 
@@ -258,6 +282,53 @@ The preview shows counts for:
 The default filter is `Resolved`, which includes both HIT and MISS. Users can also filter to HIT or MISS. The preview limits rows to the latest five cases to avoid rendering too many charts.
 
 Historical Replay renders post-replay verification as a separate outcome block and a single Replay Outcome Case Chart. The chart can contain future bars after the signal date, but those bars are not used for the replay signal or ranking.
+
+## Walk-Forward Summary
+
+Walk-Forward Replay displays:
+
+- Replay Periods
+- Periods With MATCH
+- Periods Without MATCH
+- Candidate Occurrences
+- Unique Candidate Symbols
+- Post-Replay outcome occurrence counts
+
+It intentionally does not display Walk-Forward Hit Rate, Win Rate, Prediction Accuracy, or Probability.
+
+## Period Timeline
+
+The period timeline shows:
+
+- Replay Date
+- Scanned
+- MATCH
+- NO_MATCH
+- NOT_EVALUABLE
+- FAILED
+- Candidate Symbols
+
+Zero-match periods are preserved and shown as normal periods.
+
+## Period Detail
+
+Selecting a period reuses the Single-Date Historical Replay result UI. The dashboard does not recompute signal logic or historical statistics in the walk-forward layer.
+
+If a period has zero MATCH candidates, the UI shows that no symbols matched for that replay period.
+
+## Candidate Frequency
+
+Candidate Frequency shows repeated candidate occurrences by symbol:
+
+- Symbol
+- Candidate Occurrences
+- First Seen
+- Last Seen
+- Post-Replay HIT
+- MISS
+- INCOMPLETE
+
+The table is occurrence-based and must not be read as independent-sample probability.
 
 ## HIT / MISS Semantics
 

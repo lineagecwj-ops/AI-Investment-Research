@@ -101,7 +101,7 @@ Dashboard 目前提供：
 - `Research`：單一股票研究頁，依照 Company Overview、Profitability、Growth、Financial Health、Valuation、Market Position、Risk Signals、Research Next Steps 整理 fundamental snapshot。
 - `Historical Trends`：單一股票年度歷史趨勢頁，呈現 Revenue、Earnings / EPS、Margins、Cash Flow、Financial Position、deterministic historical interpretation 與完整 historical table。
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
-- `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols。Current Scan 顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。Historical Replay 讓使用者指定單一 Replay Date，顯示 Requested Replay Date、各 symbol 的 Actual Trading Date、Historical Hit Rate (As Of) 與獨立的 Post-Replay Outcome 事後驗證。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率或交易指令。
+- `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols。Current Scan 顯示 current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。Historical Replay 讓使用者指定單一 Replay Date，顯示 Requested Replay Date、各 symbol 的 Actual Trading Date、Historical Hit Rate (As Of) 與獨立的 Post-Replay Outcome 事後驗證。Walk-Forward Replay 會依 Monthly 或 Weekly schedule 重複執行 Single-Date Historical Replay，顯示 period timeline、candidate occurrence counts 與 repeated candidate frequency。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率、prediction accuracy 或交易指令。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
@@ -128,6 +128,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Swing opportunity scanner foundation：`src/swing_scanner_service.py`
 - Historical case explorer：`src/historical_case_service.py`、`src/historical_case_dashboard.py`
 - Historical replay mode：`src/historical_replay_service.py`
+- Walk-forward replay mode：`src/walk_forward_replay_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -144,6 +145,7 @@ Historical Case Explorer 詳見 `docs/HISTORICAL_CASE_EXPLORER.md`。
 Swing Research Dashboard 詳見 `docs/SWING_RESEARCH_DASHBOARD.md`。
 Universe Management 詳見 `docs/UNIVERSE_MANAGEMENT.md`。
 Historical Replay Mode 詳見 `docs/HISTORICAL_REPLAY_MODE.md`。
+Walk-Forward Replay 詳見 `docs/WALK_FORWARD_REPLAY.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -222,6 +224,14 @@ Sprint 07 Batch C 新增 deterministic Historical As-Of Scan / Replay Mode。
 Replay Mode 使用使用者指定的 calendar Replay Date，但每支股票保存自己的 Actual Trading Date，也就是 `trading_date <= replay_date` 的最新可用交易日。Replay signal 只從 as-of sliced price series 重建 technical snapshot；Replay 當時可知的 historical statistics 只包含 replay date 以前已知的 outcomes。Early HIT 可以進入 resolved denominator；MISS 與 MFE / MAE / End Return 必須等完整 trading-bar horizon 已在 replay date 前走完。
 
 Post-Replay Outcome 是獨立事後驗證區塊，不會進入 Research Priority、Historical Hit Rate (As Of)、sample-size status 或其他 ranking inputs。本功能不做 probability、AI prediction、parameter optimization、multi-date walk-forward 或 full market crawler。
+
+## Walk-Forward Replay
+
+Sprint 07 Batch D 新增 Multi-Date Walk-Forward Replay。
+
+Walk-Forward Replay 使用日期產生器建立 Monthly 或 Weekly requested replay dates，並對每一期完整重用 Single-Date `HistoricalReplayService`。Monthly 使用 calendar month end；Weekly 使用 Friday；actual trading date 仍由每支股票在單期 replay 中各自決定。
+
+Walk-forward 結果保存 period timeline、每期 MATCH / NO_MATCH / NOT_EVALUABLE / FAILED counts、candidate occurrences、unique candidate symbols、Post-Replay outcome occurrence counts 與 per-symbol repeated candidate summary。同一 symbol 可在多期重複出現，這些 candidate occurrences 是相關觀察，不是獨立樣本，因此本層不提供 aggregate hit-rate、probability、prediction accuracy 或 trading P&L。
 
 ## Universe Management
 

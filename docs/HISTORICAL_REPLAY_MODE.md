@@ -8,7 +8,7 @@ Historical Replay Mode lets the user choose one Replay Date and asks:
 If this Swing Research system had been run as of that date, which supplied symbols would have been MATCH?
 ```
 
-This is deterministic historical research. It is not future probability, AI prediction, parameter optimization, walk-forward validation, recommendation, or trading simulation.
+This is deterministic historical research. It is not future probability, AI prediction, parameter optimization, recommendation, or trading simulation.
 
 ## Current Scan vs Replay
 
@@ -125,13 +125,15 @@ The UI uses `Historical Hit Rate (As Of)`, not probability, confidence, likeliho
 
 Replay results do not tune `technical_example_v1` or any outcome definition.
 
-## No Walk-Forward Yet
+## Walk-Forward Building Block
 
-This batch supports a single replay date only. Monthly replay, daily replay, and aggregate replay performance are future work.
+Single-Date Historical Replay is the source of truth for each period inside Walk-Forward Replay.
 
-## Future Multi-Date Replay
+Walk-Forward Replay generates requested replay dates and repeatedly calls `HistoricalReplayService`. It must not reimplement replay signal semantics, point-in-time historical statistics, Research Priority ranking, or Post-Replay Outcome verification.
 
-Future batches can add walk-forward or multi-date replay only after preserving the same point-in-time boundaries for signals, historical statistics, and ranking.
+## Multi-Date Boundary
+
+Walk-Forward Replay can aggregate descriptive candidate occurrence counts across periods, but it does not convert repeated candidates into aggregate hit-rate, probability, prediction accuracy, or trading P&L.
 
 ## Architecture
 
@@ -151,4 +153,10 @@ Replay Research Priority
 Full future history
         ↓
 separate Post-Replay Outcome Verification
+
+Walk-Forward Replay
+        ↓
+repeated HistoricalReplayService calls
+        ↓
+period snapshots and descriptive occurrence counts
 ```

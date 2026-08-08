@@ -88,6 +88,21 @@ historical_replay_service.py post-replay verification
         ↓
         Separate Post-Replay Outcome block
 
+walk_forward_replay_service.py
+    └── Replay Date Generator
+        ↓
+        run-local full price-series cache
+        ↓
+        HistoricalReplayService
+        ↓
+        WalkForwardReplayPeriod[]
+        ↓
+        WalkForwardReplaySummary
+        ↓
+        swing_research_dashboard.py
+        ↓
+        Dashboard Timeline / Period Detail
+
 backtest_service.py
     ↓
     historical_case_service.py
@@ -242,6 +257,17 @@ historical_replay_service.py
     └── Post-Replay Outcome is stored separately for historical verification only
     └── Reuses swing_research_rank_v1 with point-in-time inputs only
     └── No probability, AI prediction, optimization, walk-forward batch, full-market crawler, or persistence
+
+walk_forward_replay_service.py
+    └── Deterministic Multi-Date Walk-Forward Replay orchestration
+    └── WalkForwardReplayConfig with inclusive start/end date, Monthly / Weekly frequency, signal / outcome definitions, overlap policy, cooldown, historical start, preferred samples, and max period guard
+    └── generate_replay_dates() pure deterministic schedule builder
+    └── Monthly replay dates are calendar month ends; Weekly replay dates are Fridays
+    └── Loads full HistoricalPriceSeries once per normalized symbol into a run-local cache
+    └── Calls HistoricalReplayService for each requested replay date and reuses single-date replay semantics
+    └── Preserves WalkForwardReplayPeriod snapshots oldest to newest, including zero-match periods and period-level safe failures
+    └── Aggregates descriptive candidate occurrence counts, unique candidate symbols, post-replay outcome counts, and repeated symbol summaries
+    └── Does not compute aggregate walk-forward hit rate, probability, prediction accuracy, parameter optimization, strategy P&L, persistence, or AI ranking
 
 historical_case_service.py
     └── Deterministic historical case explorer data builder

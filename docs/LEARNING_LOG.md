@@ -1,5 +1,49 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 07 Batch D Multi-Date Walk-Forward Replay
+
+### Completed Features
+
+- 新增 `src/walk_forward_replay_service.py`，提供 deterministic Multi-Date Walk-Forward Replay orchestration。
+- 新增 frozen `WalkForwardReplayConfig`、`WalkForwardReplayPeriod`、`WalkForwardReplayResult`、`WalkForwardReplaySummary` 與 `WalkForwardSymbolSummary`。
+- `generate_replay_dates()` 支援 `MONTHLY` 與 `WEEKLY`：Monthly 使用 calendar month end；Weekly 使用 Friday；date range inclusive。
+- Walk-forward 每期完整重用 `HistoricalReplayService`，不重新實作 replay signal、as-of historical statistics、Research Priority 或 Post-Replay Outcome。
+- Walk-forward run 開始時每個 normalized symbol 載入 full `HistoricalPriceSeries` 一次，並透過 run-local memory cache 傳入每期 replay。
+- Summary 顯示 period counts、candidate occurrences、unique candidate symbols、Post-Replay outcome occurrence counts 與 repeated symbol summaries。
+- Swing Research 新增第三種 `Scan Mode`：Current / Historical Replay / Walk-Forward Replay，並加入 Period Timeline、Period Detail 與 Candidate Frequency。
+
+### Design Notes
+
+- Walk-forward repeated replay 是 historical research simulation，不是 trade strategy backtest。
+- Candidate occurrences 是相關觀察；同一 symbol 可在相鄰 replay periods 重複出現，不能直接當成獨立樣本。
+- 本 Batch 不建立 aggregate walk-forward hit-rate、probability、prediction accuracy、win rate 或 trading P&L。
+- `end_date` 只限制 requested replay dates；Post-Replay Outcome 仍可使用 end date 之後已存在的 future bars 進行事後驗證。
+- Period results 以 tuple 保存 oldest to newest；後續 period 不應 mutation 先前 period snapshot。
+- Frequency 是 replay cadence，不是 optimization target；不得用 Monthly vs Weekly 結果選出「最佳頻率」。
+
+### Modified / Added Files
+
+- 新增 `src/walk_forward_replay_service.py`
+- 新增 `tests/test_walk_forward_replay_service.py`
+- 新增 `docs/WALK_FORWARD_REPLAY.md`
+- 修改 `src/historical_replay_service.py`
+- 修改 `app.py`
+- 修改 `src/swing_research_dashboard.py`
+- 修改 `tests/test_swing_research_dashboard.py`
+- 修改 `tests/test_dashboard.py`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/SWING_RESEARCH_DASHBOARD.md`
+- 修改 `docs/HISTORICAL_REPLAY_MODE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Known Limits
+
+- Walk-forward result 仍是 session-only，沒有 SQLite persistence。
+- UI 沒有 cancel / resume / background job。
+- Weekly 已在 service 與 UI 開放，但沒有 market-specific holiday calendar；actual trading date 仍交由 per-symbol Single-Date Replay 決定。
+- 本 Batch 不做 rank movement chart、frequency optimization、aggregate probability 或 strategy simulator。
+
 ## 2026-08-08 — Sprint 07 Batch C Historical As-Of Replay
 
 ### Completed Features
