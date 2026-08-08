@@ -1859,28 +1859,40 @@ def render_swing_research_walk_forward_result(result, source_context=None) -> No
             f"Symbols scanned: {source_context['symbol_count']}"
         )
 
-    summary_cols = st.columns(5)
-    for col, row in zip(summary_cols, swing_dashboard.build_walk_forward_summary_rows(result)):
+    st.markdown("### Replay Analytics")
+    summary_rows = swing_dashboard.build_walk_forward_summary_rows(result)
+    summary_cols = st.columns(3)
+    for col, row in zip(summary_cols, summary_rows):
         col.metric(row["Metric"], row["Value"])
+    for col, row in zip(summary_cols, summary_rows[3:]):
+        col.metric(row["Metric"], row["Value"])
+    st.caption("Candidate Period Share 代表有出現至少一個研究候選的 replay periods 比例，不是未來發生機率。")
 
     with st.expander("Post-Replay Outcome Counts", expanded=False):
-        st.caption("These are repeated candidate occurrences, not independent trials.")
+        st.caption("Post-Replay Outcome 是事後驗證資訊，不參與 replay 當時的 Research Priority，也不代表策略報酬或未來機率。")
         st.dataframe(
             swing_dashboard.build_walk_forward_outcome_count_rows(result),
             width="stretch",
             hide_index=True,
         )
 
-    st.markdown("### Period Timeline")
+    st.markdown("#### Candidate Occurrence")
+    st.dataframe(
+        swing_dashboard.build_walk_forward_symbol_summary_rows(result),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.markdown("#### Period Timeline")
     st.dataframe(
         swing_dashboard.build_walk_forward_timeline_rows(result),
         width="stretch",
         hide_index=True,
     )
 
-    st.markdown("### Candidate Frequency")
+    st.markdown("#### Candidate Set Stability")
     st.dataframe(
-        swing_dashboard.build_walk_forward_symbol_summary_rows(result),
+        swing_dashboard.build_replay_analytics_candidate_set_rows(result),
         width="stretch",
         hide_index=True,
     )

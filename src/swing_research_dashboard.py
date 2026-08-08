@@ -10,6 +10,7 @@ from models import OutcomeEvaluationStatus
 from models import SignalEvaluationStatus
 from models import SignalMatch
 from models import TechnicalIndicatorSnapshot
+from replay_analytics_service import build_replay_analytics
 from swing_scanner_service import SampleSizeStatus
 from swing_scanner_service import SwingOpportunityCandidate
 from swing_scanner_service import SwingScannerConfig
@@ -156,44 +157,29 @@ def build_replay_summary_rows(result) -> list[dict[str, object]]:
 
 
 def build_walk_forward_summary_rows(result) -> list[dict[str, object]]:
-    summary = result.summary
+    summary = build_replay_analytics(result).stability_summary
     return [
-        {"Metric": "Replay Periods", "Value": summary.period_count},
-        {"Metric": "Periods With MATCH", "Value": summary.periods_with_matches},
-        {"Metric": "Periods Without MATCH", "Value": summary.periods_without_matches},
-        {"Metric": "Candidate Occurrences", "Value": summary.total_candidate_occurrences},
+        {"Metric": "Total Replay Periods", "Value": summary.total_period_count},
+        {"Metric": "Periods With Candidates", "Value": summary.periods_with_candidates},
+        {"Metric": "Periods Without Candidates", "Value": summary.periods_without_candidates},
         {"Metric": "Unique Candidate Symbols", "Value": summary.unique_candidate_symbols},
+        {"Metric": "Total Candidate Occurrences", "Value": summary.total_candidate_occurrences},
+        {"Metric": "Candidate Period Share", "Value": format_percentage(summary.candidate_period_share)},
     ]
 
 
 def build_walk_forward_outcome_count_rows(result) -> list[dict[str, object]]:
-    summary = result.summary
+    distribution = build_replay_analytics(result).post_replay_outcome_distribution
     return [
-        {"Metric": "Post-Replay HIT Occurrences", "Value": summary.post_replay_hit_occurrences},
-        {"Metric": "MISS Occurrences", "Value": summary.post_replay_miss_occurrences},
-        {"Metric": "INCOMPLETE Occurrences", "Value": summary.post_replay_incomplete_occurrences},
-        {"Metric": "NOT_EVALUABLE Occurrences", "Value": summary.post_replay_not_evaluable_occurrences},
+        {"Metric": "Post-Replay HIT", "Value": distribution.post_replay_hit_count},
+        {"Metric": "Post-Replay MISS", "Value": distribution.post_replay_miss_count},
+        {"Metric": "Post-Replay INCOMPLETE", "Value": distribution.post_replay_incomplete_count},
+        {"Metric": "Post-Replay NOT_EVALUABLE", "Value": distribution.post_replay_not_evaluable_count},
     ]
 
 
 def build_walk_forward_timeline_rows(result) -> list[dict[str, object]]:
-    rows = []
-    for period in result.period_results:
-        candidate_symbols = tuple()
-        if period.replay_result is not None:
-            candidate_symbols = tuple(candidate.symbol for candidate in period.replay_result.match_candidates)
-        rows.append(
-            {
-                "Replay Date": format_date(period.requested_replay_date),
-                "Scanned": period.scanned_count,
-                "MATCH": period.matched_count,
-                "NO_MATCH": period.no_match_count,
-                "NOT_EVALUABLE": period.not_evaluable_count,
-                "FAILED": period.failed_count,
-                "Candidate Symbols": ", ".join(candidate_symbols) or "N/A",
-            }
-        )
-    return rows
+    return build_replay_analytics_period_rows(result)
 
 
 def walk_forward_period_selector_label(period) -> str:
@@ -208,13 +194,54 @@ def build_walk_forward_symbol_summary_rows(result) -> list[dict[str, object]]:
         {
             "Symbol": item.symbol,
             "Candidate Occurrences": item.candidate_occurrence_count,
-            "First Seen": format_date(item.first_candidate_date),
-            "Last Seen": format_date(item.last_candidate_date),
+            "Candidate Period Share": format_percentage(item.candidate_period_share),
+            "First Appearance": format_date(item.first_candidate_date),
+            "Last Appearance": format_date(item.last_candidate_date),
+            "Longest Consecutive Periods": item.longest_consecutive_candidate_periods,
+            "Best Research Priority": format_optional_number(item.best_research_priority_rank),
+            "Median Research Priority": format_optional_number(item.median_research_priority_rank),
+            "Worst Research Priority": format_optional_number(item.worst_research_priority_rank),
             "Post-Replay HIT": item.post_replay_hit_count,
-            "MISS": item.post_replay_miss_count,
-            "INCOMPLETE": item.post_replay_incomplete_count,
+            "Post-Replay MISS": item.post_replay_miss_count,
+            "Post-Replay INCOMPLETE": item.post_replay_incomplete_count,
+            "Post-Replay NOT_EVALUABLE": item.post_replay_not_evaluable_count,
         }
-        for item in result.summary.symbol_summaries
+        for item in build_replay_analytics(result).symbol_summaries
+    ]
+
+
+def build_replay_analytics_period_rows(result) -> list[dict[str, object]]:
+    analytics = build_replay_analytics(result)
+    return [
+        {
+            "Replay Date": format_date(item.requested_replay_date),
+            "Candidates": item.candidate_count,
+            "Candidate Symbols": ", ".join(item.candidate_symbols) or "N/A",
+            "NO_MATCH": item.no_match_count,
+            "NOT_EVALUABLE": item.not_evaluable_count,
+            "FAILED": item.failure_count,
+            "Post-Replay HIT": item.post_replay_hit_count,
+            "Post-Replay MISS": item.post_replay_miss_count,
+            "Post-Replay INCOMPLETE": item.post_replay_incomplete_count,
+            "Post-Replay NOT_EVALUABLE Outcome": item.post_replay_not_evaluable_count,
+        }
+        for item in analytics.period_summaries
+    ]
+
+
+def build_replay_analytics_candidate_set_rows(result) -> list[dict[str, object]]:
+    analytics = build_replay_analytics(result)
+    return [
+        {
+            "Previous Replay Date": format_date(item.previous_requested_date),
+            "Current Replay Date": format_date(item.current_requested_date),
+            "Previous Candidate Count": item.previous_candidate_count,
+            "Current Candidate Count": item.current_candidate_count,
+            "Shared Candidates": item.shared_candidate_count,
+            "Candidate Set Similarity": format_percentage(item.candidate_jaccard_similarity),
+            "Candidate Set Turnover": format_percentage(item.candidate_turnover),
+        }
+        for item in analytics.stability_summary.candidate_set_transitions
     ]
 
 
