@@ -107,6 +107,21 @@ walk_forward_replay_service.py
         ↓
         Dashboard Replay Analytics / Period Detail
 
+out_of_sample_validation_service.py
+    └── ValidationPeriodRole / ValidationPeriod
+        ↓
+        FrozenResearchSpecification / deterministic fingerprint
+        ↓
+        one run-local full price-series cache across all period roles
+        ↓
+        DEVELOPMENT Walk-Forward Replay + period-local Replay Analytics
+        ↓
+        VALIDATION Walk-Forward Replay + period-local Replay Analytics
+        ↓
+        HOLDOUT Walk-Forward Replay + period-local Replay Analytics
+        ↓
+        transparent cross-period raw-fact comparison
+
 backtest_service.py
     ↓
     historical_case_service.py
@@ -282,6 +297,18 @@ replay_analytics_service.py
     └── Preserves zero-match periods and period-level failures in period summaries
     └── Separates as-of candidate occurrence / Research Priority from Post-Replay Outcome counts
     └── No Yahoo fetch, HistoricalReplayService call, scanner call, backtest rerun, probability, recommendation, optimization, strategy P&L, persistence, or OpenAI API
+
+out_of_sample_validation_service.py
+    └── Deterministic Out-of-Sample Validation Foundation for DEVELOPMENT / VALIDATION / HOLDOUT periods
+    └── Validation periods are frozen, non-overlapping, chronological, and use inclusive start/end boundaries
+    └── OutOfSampleValidationConfig preserves fixed SignalDefinition, OutcomeDefinition, replay frequency, overlap policy, cooldown, historical start, and minimum resolved samples
+    └── FrozenResearchSpecification creates a deterministic fingerprint from materially relevant settings and excludes generated_at
+    └── Loads each normalized symbol's full HistoricalPriceSeries once, then reuses the cache across all three period roles
+    └── Reuses HistoricalReplayService point-in-time semantics and ReplayAnalyticsService period-local descriptive stability metrics
+    └── Period results preserve requested/completed replay periods, candidate period share, unique candidate symbols, candidate occurrences, HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts, Resolved n, and Historical Hit Rate
+    └── Historical Hit Rate denominator remains HIT + MISS; INCOMPLETE and NOT_EVALUABLE are excluded and zero resolved samples produce None
+    └── Cross-period comparison contains transparent raw differences and candidate-set Jaccard only
+    └── No probability model, optimization, hidden score, Buy / Sell / Hold recommendation, position sizing, strategy P&L, persistence, or Batch B dashboard
 
 historical_case_service.py
     └── Deterministic historical case explorer data builder

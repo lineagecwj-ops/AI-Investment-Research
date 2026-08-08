@@ -1,5 +1,39 @@
 # Learning Log
 
+## 2026-08-08 — Sprint 08 Batch A Out-of-Sample Validation Foundation
+
+### Completed Features
+
+- 新增 `src/out_of_sample_validation_service.py`，提供 deterministic OOS validation foundation。
+- 新增 `ValidationPeriodRole`、`ValidationPeriod`、`FrozenResearchSpecification`、`OutOfSampleValidationConfig`、`OutOfSamplePeriodResult`、`CrossPeriodComparison` 與 `OutOfSampleValidationResult`。
+- 支援 `DEVELOPMENT`、`VALIDATION`、`HOLDOUT` 三個 frozen period roles，period start/end 為 inclusive，並拒絕 overlap、反向日期與 Development → Validation → Holdout 順序錯誤。
+- 建立 deterministic research fingerprint，保存 fixed SignalDefinition、OutcomeDefinition、replay frequency、overlap policy、cooldown、historical start 與 minimum resolved samples；`generated_at` 不進 fingerprint。
+- OOS run 會對 normalized symbols 載入一次 full `HistoricalPriceSeries`，並跨三段 period roles 共用 cache；每個 replay date 仍交由 `HistoricalReplayService` 保證 point-in-time semantics。
+- 每個 period result 保存 requested/completed replay periods、candidate period share、unique candidate symbols、candidate occurrences、Post-Replay HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts、Resolved n 與 Historical Hit Rate。
+- Period-local stability analytics 直接 reuse `ReplayAnalyticsService`，不混入其他 period 的 candidate history。
+- Cross-period comparison 只保存 transparent raw-fact differences 與 candidate-set Jaccard similarity，不建立 hidden score。
+- Provider failure 會隔離為該 symbol 的 empty stale price series，避免 validation run 崩潰或每期重複 refetch。
+
+### Safety Notes
+
+- Historical Hit Rate denominator 維持 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 只保留為 count，不進 denominator。
+- `Resolved n == 0` 時 Historical Hit Rate 為 `None` / `N/A`，不是 `0%`。
+- Holdout result 不會回流修改 Development / Validation result、signal / outcome definition、cooldown、frequency、minimum samples 或 ranking rule。
+- 本 Batch 不做 probability model、parameter optimization、threshold tuning、best signal / outcome / cooldown / horizon selection、Buy / Sell / Hold recommendation、position sizing、strategy P&L、full dashboard 或 Batch B。
+
+### Modified / Added Files
+
+- 新增 `src/out_of_sample_validation_service.py`
+- 新增 `tests/test_out_of_sample_validation_service.py`
+- 新增 `docs/OUT_OF_SAMPLE_VALIDATION.md`
+- 修改 `README.md`
+- 修改 `docs/ARCHITECTURE.md`
+- 修改 `docs/LEARNING_LOG.md`
+
+### Testing Notes
+
+- 新增 `tests/test_out_of_sample_validation_service.py`，覆蓋 period validation、inclusive overlap rejection、deterministic fingerprint、generated_at exclusion、relevant setting sensitivity、三段 result separation、replay date separation、price loader reuse、zero candidates、zero resolved samples、INCOMPLETE / NOT_EVALUABLE denominator exclusion、candidate period share、period-local analytics、Holdout mutation safety、Validation mutation safety、fixed fingerprint、no optimization / recommendation fields、mixed-market symbols、provider failure isolation 與 deterministic ordering。
+
 ## 2026-08-08 — Sprint 07 Batch E Replay Analytics & Stability Review
 
 ### Completed Features

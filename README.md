@@ -131,6 +131,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Historical replay mode：`src/historical_replay_service.py`
 - Walk-forward replay mode：`src/walk_forward_replay_service.py`
 - Replay analytics stability review：`src/replay_analytics_service.py`
+- Out-of-sample validation foundation：`src/out_of_sample_validation_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -149,6 +150,7 @@ Universe Management 詳見 `docs/UNIVERSE_MANAGEMENT.md`。
 Historical Replay Mode 詳見 `docs/HISTORICAL_REPLAY_MODE.md`。
 Walk-Forward Replay 詳見 `docs/WALK_FORWARD_REPLAY.md`。
 Replay Analytics & Stability Review 詳見 `docs/REPLAY_ANALYTICS_STABILITY.md`。
+Out-of-Sample Validation 詳見 `docs/OUT_OF_SAMPLE_VALIDATION.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -235,6 +237,18 @@ Sprint 07 Batch D 新增 Multi-Date Walk-Forward Replay。
 Walk-Forward Replay 使用日期產生器建立 Monthly 或 Weekly requested replay dates，並對每一期完整重用 Single-Date `HistoricalReplayService`。Monthly 使用 calendar month end；Weekly 使用 Friday；actual trading date 仍由每支股票在單期 replay 中各自決定。
 
 Walk-forward 結果保存 period timeline、每期 MATCH / NO_MATCH / NOT_EVALUABLE / FAILED counts、candidate occurrences、unique candidate symbols、Post-Replay outcome occurrence counts 與 per-symbol repeated candidate summary。同一 symbol 可在多期重複出現，這些 candidate occurrences 是相關觀察，不是獨立樣本，因此本層不提供 aggregate hit-rate、probability、prediction accuracy 或 trading P&L。
+
+## Out-of-Sample Validation
+
+Sprint 08 Batch A 新增 Out-of-Sample Validation Foundation。
+
+OOS validation 使用固定的 `SignalDefinition`、`OutcomeDefinition`、replay frequency、overlap policy、cooldown 與 minimum resolved samples，比較 `DEVELOPMENT`、`VALIDATION` 與 `HOLDOUT` 三個互不重疊期間的 Walk-Forward Replay / Replay Analytics 結果。三段 period boundaries 為 inclusive，且 Development → Validation → Holdout 必須依時間順序排列。
+
+每次 run 會建立 deterministic frozen research fingerprint，且 `generated_at` 不進 fingerprint。三段結果必須使用相同 fingerprint，表示它們是同一套固定研究規格。OOS service 只限制 requested replay dates；每個 replay date 的 point-in-time signal 與 Historical Hit Rate (As Of) semantics 仍由 `HistoricalReplayService` 保證。
+
+OOS result 保存 candidate period share、unique candidate symbols、candidate occurrences、period-local stability analytics、Post-Replay HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts、Resolved n 與 Historical Hit Rate。Historical Hit Rate denominator 固定為 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 不進 denominator，且 zero resolved samples 顯示為 `None` / `N/A`。
+
+本層不做 parameter optimization、threshold tuning、probability model、prediction accuracy、Buy / Sell / Hold recommendation、position sizing 或 strategy P&L，也不建立 Batch B dashboard。
 
 ## Universe Management
 
