@@ -277,6 +277,7 @@ class SwingScannerServiceTestCase(unittest.TestCase):
         self.assertEqual(result.matched_count, 1)
         self.assertEqual(len(runner.calls), 1)
         self.assertEqual(runner.calls[0][0], "NVDA")
+        self.assertEqual(result.current_signal_details[0].status, SignalEvaluationStatus.MATCH)
 
     def test_no_match_never_calls_backtest(self):
         no_match_snapshot = self.snapshot(symbol="AAPL", analysis_close=90.0)
@@ -301,6 +302,21 @@ class SwingScannerServiceTestCase(unittest.TestCase):
         self.assertEqual(result.no_match_details[0].status, SignalEvaluationStatus.NO_MATCH)
         self.assertEqual(result.no_match_details[0].failed_conditions, ("analysis_close",))
 
+    def test_no_match_preserves_scan_time_current_signal_detail(self):
+        no_match_snapshot = self.snapshot(symbol="AAPL", analysis_close=90.0)
+        price = {"AAPL": self.price_series("AAPL")}
+        technical = {"AAPL": self.technical_series("AAPL", snapshot=no_match_snapshot)}
+        service, runner = self.service(price, technical, {})
+
+        result = service.scan(["AAPL"], self.config())
+
+        self.assertEqual(runner.calls, [])
+        self.assertEqual(len(result.current_signal_details), 1)
+        self.assertEqual(result.current_signal_details[0].symbol, "AAPL")
+        self.assertEqual(result.current_signal_details[0].status, SignalEvaluationStatus.NO_MATCH)
+        self.assertIs(result.current_signal_details[0].feature_snapshot, no_match_snapshot)
+        self.assertEqual(result.current_signal_details[0].evaluated_conditions[0].actual_value, 90.0)
+
     def test_not_evaluable_never_calls_backtest(self):
         not_evaluable_snapshot = self.snapshot(symbol="AAPL", volume_ratio_20=None)
         price = {"AAPL": self.price_series("AAPL")}
@@ -310,6 +326,7 @@ class SwingScannerServiceTestCase(unittest.TestCase):
         result = service.scan(["AAPL"], self.config())
 
         self.assertEqual(result.not_evaluable_count, 1)
+        self.assertEqual(result.current_signal_details, tuple())
         self.assertEqual(result.not_evaluable_symbols[0].missing_required_features, ("volume_ratio_20",))
         self.assertEqual(runner.calls, [])
 

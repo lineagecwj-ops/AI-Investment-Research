@@ -32,6 +32,7 @@ from models import SignalEvent
 from models import TechnicalIndicatorSeries
 from models import TechnicalIndicatorSnapshot
 from models import TechnicalSignalCondition
+from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 from signal_outcome_service import evaluate_signal_conditions
 from swing_research_dashboard import CASE_PREVIEW_LIMIT
 from swing_research_dashboard import CURRENT_SCAN_MODE
@@ -48,6 +49,11 @@ from swing_research_dashboard import build_replay_candidate_table_rows
 from swing_research_dashboard import build_replay_summary_rows
 from swing_research_dashboard import build_scan_summary_rows
 from swing_research_dashboard import build_swing_research_fingerprint
+from swing_research_dashboard import build_beginner_indicator_explanations
+from swing_research_dashboard import build_technical_condition_detail_rows
+from swing_research_dashboard import build_technical_condition_detail_view
+from swing_research_dashboard import build_technical_condition_visualization_rows
+from swing_research_dashboard import build_technical_condition_developer_rows
 from swing_research_dashboard import build_technical_snapshot_rows
 from swing_research_dashboard import build_walk_forward_outcome_count_rows
 from swing_research_dashboard import build_replay_analytics_candidate_set_rows
@@ -65,6 +71,7 @@ from swing_research_dashboard import parse_swing_symbol_input
 from swing_research_dashboard import replay_candidate_selector_label
 from swing_research_dashboard import replay_fingerprint_from_config
 from swing_research_dashboard import sample_status_label
+from swing_research_dashboard import technical_detail_selector_matches
 from swing_research_dashboard import walk_forward_fingerprint_from_config
 from swing_research_dashboard import walk_forward_period_selector_label
 from historical_replay_service import HistoricalReplayConfig
@@ -814,6 +821,126 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertIn("MACD 訊號線", labels)
         self.assertIn("距離前 60 日高點", labels)
         self.assertEqual(rows[-1]["Value"], "-4.00%")
+
+    def test_technical_detail_uses_scan_time_values_and_condition_status(self):
+        snapshot = self.snapshot(
+            symbol="2330.TW",
+            volume_ratio_20=1.08,
+            rsi_14=58.3,
+            distance_to_prior_60d_high=-0.072,
+        )
+        signal_match = evaluate_signal_conditions(snapshot, TECHNICAL_EXAMPLE_SIGNAL_V1)
+
+        detail = build_technical_condition_detail_view(signal_match)
+
+        self.assertEqual(detail.matched_count, 3)
+        self.assertEqual(detail.total_count, 5)
+        self.assertEqual(detail.condition_rows[2]["技術條件"], "20 日成交量比率")
+        self.assertEqual(detail.condition_rows[2]["目前實際值"], "1.08")
+        self.assertEqual(detail.condition_rows[2]["V1 要求"], ">= 1.20")
+        self.assertEqual(detail.condition_rows[2]["狀態"], "不符合")
+        self.assertEqual(detail.condition_rows[2]["距離門檻"], "尚差 0.12")
+        self.assertEqual(detail.condition_rows[4]["目前實際值"], "-7.20%")
+        self.assertEqual(detail.condition_rows[4]["V1 要求"], ">= -5.00%")
+        self.assertEqual(detail.condition_rows[4]["距離門檻"], "尚差 2.20 percentage points")
+
+    def test_technical_detail_supports_no_match_and_match_selector(self):
+        match = evaluate_signal_conditions(self.snapshot(symbol="MATCH"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        no_match = evaluate_signal_conditions(
+            self.snapshot(symbol="NO_MATCH", volume_ratio_20=1.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        result = self.result(
+            candidates=tuple(),
+            current_signal_details=(match, no_match),
+            no_match_symbols=("NO_MATCH",),
+        )
+
+        selector_matches = technical_detail_selector_matches(result)
+
+        self.assertEqual([item.symbol for item in selector_matches], ["MATCH", "NO_MATCH"])
+        self.assertEqual(selector_matches[1].status, SignalEvaluationStatus.NO_MATCH)
+
+    def test_technical_detail_falls_back_to_matched_candidates_for_older_results(self):
+        candidate = self.candidate("MATCH")
+        result = self.result(candidates=(candidate,), current_signal_details=tuple())
+
+        self.assertEqual(technical_detail_selector_matches(result), (candidate.signal_match,))
+
+    def test_technical_detail_does_not_include_not_evaluable_or_failed_as_complete(self):
+        not_evaluable = replace(
+            evaluate_signal_conditions(self.snapshot(symbol="MISS"), TECHNICAL_EXAMPLE_SIGNAL_V1),
+            status=SignalEvaluationStatus.NOT_EVALUABLE,
+        )
+        result = self.result(
+            current_signal_details=(not_evaluable,),
+            failed_symbols=tuple(),
+        )
+
+        self.assertEqual(technical_detail_selector_matches(result), tuple())
+
+    def test_technical_detail_missing_metric_displays_na_without_crash(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="MISS", rsi_14=None),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+
+        rows = build_technical_condition_detail_rows(signal_match)
+
+        self.assertEqual(rows[3]["技術條件"], "RSI 14")
+        self.assertEqual(rows[3]["目前實際值"], "N/A")
+        self.assertEqual(rows[3]["距離門檻"], "N/A")
+
+    def test_technical_detail_visualization_rows_are_factual_markers(self):
+        signal_match = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+
+        rows = build_technical_condition_visualization_rows(signal_match)
+
+        self.assertIn({"指標": "20 日成交量比率", "標記": "V1 門檻", "數值": 1.2, "說明": "1.20", "備註": "V1 threshold = 1.20"}, rows)
+        self.assertIn({"指標": "距離前 60 日高點", "標記": "前 60 日高點", "數值": 0.0, "說明": "0.00%", "備註": "0% = prior 60-day high；-5% = V1 threshold"}, rows)
+
+    def test_technical_detail_primary_rows_use_traditional_chinese_not_raw_snake_case(self):
+        signal_match = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+
+        rows = build_technical_condition_detail_rows(signal_match)
+        joined = " ".join(" ".join(row.values()) for row in rows)
+
+        self.assertIn("距離前 60 日高點", joined)
+        self.assertIn("20 日成交量比率", joined)
+        self.assertNotIn("volume_ratio_20", joined)
+        self.assertNotIn("distance_to_prior_60d_high", joined)
+
+    def test_developer_rows_keep_internal_ids_outside_primary_rows(self):
+        signal_match = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+
+        rows = build_technical_condition_developer_rows(signal_match)
+
+        self.assertEqual(rows[0]["Signal ID"], "technical_example_v1")
+        self.assertEqual(rows[0]["Raw Metric"], "analysis_close")
+
+    def test_beginner_explanations_do_not_describe_future_probability(self):
+        rows = build_beginner_indicator_explanations()
+        joined = " ".join(row["說明"] for row in rows)
+
+        self.assertIn("不代表預測上漲機率", joined)
+        self.assertNotIn("買進", joined)
+        self.assertNotIn("看漲", joined)
+
+    def test_technical_detail_helper_does_not_refetch_rerun_scanner_or_backtest(self):
+        source = (SRC_PATH / "swing_research_dashboard.py").read_text(encoding="utf-8")
+
+        detail_source = source[source.index("def technical_detail_selector_matches"):]
+        self.assertNotIn("get_historical_prices", detail_source)
+        self.assertNotIn("scan_swing_opportunities", detail_source)
+        self.assertNotIn("run_historical_backtest", detail_source)
+
+    def test_technical_detail_helper_does_not_mutate_signal_match(self):
+        signal_match = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        before = signal_match.evaluated_conditions
+
+        build_technical_condition_detail_view(signal_match)
+
+        self.assertEqual(signal_match.evaluated_conditions, before)
 
     def test_no_match_rows_show_failed_conditions(self):
         from swing_scanner_service import SwingScanCurrentSignalAudit
