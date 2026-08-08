@@ -139,6 +139,28 @@ class DashboardFormattingTestCase(unittest.TestCase):
             app_source.index('st.markdown("### Historical Table（完整年度資料）")'),
         )
 
+    def test_historical_cases_tab_uses_explicit_session_result(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn('"Historical Cases"', app_source)
+        self.assertIn("def render_historical_cases() -> None:", app_source)
+        self.assertIn('st.session_state.setdefault("historical_case_result", None)', app_source)
+        self.assertIn('submitted = st.form_submit_button("建立歷史案例")', app_source)
+        self.assertIn('if submitted:', app_source)
+        self.assertIn('if st.button("清除案例結果"):', app_source)
+        self.assertIn("build_historical_case_result(", app_source)
+
+    def test_historical_cases_tab_does_not_use_scanner_ranking_language(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        case_page_source = app_source[
+            app_source.index("def render_historical_cases() -> None:"):
+            app_source.index("def read_watchlist_for_ui()")
+        ]
+
+        self.assertNotIn("Research Priority", case_page_source)
+        self.assertNotIn("Buy Point", case_page_source)
+        self.assertNotIn("Sell Point", case_page_source)
+
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
         self.assertEqual(format_sector("Financial Services"), "Financial Services（金融服務）")
