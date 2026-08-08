@@ -20,6 +20,7 @@ from universe_dashboard import parse_universe_symbol_text
 
 CURRENT_SCAN_MODE = "Current"
 HISTORICAL_REPLAY_MODE = "Historical Replay"
+WALK_FORWARD_REPLAY_MODE = "Walk-Forward Replay"
 CASE_PREVIEW_FILTER_OPTIONS = ("Resolved", "HIT", "MISS")
 CASE_PREVIEW_LIMIT = 5
 RESEARCH_RANKING_EXPLANATION = (
@@ -40,18 +41,21 @@ def build_swing_research_fingerprint(
     source_type: str = MANUAL_SOURCE,
     scan_mode: str = CURRENT_SCAN_MODE,
     replay_date: date | None = None,
+    frequency: str | None = None,
     signal_id: str,
     outcome_id: str,
     overlap_policy: str,
     cooldown_bars: int | None,
     start_date: date | None,
     end_date: date | None,
+    historical_start_date: date | None = None,
     preferred_sample_minimum: int,
 ) -> str:
     identity = "|".join(
         (
             scan_mode,
             "" if replay_date is None else replay_date.isoformat(),
+            "" if frequency is None else frequency,
             source_type,
             ",".join(normalized_symbols),
             signal_id,
@@ -60,6 +64,7 @@ def build_swing_research_fingerprint(
             "" if cooldown_bars is None else str(cooldown_bars),
             "" if start_date is None else start_date.isoformat(),
             "" if end_date is None else end_date.isoformat(),
+            "" if historical_start_date is None else historical_start_date.isoformat(),
             str(preferred_sample_minimum),
         )
     )
@@ -108,6 +113,28 @@ def replay_fingerprint_from_config(
     )
 
 
+def walk_forward_fingerprint_from_config(
+    normalized_symbols: tuple[str, ...],
+    config,
+    *,
+    source_type: str = MANUAL_SOURCE,
+) -> str:
+    return build_swing_research_fingerprint(
+        normalized_symbols=normalized_symbols,
+        source_type=source_type,
+        scan_mode=WALK_FORWARD_REPLAY_MODE,
+        frequency=config.frequency.value,
+        signal_id=config.signal_definition.id,
+        outcome_id=config.outcome_definition.id,
+        overlap_policy=config.overlap_policy.value,
+        cooldown_bars=config.cooldown_bars,
+        start_date=config.start_date,
+        end_date=config.end_date,
+        historical_start_date=config.historical_start_date,
+        preferred_sample_minimum=config.preferred_resolved_samples,
+    )
+
+
 def build_scan_summary_rows(result: SwingScannerResult) -> list[dict[str, object]]:
     return [
         {"Metric": "Scanned", "Value": result.scanned_count},
@@ -125,6 +152,69 @@ def build_replay_summary_rows(result) -> list[dict[str, object]]:
         {"Metric": "NO_MATCH", "Value": result.no_match_count},
         {"Metric": "NOT_EVALUABLE", "Value": result.not_evaluable_count},
         {"Metric": "FAILED", "Value": result.failure_count},
+    ]
+
+
+def build_walk_forward_summary_rows(result) -> list[dict[str, object]]:
+    summary = result.summary
+    return [
+        {"Metric": "Replay Periods", "Value": summary.period_count},
+        {"Metric": "Periods With MATCH", "Value": summary.periods_with_matches},
+        {"Metric": "Periods Without MATCH", "Value": summary.periods_without_matches},
+        {"Metric": "Candidate Occurrences", "Value": summary.total_candidate_occurrences},
+        {"Metric": "Unique Candidate Symbols", "Value": summary.unique_candidate_symbols},
+    ]
+
+
+def build_walk_forward_outcome_count_rows(result) -> list[dict[str, object]]:
+    summary = result.summary
+    return [
+        {"Metric": "Post-Replay HIT Occurrences", "Value": summary.post_replay_hit_occurrences},
+        {"Metric": "MISS Occurrences", "Value": summary.post_replay_miss_occurrences},
+        {"Metric": "INCOMPLETE Occurrences", "Value": summary.post_replay_incomplete_occurrences},
+        {"Metric": "NOT_EVALUABLE Occurrences", "Value": summary.post_replay_not_evaluable_occurrences},
+    ]
+
+
+def build_walk_forward_timeline_rows(result) -> list[dict[str, object]]:
+    rows = []
+    for period in result.period_results:
+        candidate_symbols = tuple()
+        if period.replay_result is not None:
+            candidate_symbols = tuple(candidate.symbol for candidate in period.replay_result.match_candidates)
+        rows.append(
+            {
+                "Replay Date": format_date(period.requested_replay_date),
+                "Scanned": period.scanned_count,
+                "MATCH": period.matched_count,
+                "NO_MATCH": period.no_match_count,
+                "NOT_EVALUABLE": period.not_evaluable_count,
+                "FAILED": period.failed_count,
+                "Candidate Symbols": ", ".join(candidate_symbols) or "N/A",
+            }
+        )
+    return rows
+
+
+def walk_forward_period_selector_label(period) -> str:
+    return (
+        f"{format_date(period.requested_replay_date)} | "
+        f"MATCH {period.matched_count}"
+    )
+
+
+def build_walk_forward_symbol_summary_rows(result) -> list[dict[str, object]]:
+    return [
+        {
+            "Symbol": item.symbol,
+            "Candidate Occurrences": item.candidate_occurrence_count,
+            "First Seen": format_date(item.first_candidate_date),
+            "Last Seen": format_date(item.last_candidate_date),
+            "Post-Replay HIT": item.post_replay_hit_count,
+            "MISS": item.post_replay_miss_count,
+            "INCOMPLETE": item.post_replay_incomplete_count,
+        }
+        for item in result.summary.symbol_summaries
     ]
 
 

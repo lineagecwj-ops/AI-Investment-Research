@@ -117,6 +117,9 @@ from historical_replay_service import HistoricalReplayConfig
 from historical_replay_service import HistoricalReplayService
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
+from walk_forward_replay_service import WalkForwardReplayConfig
+from walk_forward_replay_service import WalkForwardReplayFrequency
+from walk_forward_replay_service import WalkForwardReplayService
 import swing_research_dashboard as swing_dashboard
 import universe_dashboard as universe_ui
 
@@ -1299,6 +1302,33 @@ def build_swing_research_replay_result(
     }
 
 
+def build_swing_research_walk_forward_result(
+    *,
+    symbols: tuple[str, ...],
+    config: WalkForwardReplayConfig,
+    source_type: str,
+) -> dict:
+    price_series_by_symbol = {}
+
+    def recording_price_loader(symbol: str, *, force_refresh: bool = False):
+        price_series = get_historical_prices(symbol, force_refresh=force_refresh)
+        price_series_by_symbol[price_series.symbol] = price_series
+        return price_series
+
+    walk_forward_service = WalkForwardReplayService(price_loader=recording_price_loader)
+    result = walk_forward_service.run_walk_forward_replay(symbols, config)
+    fingerprint = swing_dashboard.walk_forward_fingerprint_from_config(
+        result.normalized_symbols,
+        config,
+        source_type=source_type,
+    )
+    return {
+        "result": result,
+        "fingerprint": fingerprint,
+        "price_series_by_symbol": price_series_by_symbol,
+    }
+
+
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
@@ -1311,7 +1341,11 @@ def render_swing_research() -> None:
     st.markdown("### Scan Setup")
     scan_mode = st.radio(
         "Scan Mode",
-        [swing_dashboard.CURRENT_SCAN_MODE, swing_dashboard.HISTORICAL_REPLAY_MODE],
+        [
+            swing_dashboard.CURRENT_SCAN_MODE,
+            swing_dashboard.HISTORICAL_REPLAY_MODE,
+            swing_dashboard.WALK_FORWARD_REPLAY_MODE,
+        ],
         horizontal=True,
         key="swing_research_scan_mode",
     )
@@ -1368,11 +1402,24 @@ def render_swing_research() -> None:
         if overlap_label == "COOLDOWN":
             cooldown_bars = st.number_input("Cooldown Trading Bars", min_value=1, value=20, step=1)
         date_cols = st.columns(2)
-        start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2018-01-01").date())
+        frequency_label = None
+        walk_forward_start_date = None
+        walk_forward_end_date = None
+        historical_start_date = None
         if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
+            start_date = date_cols[0].date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
             replay_date = date_cols[1].date_input("Replay Date", value=pd.to_datetime("2024-06-30").date())
             end_date = None
+        elif scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
+            walk_forward_start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2024-01-01").date())
+            walk_forward_end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2024-06-30").date())
+            frequency_label = st.selectbox("Frequency", ["MONTHLY", "WEEKLY"], index=0)
+            historical_start_date = st.date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
+            start_date = walk_forward_start_date
+            replay_date = None
+            end_date = walk_forward_end_date
         else:
+            start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2018-01-01").date())
             replay_date = None
             end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2025-12-31").date())
         preferred_sample_minimum = st.number_input(
@@ -1384,7 +1431,11 @@ def render_swing_research() -> None:
         )
         st.caption("Current Scan button label: 執行波段掃描")
         submitted = st.form_submit_button(
-            "執行 Replay Scan" if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE else "執行波段掃描"
+            "執行 Walk-Forward Replay"
+            if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE
+            else "執行 Replay Scan"
+            if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE
+            else "執行波段掃描"
         )
 
     normalized_symbols, current_source_context = resolve_swing_research_source(
@@ -1398,12 +1449,14 @@ def render_swing_research() -> None:
         source_type=source_type,
         scan_mode=scan_mode,
         replay_date=replay_date,
+        frequency=frequency_label,
         signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
         outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
         overlap_policy=overlap_label,
         cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
         start_date=start_date,
         end_date=end_date,
+        historical_start_date=historical_start_date,
         preferred_sample_minimum=int(preferred_sample_minimum),
     )
 
@@ -1424,6 +1477,8 @@ def render_swing_research() -> None:
         st.caption("Historical Hit Rate 必須和 Resolved Sample Size 一起閱讀；它不是未來發生機率。")
         if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
             st.caption("Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。")
+        if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
+            st.caption("Walk-Forward Replay 會依頻率重複執行 Single-Date Historical Replay。Candidate occurrences 是重複觀察，不是獨立樣本，也不是績效評分。")
 
     if overlap_label == "ALLOW_ALL":
         st.info("ALLOW_ALL：historical signal events may overlap.")
@@ -1456,6 +1511,24 @@ def render_swing_research() -> None:
                     )
                     with st.spinner("正在執行 Historical Replay..."):
                         scan_payload = build_swing_research_replay_result(
+                            symbols=normalized_symbols,
+                            config=config,
+                            source_type=source_type,
+                        )
+                elif scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
+                    config = WalkForwardReplayConfig(
+                        start_date=walk_forward_start_date,
+                        end_date=walk_forward_end_date,
+                        frequency=WalkForwardReplayFrequency(frequency_label),
+                        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+                        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+                        overlap_policy=OverlappingSignalPolicy(overlap_label),
+                        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                        historical_start_date=historical_start_date,
+                        preferred_resolved_samples=int(preferred_sample_minimum),
+                    )
+                    with st.spinner("正在執行 Walk-Forward Replay..."):
+                        scan_payload = build_swing_research_walk_forward_result(
                             symbols=normalized_symbols,
                             config=config,
                             source_type=source_type,
@@ -1510,7 +1583,12 @@ def render_swing_research() -> None:
         else:
             st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
 
-    if st.session_state.get("swing_research_result_mode") == swing_dashboard.HISTORICAL_REPLAY_MODE:
+    if st.session_state.get("swing_research_result_mode") == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
+        render_swing_research_walk_forward_result(
+            result,
+            st.session_state.get("swing_research_source_context"),
+        )
+    elif st.session_state.get("swing_research_result_mode") == swing_dashboard.HISTORICAL_REPLAY_MODE:
         render_swing_research_replay_result(
             result,
             st.session_state.get("swing_research_source_context"),
@@ -1761,6 +1839,74 @@ def render_swing_research_replay_result(result, source_context=None) -> None:
     selected_label = st.selectbox("選擇 Replay 研究候選", candidate_labels)
     selected_candidate = result.match_candidates[candidate_labels.index(selected_label)]
     render_swing_replay_candidate_detail(selected_candidate, result.config)
+
+
+def render_swing_research_walk_forward_result(result, source_context=None) -> None:
+    st.markdown("### Walk-Forward Replay")
+    st.caption(
+        f"Replay Range: {swing_dashboard.format_date(result.config.start_date)} -> "
+        f"{swing_dashboard.format_date(result.config.end_date)} · "
+        f"Frequency: {result.config.frequency.value}"
+    )
+    st.caption(
+        "同一股票可能在相鄰 Replay Period 重複出現，因此 candidate occurrences 並非獨立統計樣本。"
+        "本頁只顯示 occurrence counts，不顯示 aggregate hit-rate 或 probability。"
+    )
+    if source_context:
+        st.caption(
+            "Source: "
+            f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
+            f"Symbols scanned: {source_context['symbol_count']}"
+        )
+
+    summary_cols = st.columns(5)
+    for col, row in zip(summary_cols, swing_dashboard.build_walk_forward_summary_rows(result)):
+        col.metric(row["Metric"], row["Value"])
+
+    with st.expander("Post-Replay Outcome Counts", expanded=False):
+        st.caption("These are repeated candidate occurrences, not independent trials.")
+        st.dataframe(
+            swing_dashboard.build_walk_forward_outcome_count_rows(result),
+            width="stretch",
+            hide_index=True,
+        )
+
+    st.markdown("### Period Timeline")
+    st.dataframe(
+        swing_dashboard.build_walk_forward_timeline_rows(result),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.markdown("### Candidate Frequency")
+    st.dataframe(
+        swing_dashboard.build_walk_forward_symbol_summary_rows(result),
+        width="stretch",
+        hide_index=True,
+    )
+
+    if not result.period_results:
+        st.info("此 Walk-Forward Replay 沒有可顯示的 replay periods。")
+        return
+
+    labels = [
+        swing_dashboard.walk_forward_period_selector_label(period)
+        for period in result.period_results
+    ]
+    selected_label = st.selectbox("選擇 Replay Period", labels)
+    selected_period = result.period_results[labels.index(selected_label)]
+    if selected_period.failure is not None:
+        st.warning(
+            "此 Replay Period 執行失敗："
+            f"{selected_period.failure.error_type} - {selected_period.failure.safe_message}"
+        )
+        return
+    if selected_period.replay_result is None:
+        st.info("此 Replay Period 沒有結果。")
+        return
+    if selected_period.matched_count == 0:
+        st.info("此 Replay Period 沒有符合條件的股票。")
+    render_swing_research_replay_result(selected_period.replay_result, source_context)
 
 
 def render_swing_replay_candidate_detail(candidate, config: HistoricalReplayConfig) -> None:
