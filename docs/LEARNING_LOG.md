@@ -40,7 +40,7 @@
 - 本批只支援 single-date replay。
 - 尚未做 monthly / daily walk-forward replay。
 - 尚未做 replay result persistence、DB schema、alert、AI prediction、parameter optimization 或 full market crawler。
-- Replay outcome chart 目前先以獨立 Post-Replay Outcome block 呈現；未來可補 chart，但不得讓 future bars 影響 replay signal / ranking。
+- Replay outcome chart 使用既有 Historical Case chart builder 顯示單一事後驗證案例；future bars 不得影響 replay signal / ranking。
 
 ## 2026-08-08 — Sprint 07 Batch B Universe Management
 

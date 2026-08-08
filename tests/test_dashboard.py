@@ -211,6 +211,8 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn("Historical Hit Rate", swing_page_source)
         self.assertIn("Historical Hit Rate (As Of)", swing_page_source)
         self.assertIn("Post-Replay Outcome", swing_page_source)
+        self.assertIn("Replay Outcome Case Chart", swing_page_source)
+        self.assertIn("signal date 之後資料只用於歷史事後驗證", swing_page_source)
         self.assertIn("Resolved Samples", swing_page_source)
         self.assertIn("Research Priority", swing_page_source)
         self.assertIn("swing_research_price_series_by_symbol", swing_page_source)

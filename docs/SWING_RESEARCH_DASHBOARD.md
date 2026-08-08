@@ -257,7 +257,7 @@ The preview shows counts for:
 
 The default filter is `Resolved`, which includes both HIT and MISS. Users can also filter to HIT or MISS. The preview limits rows to the latest five cases to avoid rendering too many charts.
 
-Historical Replay currently renders post-replay verification as a separate outcome block. Future work can add a replay outcome case chart while preserving the rule that future bars are not used for the replay signal or ranking.
+Historical Replay renders post-replay verification as a separate outcome block and a single Replay Outcome Case Chart. The chart can contain future bars after the signal date, but those bars are not used for the replay signal or ranking.
 
 ## HIT / MISS Semantics
 

@@ -31,6 +31,9 @@ from dashboard import StockQueryFailure
 from dashboard import stock_display_data
 from backtest_service import BacktestConfig
 from backtest_service import BacktestDataError
+from backtest_service import HistoricalBacktestCase
+from backtest_service import aggregate_backtest_cases
+from backtest_service import build_case_id
 from backtest_service import run_historical_backtest
 from ai_config import MAX_RESEARCH_QUESTION_LENGTH
 from ai_config import get_ai_research_config
@@ -109,6 +112,7 @@ from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
 from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+from signal_outcome_service import build_signal_event
 from historical_replay_service import HistoricalReplayConfig
 from historical_replay_service import HistoricalReplayService
 from swing_scanner_service import SwingScannerConfig
@@ -1756,10 +1760,10 @@ def render_swing_research_replay_result(result, source_context=None) -> None:
     ]
     selected_label = st.selectbox("選擇 Replay 研究候選", candidate_labels)
     selected_candidate = result.match_candidates[candidate_labels.index(selected_label)]
-    render_swing_replay_candidate_detail(selected_candidate)
+    render_swing_replay_candidate_detail(selected_candidate, result.config)
 
 
-def render_swing_replay_candidate_detail(candidate) -> None:
+def render_swing_replay_candidate_detail(candidate, config: HistoricalReplayConfig) -> None:
     st.markdown("### Selected Replay Candidate Detail")
     if candidate.source_price_is_stale:
         st.warning("Historical price data is from stale cache.")
@@ -1806,6 +1810,56 @@ def render_swing_replay_candidate_detail(candidate) -> None:
         width="stretch",
         hide_index=True,
     )
+    render_swing_replay_outcome_chart(candidate, config)
+
+
+def render_swing_replay_outcome_chart(candidate, config: HistoricalReplayConfig) -> None:
+    price_series_by_symbol = st.session_state.get("swing_research_price_series_by_symbol", {})
+    price_series = price_series_by_symbol.get(candidate.symbol)
+    if price_series is None:
+        st.warning("Replay outcome chart unavailable: scan-time price series cache is missing.")
+        return
+
+    signal_raw_close = None
+    for bar in price_series.bars:
+        if bar.trading_date == candidate.actual_signal_date:
+            signal_raw_close = bar.close
+            break
+    signal_event = build_signal_event(
+        candidate.signal_match,
+        signal_raw_close=signal_raw_close,
+    )
+    case = HistoricalBacktestCase(
+        symbol=candidate.symbol,
+        signal_event=signal_event,
+        outcome=candidate.post_replay_outcome,
+        case_id=build_case_id(candidate.symbol, signal_event, candidate.post_replay_outcome),
+    )
+    report = aggregate_backtest_cases(
+        (case,),
+        symbol=candidate.symbol,
+        config=config.to_backtest_config(actual_signal_date=candidate.actual_signal_date),
+        raw_events=(signal_event,),
+        evaluated_events=(signal_event,),
+    )
+    try:
+        case_view = build_historical_case_views(
+            price_series,
+            report,
+            HistoricalCaseWindowConfig(pre_signal_bars=60, post_signal_bars=config.outcome_definition.horizon_bars),
+        )[0]
+    except HistoricalCaseDataError as error:
+        st.warning(str(error))
+        return
+
+    st.markdown("#### Replay Outcome Case Chart")
+    chart_cols = st.columns(4)
+    chart_cols[0].metric("Signal Date", case_view.signal_date.isoformat())
+    chart_cols[1].metric("Outcome Status", case_view.outcome_status.value)
+    chart_cols[2].metric("First Hit", format_date_value(case_view.target_hit_date))
+    chart_cols[3].metric("Hit Bar", format_optional_int(case_view.target_hit_bar_index))
+    st.altair_chart(build_case_chart(case_view, x_mode="Relative Bars"), use_container_width=True)
+    st.caption("圖中 signal date 之後資料只用於歷史事後驗證，沒有用於產生當時訊號。")
 
 
 def render_swing_case_preview(candidate) -> None:
