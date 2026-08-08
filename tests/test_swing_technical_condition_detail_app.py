@@ -1,3 +1,5 @@
+import ast
+import importlib
 import sys
 import unittest
 from pathlib import Path
@@ -45,6 +47,44 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(len(at.selectbox), 1)
         self.assertGreaterEqual(len(at.dataframe), 2)
+
+    def test_render_contract_covers_all_swing_dashboard_references(self):
+        import app as app_module
+
+        source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        module = ast.parse(source)
+        render_function = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "render_swing_technical_condition_detail"
+        )
+        references = {
+            node.attr
+            for node in ast.walk(render_function)
+            if isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "swing_dashboard"
+        }
+
+        self.assertEqual(
+            references,
+            set(app_module.SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES),
+        )
+
+    def test_render_contract_recovers_stale_helper_module(self):
+        import app as app_module
+        import swing_research_dashboard
+
+        try:
+            delattr(swing_research_dashboard, "TECHNICAL_DETAIL_CAPTION")
+
+            app_module.ensure_swing_technical_detail_contract()
+
+            self.assertTrue(hasattr(app_module.swing_dashboard, "TECHNICAL_DETAIL_CAPTION"))
+        finally:
+            importlib.reload(swing_research_dashboard)
+            app_module.swing_dashboard = swing_research_dashboard
 
 
 if __name__ == "__main__":

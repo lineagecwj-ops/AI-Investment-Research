@@ -1,4 +1,5 @@
 import sys
+import importlib
 from datetime import date
 from pathlib import Path
 
@@ -164,6 +165,15 @@ HISTORICAL_CASE_X_MODE_LABELS = {
     "Relative Bars": "相對交易日",
     "Actual Dates": "實際交易日期",
 }
+
+SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
+    "TECHNICAL_DETAIL_CAPTION",
+    "technical_detail_selector_matches",
+    "technical_detail_selector_label",
+    "build_technical_condition_detail_view",
+    "build_beginner_indicator_explanations",
+    "build_technical_condition_developer_rows",
+)
 
 
 def historical_case_status_filter_label(option: str) -> str:
@@ -2051,6 +2061,7 @@ def render_swing_research_result(result, source_context=None) -> None:
 
 
 def render_swing_technical_condition_detail(result) -> None:
+    ensure_swing_technical_detail_contract()
     st.markdown("### 技術條件明細")
     st.caption(swing_dashboard.TECHNICAL_DETAIL_CAPTION)
     detail_matches = swing_dashboard.technical_detail_selector_matches(result)
@@ -2110,6 +2121,23 @@ def render_swing_technical_condition_detail(result) -> None:
             pd.DataFrame(swing_dashboard.build_technical_condition_developer_rows(selected_match)).astype(str),
             width="stretch",
             hide_index=True,
+        )
+
+
+def ensure_swing_technical_detail_contract() -> None:
+    global swing_dashboard
+    if all(hasattr(swing_dashboard, name) for name in SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES):
+        return
+    swing_dashboard = importlib.reload(swing_dashboard)
+    missing = [
+        name
+        for name in SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES
+        if not hasattr(swing_dashboard, name)
+    ]
+    if missing:
+        raise AttributeError(
+            "swing_research_dashboard missing Technical Condition Detail attributes: "
+            + ", ".join(missing)
         )
 
 
