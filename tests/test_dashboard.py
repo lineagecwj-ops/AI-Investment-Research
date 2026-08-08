@@ -161,6 +161,38 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertNotIn("Buy Point", case_page_source)
         self.assertNotIn("Sell Point", case_page_source)
 
+    def test_swing_research_tab_uses_explicit_session_result(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn('"Swing Research"', app_source)
+        self.assertIn('"Historical Cases"', app_source)
+        self.assertIn("def render_swing_research() -> None:", app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_result", None)', app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_config_fingerprint", None)', app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_last_error", None)', app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_price_series_by_symbol", {})', app_source)
+        self.assertIn('submitted = st.form_submit_button("執行波段掃描")', app_source)
+        self.assertIn('if submitted:', app_source)
+        self.assertIn('if st.button("清除掃描結果"):', app_source)
+        self.assertIn("build_swing_research_scan_result(", app_source)
+
+    def test_swing_research_wording_preserves_research_semantics(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        helper_source = (SRC_PATH / "swing_research_dashboard.py").read_text(encoding="utf-8")
+        swing_page_source = app_source[
+            app_source.index("def render_swing_research() -> None:"):
+            app_source.index("def build_historical_case_result(")
+        ]
+
+        self.assertIn("Historical Hit Rate", swing_page_source)
+        self.assertIn("Resolved Samples", swing_page_source)
+        self.assertIn("Research Priority", swing_page_source)
+        self.assertIn("swing_research_price_series_by_symbol", swing_page_source)
+        combined_source = swing_page_source + helper_source
+        self.assertNotIn("Buy Rank", combined_source)
+        self.assertNotIn("Opportunity Score", combined_source)
+        self.assertNotIn("上漲機率", combined_source)
+
     def test_known_sector_translation(self):
         self.assertEqual(format_sector("Technology"), "Technology（科技）")
         self.assertEqual(format_sector("Financial Services"), "Financial Services（金融服務）")

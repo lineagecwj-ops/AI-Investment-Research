@@ -1,0 +1,575 @@
+import sys
+import unittest
+from dataclasses import fields
+from dataclasses import replace
+from datetime import UTC
+from datetime import date
+from datetime import datetime
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = PROJECT_ROOT / "src"
+
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+from backtest_service import HistoricalBacktestCase
+from backtest_service import HistoricalBacktestReport
+from historical_case_service import HistoricalCaseDataError
+from models import EvaluatedSignalCondition
+from models import HistoricalOutcomeResult
+from models import HistoricalPriceBar
+from models import HistoricalPriceSeries
+from models import OutcomeEvaluationStatus
+from models import OutcomeDefinition
+from models import OutcomeType
+from models import OverlappingSignalPolicy
+from models import SignalConditionOperator
+from models import SignalDefinition
+from models import SignalEvaluationStatus
+from models import SignalEvent
+from models import TechnicalIndicatorSeries
+from models import TechnicalIndicatorSnapshot
+from models import TechnicalSignalCondition
+from signal_outcome_service import evaluate_signal_conditions
+from swing_research_dashboard import CASE_PREVIEW_LIMIT
+from swing_research_dashboard import build_candidate_table_rows
+from swing_research_dashboard import build_case_preview_count_rows
+from swing_research_dashboard import build_case_preview_views
+from swing_research_dashboard import build_condition_trace_rows
+from swing_research_dashboard import build_failure_rows
+from swing_research_dashboard import build_no_match_rows
+from swing_research_dashboard import build_not_evaluable_rows
+from swing_research_dashboard import build_scan_summary_rows
+from swing_research_dashboard import build_swing_research_fingerprint
+from swing_research_dashboard import build_technical_snapshot_rows
+from swing_research_dashboard import candidate_selector_label
+from swing_research_dashboard import current_match_trace_is_consistent
+from swing_research_dashboard import filter_case_preview_views
+from swing_research_dashboard import fingerprint_from_config
+from swing_research_dashboard import format_percentage
+from swing_research_dashboard import latest_case_preview_rows
+from swing_research_dashboard import parse_swing_symbol_input
+from swing_research_dashboard import sample_status_label
+from swing_scanner_service import SampleSizeStatus
+from swing_scanner_service import SwingScannerConfig
+from swing_scanner_service import SwingScannerResult
+from swing_scanner_service import build_swing_candidate
+from swing_scanner_service import rank_swing_candidates
+
+
+FETCHED_AT = datetime(2026, 8, 8, 1, 0, tzinfo=UTC)
+GENERATED_AT = datetime(2026, 8, 8, 2, 0, tzinfo=UTC)
+
+
+class SwingResearchDashboardTestCase(unittest.TestCase):
+
+    def signal_definition(self):
+        return SignalDefinition(
+            id="test_signal_v1",
+            name="Test Signal",
+            conditions=(
+                TechnicalSignalCondition(
+                    metric="analysis_close",
+                    operator=SignalConditionOperator.GREATER_THAN,
+                    secondary_metric="sma_20",
+                ),
+                TechnicalSignalCondition(
+                    metric="sma_20",
+                    operator=SignalConditionOperator.GREATER_THAN,
+                    secondary_metric="sma_60",
+                ),
+            ),
+            minimum_required_features=("analysis_close", "sma_20", "sma_60"),
+            description="Test-only signal.",
+        )
+
+    def outcome_definition(self):
+        return OutcomeDefinition(
+            id="test_outcome_v1",
+            outcome_type=OutcomeType.RAW_HIGH_BREAKOUT,
+            horizon_bars=20,
+            reference_metric="prior_high_60d",
+        )
+
+    def config(self, **overrides):
+        values = {
+            "signal_definition": self.signal_definition(),
+            "outcome_definition": self.outcome_definition(),
+            "overlap_policy": OverlappingSignalPolicy.ALLOW_ALL,
+            "cooldown_bars": None,
+            "backtest_start_date": date(2018, 1, 1),
+            "backtest_end_date": date(2025, 12, 31),
+            "minimum_resolved_samples": 20,
+        }
+        values.update(overrides)
+        return SwingScannerConfig(**values)
+
+    def snapshot(self, symbol="TEST", trading_date=date(2025, 1, 3), **overrides):
+        params = {field.name: None for field in fields(TechnicalIndicatorSnapshot)}
+        params.update(
+            symbol=symbol,
+            trading_date=trading_date,
+            analysis_close=110.0,
+            sma_20=100.0,
+            sma_60=90.0,
+            sma_120=80.0,
+            sma_200=70.0,
+            rsi_14=61.0,
+            macd=1.2,
+            macd_signal=0.8,
+            atr_14_pct=0.03,
+            volume_ratio_20=1.4,
+            return_20d=0.05,
+            return_60d=0.12,
+            prior_high_60d=115.0,
+            distance_to_prior_60d_high=-0.04,
+        )
+        params.update(overrides)
+        return TechnicalIndicatorSnapshot(**params)
+
+    def technical_series(self, symbol="TEST", snapshot=None):
+        return TechnicalIndicatorSeries(
+            symbol=symbol,
+            snapshots=(snapshot or self.snapshot(symbol=symbol),),
+            generated_at=GENERATED_AT,
+            source_price_fetched_at=FETCHED_AT,
+            source_price_is_stale=False,
+        )
+
+    def price_series(self, symbol="TEST"):
+        bars = tuple(
+            HistoricalPriceBar(
+                symbol=symbol,
+                trading_date=date(2025, 1, day),
+                open=100.0 + day,
+                high=104.0 + day,
+                low=98.0 + day,
+                close=101.0 + day,
+                adjusted_close=101.0 + day,
+                volume=1000 + day,
+            )
+            for day in range(1, 7)
+        )
+        return HistoricalPriceSeries(
+            symbol=symbol,
+            currency="USD",
+            bars=bars,
+            fetched_at=FETCHED_AT,
+            is_stale=False,
+        )
+
+    def condition(self):
+        return EvaluatedSignalCondition(
+            metric="analysis_close",
+            actual_value=110.0,
+            operator=SignalConditionOperator.GREATER_THAN,
+            expected_value=None,
+            secondary_metric="sma_20",
+            secondary_actual_value=100.0,
+            status=SignalEvaluationStatus.MATCH,
+            matched=True,
+        )
+
+    def signal_event(self, symbol="TEST", signal_date=date(2025, 1, 3)):
+        return SignalEvent(
+            symbol=symbol,
+            signal_id=self.signal_definition().id,
+            signal_date=signal_date,
+            signal_analysis_close=103.0,
+            signal_raw_close=103.0,
+            reference_high=110.0,
+            reference_low=80.0,
+            evaluation_status=SignalEvaluationStatus.MATCH,
+            feature_snapshot=self.snapshot(symbol=symbol, trading_date=signal_date),
+            evaluated_conditions=(self.condition(),),
+        )
+
+    def outcome(self, status, symbol="TEST", signal_date=date(2025, 1, 3)):
+        is_hit = status is OutcomeEvaluationStatus.HIT
+        return HistoricalOutcomeResult(
+            symbol=symbol,
+            signal_id=self.signal_definition().id,
+            signal_date=signal_date,
+            outcome_definition_id=self.outcome_definition().id,
+            status=status,
+            horizon_bars=20,
+            available_future_bars=20,
+            reference_high=110.0,
+            intraday_target_hit=is_hit,
+            intraday_target_hit_date=date(2025, 1, 4) if is_hit else None,
+            intraday_target_hit_bar_index=1 if is_hit else None,
+            close_target_hit=False,
+            close_target_hit_date=None,
+            close_target_hit_bar_index=None,
+            max_close_return=0.10,
+            max_close_return_date=date(2025, 1, 5),
+            max_adverse_return=-0.04,
+            max_adverse_return_date=date(2025, 1, 4),
+            end_of_window_return=-0.02,
+        )
+
+    def report(self, symbol="TEST", *, hit_rate=0.7, resolved=100, cases=tuple()):
+        config = self.config()
+        hit = int(hit_rate * resolved) if hit_rate is not None else 0
+        miss = resolved - hit
+        return HistoricalBacktestReport(
+            symbol=symbol,
+            signal_definition_id=config.signal_definition.id,
+            outcome_definition_id=config.outcome_definition.id,
+            overlap_policy=config.overlap_policy,
+            cooldown_bars=config.cooldown_bars,
+            start_date=config.backtest_start_date,
+            end_date=config.backtest_end_date,
+            backtest_id=f"backtest_{symbol}",
+            raw_signal_count=120,
+            filtered_signal_count=100,
+            hit_count=hit,
+            miss_count=miss,
+            incomplete_count=1,
+            not_evaluable_count=2,
+            resolved_count=resolved,
+            historical_hit_rate=hit_rate,
+            average_max_close_return=0.11,
+            median_max_close_return=0.10,
+            average_max_adverse_return=-0.05,
+            median_max_adverse_return=-0.04,
+            average_end_return=0.02,
+            median_end_return=-0.02,
+            average_hit_bar_index=3.0,
+            median_hit_bar_index=3.0,
+            max_return_sample_count=resolved,
+            max_adverse_sample_count=resolved,
+            end_return_sample_count=resolved,
+            hit_bar_sample_count=hit,
+            raw_events=tuple(),
+            evaluated_events=tuple(),
+            cases=cases,
+            generated_at=GENERATED_AT,
+        )
+
+    def candidate(self, symbol, *, hit_rate=0.7, resolved=100):
+        config = self.config()
+        snapshot = self.snapshot(symbol=symbol)
+        signal_match = evaluate_signal_conditions(snapshot, config.signal_definition)
+        return build_swing_candidate(
+            signal_match=signal_match,
+            technical_series=self.technical_series(symbol=symbol, snapshot=snapshot),
+            report=self.report(symbol=symbol, hit_rate=hit_rate, resolved=resolved),
+            config=config,
+        )
+
+    def result(self, candidates=tuple(), **overrides):
+        values = {
+            "config": self.config(),
+            "requested_symbols": ("2330", "2330.TW", "NVDA"),
+            "normalized_symbols": ("2330.TW", "NVDA"),
+            "matched_candidates": tuple(candidates),
+            "no_match_symbols": ("AAPL",),
+            "no_match_details": tuple(),
+            "not_evaluable_symbols": tuple(),
+            "failed_symbols": tuple(),
+            "generated_at": GENERATED_AT,
+        }
+        values.update(overrides)
+        return SwingScannerResult(**values)
+
+    def test_symbol_input_supports_newlines_commas_and_dedupes(self):
+        self.assertEqual(
+            parse_swing_symbol_input("2330\n2330.TW, NVDA；6488.TWO"),
+            ("2330.TW", "NVDA", "6488.TWO"),
+        )
+
+    def test_fingerprint_changes_for_symbols_overlap_range_and_preferred_n(self):
+        base = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        changed_symbols = build_swing_research_fingerprint(
+            normalized_symbols=("2454.TW",),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        changed_policy = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="COOLDOWN",
+            cooldown_bars=20,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        changed_range = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2019, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        changed_minimum = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=30,
+        )
+
+        self.assertNotEqual(base, changed_symbols)
+        self.assertNotEqual(base, changed_policy)
+        self.assertNotEqual(base, changed_range)
+        self.assertNotEqual(base, changed_minimum)
+
+    def test_fingerprint_from_config_uses_scanner_config_values(self):
+        config = self.config()
+        self.assertEqual(
+            fingerprint_from_config(("2330.TW",), config),
+            build_swing_research_fingerprint(
+                normalized_symbols=("2330.TW",),
+                signal_id=config.signal_definition.id,
+                outcome_id=config.outcome_definition.id,
+                overlap_policy=config.overlap_policy.value,
+                cooldown_bars=config.cooldown_bars,
+                start_date=config.backtest_start_date,
+                end_date=config.backtest_end_date,
+                preferred_sample_minimum=config.minimum_resolved_samples,
+            ),
+        )
+
+    def test_percentage_formatter(self):
+        self.assertEqual(format_percentage(0.72), "72.00%")
+        self.assertEqual(format_percentage(-0.08), "-8.00%")
+        self.assertEqual(format_percentage(None), "N/A")
+
+    def test_sample_status_labels_are_neutral(self):
+        self.assertEqual(sample_status_label(SampleSizeStatus.BELOW_PREFERRED_MINIMUM), "Below Preferred Minimum")
+        self.assertNotIn("confidence", sample_status_label(SampleSizeStatus.BELOW_PREFERRED_MINIMUM).lower())
+
+    def test_candidate_table_uses_service_order_and_display_fields(self):
+        small = self.candidate("SMALL", hit_rate=1.0, resolved=3)
+        large = self.candidate("LARGE", hit_rate=0.7, resolved=100)
+        ranked = rank_swing_candidates((small, large))
+
+        rows = build_candidate_table_rows(ranked)
+
+        self.assertEqual(rows[0]["Symbol"], "LARGE")
+        self.assertEqual(rows[0]["Research Priority"], 1)
+        self.assertEqual(rows[0]["Historical Hit Rate"], "70.00%")
+        self.assertEqual(rows[0]["Resolved n"], 100)
+        self.assertEqual(rows[0]["Median MFE"], "10.00%")
+        self.assertEqual(rows[0]["Median MAE"], "-4.00%")
+        self.assertEqual(rows[0]["Median End Return"], "-2.00%")
+        self.assertEqual(rows[1]["Sample Status"], "Below Preferred Minimum")
+
+    def test_candidate_selector_shows_hit_rate_and_resolved_n(self):
+        self.assertEqual(
+            candidate_selector_label(self.candidate("TEST", hit_rate=1.0, resolved=3)),
+            "TEST | 100.00% | n=3",
+        )
+
+    def test_zero_match_summary_is_safe(self):
+        result = self.result()
+        rows = build_scan_summary_rows(result)
+
+        self.assertEqual(rows[1], {"Metric": "MATCH", "Value": 0})
+        self.assertEqual(build_candidate_table_rows(result.matched_candidates), [])
+
+    def test_condition_trace_comes_from_signal_match(self):
+        candidate = self.candidate("TEST")
+        rows = build_condition_trace_rows(candidate.signal_match)
+
+        self.assertEqual(rows[0]["Metric"], "analysis_close")
+        self.assertEqual(rows[0]["Operator"], ">")
+        self.assertEqual(rows[0]["Expected / Secondary"], "sma_20")
+        self.assertEqual(rows[0]["Status"], "MATCH")
+        self.assertTrue(current_match_trace_is_consistent(candidate.signal_match))
+
+    def test_inconsistent_current_match_trace_is_detected(self):
+        candidate = self.candidate("TEST")
+        condition = replace(
+            candidate.signal_match.evaluated_conditions[0],
+            status=SignalEvaluationStatus.NO_MATCH,
+            matched=False,
+        )
+        signal_match = replace(candidate.signal_match, evaluated_conditions=(condition,))
+
+        self.assertFalse(current_match_trace_is_consistent(signal_match))
+
+    def test_technical_snapshot_rows_include_required_current_metrics(self):
+        rows = build_technical_snapshot_rows(self.snapshot())
+        labels = [row["Metric"] for row in rows]
+
+        self.assertIn("SMA20", labels)
+        self.assertIn("RSI14", labels)
+        self.assertIn("MACD Signal", labels)
+        self.assertIn("Distance to Prior60D High", labels)
+        self.assertEqual(rows[-1]["Value"], "-4.00%")
+
+    def test_no_match_rows_show_failed_conditions(self):
+        from swing_scanner_service import SwingScanCurrentSignalAudit
+
+        result = self.result(
+            no_match_details=(
+                SwingScanCurrentSignalAudit(
+                    symbol="AAPL",
+                    status=SignalEvaluationStatus.NO_MATCH,
+                    failed_conditions=("analysis_close",),
+                ),
+            )
+        )
+
+        self.assertEqual(build_no_match_rows(result)[0]["Failed Conditions"], "analysis_close")
+
+    def test_not_evaluable_rows_show_missing_features(self):
+        from swing_scanner_service import SwingScanCurrentSignalAudit
+
+        result = self.result(
+            not_evaluable_symbols=(
+                SwingScanCurrentSignalAudit(
+                    symbol="AAPL",
+                    status=SignalEvaluationStatus.NOT_EVALUABLE,
+                    missing_required_features=("sma_200",),
+                ),
+            )
+        )
+
+        self.assertEqual(build_not_evaluable_rows(result)[0]["Missing Required Features"], "sma_200")
+
+    def test_failure_rows_use_safe_error_fields(self):
+        from swing_scanner_service import SwingScanFailure
+
+        result = self.result(
+            failed_symbols=(
+                SwingScanFailure(symbol="FAIL", error_type="RuntimeError", message="provider unavailable"),
+            )
+        )
+
+        self.assertEqual(build_failure_rows(result)[0]["Safe Message"], "provider unavailable")
+        self.assertNotIn("traceback", build_failure_rows(result)[0]["Safe Message"].lower())
+
+    def test_case_preview_uses_session_price_cache(self):
+        hit_case = HistoricalBacktestCase(
+            symbol="TEST",
+            signal_event=self.signal_event(),
+            outcome=self.outcome(OutcomeEvaluationStatus.HIT),
+            case_id="case_hit",
+        )
+        miss_case = HistoricalBacktestCase(
+            symbol="TEST",
+            signal_event=self.signal_event(signal_date=date(2025, 1, 4)),
+            outcome=self.outcome(OutcomeEvaluationStatus.MISS, signal_date=date(2025, 1, 4)),
+            case_id="case_miss",
+        )
+        candidate = self.candidate("TEST")
+        candidate = replace(candidate, historical_backtest_report=self.report(symbol="TEST", cases=(hit_case, miss_case)))
+
+        views = build_case_preview_views(
+            candidate=candidate,
+            price_series_by_symbol={"TEST": self.price_series("TEST")},
+        )
+
+        self.assertEqual(len(views), 2)
+        self.assertEqual({view.outcome_status for view in views}, {OutcomeEvaluationStatus.HIT, OutcomeEvaluationStatus.MISS})
+
+    def test_case_preview_missing_price_cache_does_not_fetch(self):
+        with self.assertRaises(HistoricalCaseDataError):
+            build_case_preview_views(
+                candidate=self.candidate("TEST"),
+                price_series_by_symbol={},
+            )
+
+    def test_case_preview_filters_resolved_hit_and_miss(self):
+        hit = replace(self.signal_event(), signal_date=date(2025, 1, 3))
+        # Reuse built views from direct helper test shape for filter behavior.
+        hit_case = HistoricalBacktestCase("TEST", hit, self.outcome(OutcomeEvaluationStatus.HIT), "hit")
+        incomplete_case = HistoricalBacktestCase(
+            "TEST",
+            self.signal_event(signal_date=date(2025, 1, 4)),
+            self.outcome(OutcomeEvaluationStatus.INCOMPLETE, signal_date=date(2025, 1, 4)),
+            "incomplete",
+        )
+        candidate = replace(
+            self.candidate("TEST"),
+            historical_backtest_report=self.report(symbol="TEST", cases=(hit_case, incomplete_case)),
+        )
+        views = build_case_preview_views(candidate=candidate, price_series_by_symbol={"TEST": self.price_series("TEST")})
+
+        self.assertEqual(len(filter_case_preview_views(views, "Resolved")), 1)
+        self.assertEqual(filter_case_preview_views(views, "HIT")[0].outcome_status, OutcomeEvaluationStatus.HIT)
+        self.assertEqual(filter_case_preview_views(views, "MISS"), tuple())
+
+    def test_case_preview_count_rows(self):
+        hit_case = HistoricalBacktestCase("TEST", self.signal_event(), self.outcome(OutcomeEvaluationStatus.HIT), "hit")
+        miss_case = HistoricalBacktestCase(
+            "TEST",
+            self.signal_event(signal_date=date(2025, 1, 4)),
+            self.outcome(OutcomeEvaluationStatus.MISS, signal_date=date(2025, 1, 4)),
+            "miss",
+        )
+        candidate = replace(
+            self.candidate("TEST"),
+            historical_backtest_report=self.report(symbol="TEST", cases=(hit_case, miss_case)),
+        )
+        views = build_case_preview_views(candidate=candidate, price_series_by_symbol={"TEST": self.price_series("TEST")})
+
+        self.assertEqual(build_case_preview_count_rows(views)[0], {"Metric": "HIT Cases", "Value": 1})
+        self.assertEqual(build_case_preview_count_rows(views)[1], {"Metric": "MISS Cases", "Value": 1})
+
+    def test_case_preview_limits_to_latest_five(self):
+        views = tuple(
+            replace(
+                build_case_preview_views(
+                    candidate=replace(
+                        self.candidate("TEST"),
+                        historical_backtest_report=self.report(
+                            symbol="TEST",
+                            cases=(
+                                HistoricalBacktestCase(
+                                    "TEST",
+                                    self.signal_event(signal_date=date(2025, 1, day)),
+                                    self.outcome(OutcomeEvaluationStatus.HIT, signal_date=date(2025, 1, day)),
+                                    f"case_{day}",
+                                ),
+                            ),
+                        ),
+                    ),
+                    price_series_by_symbol={"TEST": self.price_series("TEST")},
+                )[0]
+            )
+            for day in range(1, 7)
+        )
+
+        limited = latest_case_preview_rows(views)
+
+        self.assertEqual(len(limited), CASE_PREVIEW_LIMIT)
+        self.assertEqual(limited[0].signal_date, date(2025, 1, 6))
+
+    def test_helper_source_does_not_use_recommendation_or_probability_language(self):
+        source = (SRC_PATH / "swing_research_dashboard.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("Buy Rank", source)
+        self.assertNotIn("Opportunity Score", source)
+        self.assertNotIn("上漲機率", source)
+        self.assertNotIn("confidence", source)
+
+
+if __name__ == "__main__":
+    unittest.main()
