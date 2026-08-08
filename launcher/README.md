@@ -36,6 +36,8 @@ dist/AI Investment Research.app
 
 `dist/` 是 generated artifact，不進 Git。未來如果 AppleScript 或 shell launcher 有調整，重新執行 build script 即可重建 `.app`。
 
+如果 Launcher 重新 build 後 Dock 點擊行為異常，請從 Dock 移除舊圖示，再將最新 `dist/AI Investment Research.app` 拖回 Dock。
+
 ## 第二次雙擊行為
 
 如果 `localhost:8501` 已經是 ready 的 Streamlit server，Launcher 不會啟動第二個 Streamlit process，只會直接開啟瀏覽器到：
