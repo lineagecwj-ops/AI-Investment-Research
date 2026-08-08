@@ -173,11 +173,17 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn('st.session_state.setdefault("swing_research_last_error", None)', app_source)
         self.assertIn('st.session_state.setdefault("swing_research_price_series_by_symbol", {})', app_source)
         self.assertIn('st.session_state.setdefault("swing_research_source_context", None)', app_source)
-        self.assertIn('submitted = st.form_submit_button("執行波段掃描")', app_source)
+        self.assertIn('"執行波段掃描"', app_source)
+        self.assertIn('"執行 Replay Scan"', app_source)
         self.assertIn('if submitted:', app_source)
         self.assertIn('if st.button("清除掃描結果"):', app_source)
         self.assertIn("build_swing_research_scan_result(", app_source)
+        self.assertIn("build_swing_research_replay_result(", app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_result_mode", None)', app_source)
+        self.assertIn('st.session_state.setdefault("swing_research_replay_date", None)', app_source)
         self.assertIn("Symbol Source", app_source)
+        self.assertIn("Historical Replay", app_source)
+        self.assertIn("Replay Date", app_source)
         self.assertIn("Manual Input", universe_source)
         self.assertIn("Saved Universe", universe_source)
 
@@ -203,10 +209,14 @@ class DashboardFormattingTestCase(unittest.TestCase):
         ]
 
         self.assertIn("Historical Hit Rate", swing_page_source)
+        self.assertIn("Historical Hit Rate (As Of)", swing_page_source)
+        self.assertIn("Post-Replay Outcome", swing_page_source)
         self.assertIn("Resolved Samples", swing_page_source)
         self.assertIn("Research Priority", swing_page_source)
         self.assertIn("swing_research_price_series_by_symbol", swing_page_source)
         combined_source = swing_page_source + helper_source + universe_source
+        self.assertNotIn("Prediction Result", combined_source)
+        self.assertNotIn("Replay Probability", combined_source)
         self.assertNotIn("Buy Rank", combined_source)
         self.assertNotIn("Opportunity Score", combined_source)
         self.assertNotIn("上漲機率", combined_source)

@@ -34,6 +34,8 @@ from models import TechnicalIndicatorSnapshot
 from models import TechnicalSignalCondition
 from signal_outcome_service import evaluate_signal_conditions
 from swing_research_dashboard import CASE_PREVIEW_LIMIT
+from swing_research_dashboard import CURRENT_SCAN_MODE
+from swing_research_dashboard import HISTORICAL_REPLAY_MODE
 from swing_research_dashboard import build_candidate_table_rows
 from swing_research_dashboard import build_case_preview_count_rows
 from swing_research_dashboard import build_case_preview_views
@@ -41,6 +43,8 @@ from swing_research_dashboard import build_condition_trace_rows
 from swing_research_dashboard import build_failure_rows
 from swing_research_dashboard import build_no_match_rows
 from swing_research_dashboard import build_not_evaluable_rows
+from swing_research_dashboard import build_replay_candidate_table_rows
+from swing_research_dashboard import build_replay_summary_rows
 from swing_research_dashboard import build_scan_summary_rows
 from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_technical_snapshot_rows
@@ -50,8 +54,15 @@ from swing_research_dashboard import filter_case_preview_views
 from swing_research_dashboard import fingerprint_from_config
 from swing_research_dashboard import format_percentage
 from swing_research_dashboard import latest_case_preview_rows
+from swing_research_dashboard import post_replay_outcome_rows
 from swing_research_dashboard import parse_swing_symbol_input
+from swing_research_dashboard import replay_candidate_selector_label
+from swing_research_dashboard import replay_fingerprint_from_config
 from swing_research_dashboard import sample_status_label
+from historical_replay_service import HistoricalReplayConfig
+from historical_replay_service import HistoricalReplayResult
+from historical_replay_service import build_historical_replay_candidate
+from historical_replay_service import build_point_in_time_backtest_summary
 from swing_scanner_service import SampleSizeStatus
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerResult
@@ -210,6 +221,46 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
             end_of_window_return=-0.02,
         )
 
+    def replay_config(self, **overrides):
+        values = {
+            "replay_date": date(2024, 6, 30),
+            "signal_definition": self.signal_definition(),
+            "outcome_definition": self.outcome_definition(),
+            "overlap_policy": OverlappingSignalPolicy.ALLOW_ALL,
+            "cooldown_bars": None,
+            "historical_start_date": date(2018, 1, 1),
+            "preferred_resolved_samples": 20,
+        }
+        values.update(overrides)
+        return HistoricalReplayConfig(**values)
+
+    def replay_candidate(self, symbol="TEST"):
+        config = self.replay_config()
+        snapshot = self.snapshot(symbol=symbol, trading_date=date(2024, 6, 28))
+        signal_match = evaluate_signal_conditions(snapshot, config.signal_definition)
+        price_series = HistoricalPriceSeries(
+            symbol=symbol,
+            currency="USD",
+            bars=(
+                HistoricalPriceBar(symbol=symbol, trading_date=date(2024, 6, 28), open=100, high=120, low=90, close=110, adjusted_close=110, volume=1000),
+                HistoricalPriceBar(symbol=symbol, trading_date=date(2024, 7, 1), open=111, high=130, low=100, close=120, adjusted_close=120, volume=1000),
+            ),
+            fetched_at=FETCHED_AT,
+        )
+        summary = build_point_in_time_backtest_summary(
+            tuple(),
+            price_series=price_series,
+            config=config,
+            actual_signal_date=date(2024, 6, 28),
+        )
+        return build_historical_replay_candidate(
+            signal_match=signal_match,
+            summary=summary,
+            post_replay_outcome=self.outcome(OutcomeEvaluationStatus.HIT, symbol=symbol, signal_date=date(2024, 6, 28)),
+            price_series=price_series,
+            config=config,
+        )
+
     def report(self, symbol="TEST", *, hit_rate=0.7, resolved=100, cases=tuple()):
         config = self.config()
         hit = int(hit_rate * resolved) if hit_rate is not None else 0
@@ -364,6 +415,49 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         self.assertNotEqual(manual, saved_universe)
 
+    def test_fingerprint_changes_for_scan_mode_and_replay_date(self):
+        current = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            source_type="Manual Input",
+            scan_mode=CURRENT_SCAN_MODE,
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            preferred_sample_minimum=20,
+        )
+        replay = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            source_type="Manual Input",
+            scan_mode=HISTORICAL_REPLAY_MODE,
+            replay_date=date(2024, 6, 30),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=None,
+            preferred_sample_minimum=20,
+        )
+        replay_next_day = build_swing_research_fingerprint(
+            normalized_symbols=("2330.TW",),
+            source_type="Manual Input",
+            scan_mode=HISTORICAL_REPLAY_MODE,
+            replay_date=date(2024, 7, 1),
+            signal_id="signal",
+            outcome_id="outcome",
+            overlap_policy="ALLOW_ALL",
+            cooldown_bars=None,
+            start_date=date(2018, 1, 1),
+            end_date=None,
+            preferred_sample_minimum=20,
+        )
+
+        self.assertNotEqual(current, replay)
+        self.assertNotEqual(replay, replay_next_day)
+
     def test_universe_content_change_changes_fingerprint(self):
         first = build_swing_research_fingerprint(
             normalized_symbols=("2330.TW", "2454.TW"),
@@ -406,6 +500,25 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
             ),
         )
 
+    def test_replay_fingerprint_from_config_uses_replay_config_values(self):
+        config = self.replay_config()
+
+        self.assertEqual(
+            replay_fingerprint_from_config(("2330.TW",), config),
+            build_swing_research_fingerprint(
+                normalized_symbols=("2330.TW",),
+                scan_mode=HISTORICAL_REPLAY_MODE,
+                replay_date=config.replay_date,
+                signal_id=config.signal_definition.id,
+                outcome_id=config.outcome_definition.id,
+                overlap_policy=config.overlap_policy.value,
+                cooldown_bars=config.cooldown_bars,
+                start_date=config.historical_start_date,
+                end_date=None,
+                preferred_sample_minimum=config.preferred_resolved_samples,
+            ),
+        )
+
     def test_percentage_formatter(self):
         self.assertEqual(format_percentage(0.72), "72.00%")
         self.assertEqual(format_percentage(-0.08), "-8.00%")
@@ -430,6 +543,54 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(rows[0]["Median MAE"], "-4.00%")
         self.assertEqual(rows[0]["Median End Return"], "-2.00%")
         self.assertEqual(rows[1]["Sample Status"], "Below Preferred Minimum")
+
+    def test_replay_summary_rows_match_current_scan_counts(self):
+        candidate = self.replay_candidate()
+        result = HistoricalReplayResult(
+            config=self.replay_config(),
+            requested_symbols=("TEST", "AAPL"),
+            normalized_symbols=("TEST", "AAPL"),
+            match_candidates=(candidate,),
+            no_match_symbols=("AAPL",),
+            no_match_details=tuple(),
+            not_evaluable_symbols=tuple(),
+            failed_symbols=tuple(),
+            generated_at=GENERATED_AT,
+        )
+
+        rows = build_replay_summary_rows(result)
+
+        self.assertEqual([row["Metric"] for row in rows], ["Scanned", "MATCH", "NO_MATCH", "NOT_EVALUABLE", "FAILED"])
+        self.assertEqual([row["Value"] for row in rows], [2, 1, 1, 0, 0])
+
+    def test_replay_candidate_table_uses_as_of_labels_and_post_outcome(self):
+        candidate = self.replay_candidate()
+
+        row = build_replay_candidate_table_rows((candidate,))[0]
+
+        self.assertEqual(row["Requested Replay Date"], "2024-06-30")
+        self.assertEqual(row["Actual Trading Date"], "2024-06-28")
+        self.assertIn("Historical Hit Rate (As Of)", row)
+        self.assertIn("Resolved n (As Of)", row)
+        self.assertEqual(row["Post-Replay Outcome"], "HIT")
+        self.assertNotIn("Replay Probability", row)
+
+    def test_replay_candidate_selector_uses_as_of_n_and_actual_date(self):
+        candidate = self.replay_candidate()
+
+        label = replay_candidate_selector_label(candidate)
+
+        self.assertIn("TEST", label)
+        self.assertIn("n=0", label)
+        self.assertIn("Actual=2024-06-28", label)
+
+    def test_post_replay_outcome_rows_are_separate_from_research_priority(self):
+        rows = post_replay_outcome_rows(self.replay_candidate())
+        labels = [row["Metric"] for row in rows]
+
+        self.assertIn("Post-Replay Outcome", labels)
+        self.assertIn("First Hit Date", labels)
+        self.assertNotIn("Prediction Result", labels)
 
     def test_candidate_selector_shows_hit_rate_and_resolved_n(self):
         self.assertEqual(
