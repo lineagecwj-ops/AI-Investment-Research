@@ -163,6 +163,26 @@ class HistoricalPriceSeries:
 
 
 @dataclass(frozen=True)
+class ResearchUniverse:
+
+    id: str
+
+    name: str
+
+    symbols: tuple[str, ...]
+
+    created_at: datetime
+
+    updated_at: datetime
+
+    description: str | None = None
+
+    @property
+    def symbol_count(self) -> int:
+        return len(self.symbols)
+
+
+@dataclass(frozen=True)
 class TechnicalIndicatorSnapshot:
 
     symbol: str

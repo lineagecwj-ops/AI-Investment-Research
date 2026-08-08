@@ -122,6 +122,25 @@ class DatabaseTestCase(unittest.TestCase):
         self.assertIsNotNone(table)
         self.assertIsNotNone(state_table)
 
+    def test_initialize_database_creates_research_universe_tables(self):
+        initialize_database(self.db_path)
+
+        connection = sqlite3.connect(self.db_path)
+        try:
+            universe_table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+                ("table", "research_universes"),
+            ).fetchone()
+            symbol_table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+                ("table", "research_universe_symbols"),
+            ).fetchone()
+        finally:
+            connection.close()
+
+        self.assertIsNotNone(universe_table)
+        self.assertIsNotNone(symbol_table)
+
     def test_save_and_read_stock_from_fresh_cache(self):
         save_stock(self.sample_stock(), self.db_path, fetched_at=self.now)
 

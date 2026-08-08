@@ -190,6 +190,40 @@ CREATE TABLE IF NOT EXISTS historical_price_fetch_state (
 )
 """
 
+RESEARCH_UNIVERSE_COLUMNS = {
+    "id": "TEXT PRIMARY KEY",
+    "name": "TEXT NOT NULL",
+    "description": "TEXT",
+    "created_at": "TEXT NOT NULL",
+    "updated_at": "TEXT NOT NULL",
+}
+
+RESEARCH_UNIVERSE_SYMBOL_COLUMNS = {
+    "universe_id": "TEXT NOT NULL",
+    "position": "INTEGER NOT NULL",
+    "symbol": "TEXT NOT NULL",
+}
+
+CREATE_RESEARCH_UNIVERSES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS research_universes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)
+"""
+
+CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS research_universe_symbols (
+    universe_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    PRIMARY KEY(universe_id, symbol),
+    FOREIGN KEY(universe_id) REFERENCES research_universes(id)
+)
+"""
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -205,10 +239,14 @@ def initialize_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
         migrate_historical_prices_table(connection)
         migrate_historical_price_fetch_state_table(connection)
+        migrate_research_universes_table(connection)
+        migrate_research_universe_symbols_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.commit()
@@ -284,6 +322,36 @@ def migrate_historical_price_fetch_state_table(connection: sqlite3.Connection) -
         )
 
 
+def migrate_research_universes_table(connection: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(research_universes)").fetchall()
+    }
+
+    for column, column_type in RESEARCH_UNIVERSE_COLUMNS.items():
+        if column in existing_columns:
+            continue
+        connection.execute(
+            f"ALTER TABLE research_universes ADD COLUMN {column} {column_type}"
+        )
+
+
+def migrate_research_universe_symbols_table(connection: sqlite3.Connection) -> None:
+    existing_columns = {
+        row[1]
+        for row in connection.execute(
+            "PRAGMA table_info(research_universe_symbols)"
+        ).fetchall()
+    }
+
+    for column, column_type in RESEARCH_UNIVERSE_SYMBOL_COLUMNS.items():
+        if column in existing_columns:
+            continue
+        connection.execute(
+            f"ALTER TABLE research_universe_symbols ADD COLUMN {column} {column_type}"
+        )
+
+
 def invalidate_stock_cache_after_schema_migration(
     connection: sqlite3.Connection,
 ) -> None:
@@ -311,10 +379,14 @@ def save_stock(
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
         migrate_historical_prices_table(connection)
         migrate_historical_price_fetch_state_table(connection)
+        migrate_research_universes_table(connection)
+        migrate_research_universe_symbols_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
         connection.execute(
@@ -498,10 +570,14 @@ def save_historical_financials(
         connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
         connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
+        connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
         schema_changed = migrate_stocks_table(connection)
         migrate_historical_financials_table(connection)
         migrate_historical_prices_table(connection)
         migrate_historical_price_fetch_state_table(connection)
+        migrate_research_universes_table(connection)
+        migrate_research_universe_symbols_table(connection)
         if schema_changed:
             invalidate_stock_cache_after_schema_migration(connection)
 
@@ -728,10 +804,14 @@ def initialize_historical_price_tables(connection: sqlite3.Connection) -> None:
     connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
     connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
     connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+    connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
+    connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
     schema_changed = migrate_stocks_table(connection)
     migrate_historical_financials_table(connection)
     migrate_historical_prices_table(connection)
     migrate_historical_price_fetch_state_table(connection)
+    migrate_research_universes_table(connection)
+    migrate_research_universe_symbols_table(connection)
     if schema_changed:
         invalidate_stock_cache_after_schema_migration(connection)
 
