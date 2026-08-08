@@ -124,6 +124,7 @@ from out_of_sample_validation_service import ValidationPeriod
 from out_of_sample_validation_service import ValidationPeriodRole
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
+import swing_scanner_service as swing_scanner_module
 from ui_terminology import format_condition_labels
 from ui_terminology import get_frequency_label
 from ui_terminology import get_outcome_definition_label
@@ -175,6 +176,9 @@ SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "build_technical_condition_detail_view",
     "build_beginner_indicator_explanations",
     "build_technical_condition_developer_rows",
+)
+SWING_SCANNER_RESULT_REQUIRED_FIELDS = (
+    "current_signal_details",
 )
 
 
@@ -1318,6 +1322,7 @@ def build_swing_research_scan_result(
     config: SwingScannerConfig,
     source_type: str,
 ) -> dict:
+    ensure_swing_scanner_result_contract()
     price_series_by_symbol = {}
 
     def recording_price_loader(symbol: str, *, force_refresh: bool = False):
@@ -1337,6 +1342,39 @@ def build_swing_research_scan_result(
         "fingerprint": fingerprint,
         "price_series_by_symbol": price_series_by_symbol,
     }
+
+
+def ensure_swing_scanner_result_contract() -> None:
+    global SwingScannerConfig
+    global SwingScannerService
+    global swing_scanner_module
+    global swing_dashboard
+    result_fields = getattr(
+        swing_scanner_module.SwingScannerResult,
+        "__dataclass_fields__",
+        {},
+    )
+    if all(name in result_fields for name in SWING_SCANNER_RESULT_REQUIRED_FIELDS):
+        return
+    swing_scanner_module = importlib.reload(swing_scanner_module)
+    SwingScannerConfig = swing_scanner_module.SwingScannerConfig
+    SwingScannerService = swing_scanner_module.SwingScannerService
+    swing_dashboard = importlib.reload(swing_dashboard)
+    result_fields = getattr(
+        swing_scanner_module.SwingScannerResult,
+        "__dataclass_fields__",
+        {},
+    )
+    missing = [
+        name
+        for name in SWING_SCANNER_RESULT_REQUIRED_FIELDS
+        if name not in result_fields
+    ]
+    if missing:
+        raise AttributeError(
+            "swing_scanner_service.SwingScannerResult missing fields: "
+            + ", ".join(missing)
+        )
 
 
 def build_swing_research_replay_result(

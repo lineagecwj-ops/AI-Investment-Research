@@ -911,6 +911,27 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertTrue(technical_detail_result_is_stale(legacy))
         self.assertEqual(technical_detail_selector_matches(legacy), tuple())
 
+    def test_fresh_scan_result_replaces_legacy_result_for_technical_detail(self):
+        legacy = self.legacy_result_without_current_signal_details()
+        no_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=1.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        session_state = {"swing_research_result": legacy}
+
+        self.assertTrue(technical_detail_result_is_stale(session_state["swing_research_result"]))
+
+        session_state["swing_research_result"] = self.result(
+            current_signal_details=(no_match,),
+            no_match_symbols=("2330.TW",),
+        )
+
+        self.assertFalse(technical_detail_result_is_stale(session_state["swing_research_result"]))
+        self.assertEqual(
+            [item.symbol for item in technical_detail_selector_matches(session_state["swing_research_result"])],
+            ["2330.TW"],
+        )
+
     def test_technical_detail_falls_back_to_matched_candidates_for_older_results(self):
         candidate = self.candidate("MATCH")
         result = self.result(candidates=(candidate,), current_signal_details=tuple())

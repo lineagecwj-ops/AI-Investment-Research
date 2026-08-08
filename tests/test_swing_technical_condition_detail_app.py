@@ -1,5 +1,6 @@
 import ast
 import importlib
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -125,6 +126,34 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         finally:
             importlib.reload(swing_research_dashboard)
             app_module.swing_dashboard = swing_research_dashboard
+
+    def test_current_scan_contract_recovers_stale_scanner_module_schema(self):
+        script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path('.').resolve()))
+sys.path.insert(0, str(Path('src').resolve()))
+import app
+import swing_scanner_service
+stale_fields = dict(swing_scanner_service.SwingScannerResult.__dataclass_fields__)
+stale_fields.pop('current_signal_details')
+swing_scanner_service.SwingScannerResult.__dataclass_fields__ = stale_fields
+app.ensure_swing_scanner_result_contract()
+assert 'current_signal_details' in app.swing_scanner_module.SwingScannerResult.__dataclass_fields__
+assert app.SwingScannerService is app.swing_scanner_module.SwingScannerService
+assert app.swing_dashboard.SwingScannerResult is app.swing_scanner_module.SwingScannerResult
+print('ok')
+"""
+
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("ok", completed.stdout)
 
 
 if __name__ == "__main__":
