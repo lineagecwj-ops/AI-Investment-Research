@@ -37,6 +37,24 @@ def app():
     render_swing_technical_condition_detail(result)
 
 
+def stale_result_app():
+    from app import render_swing_technical_condition_detail
+    from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+    case = SwingResearchDashboardTestCase()
+    render_swing_technical_condition_detail(
+        case.legacy_result_without_current_signal_details()
+    )
+
+
+def stale_current_result_app():
+    from app import render_swing_research_result
+    from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+    case = SwingResearchDashboardTestCase()
+    render_swing_research_result(case.legacy_result_without_current_signal_details())
+
+
 class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
 
     def test_detail_renderer_smoke_has_selector_table_and_chart(self):
@@ -47,6 +65,28 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(len(at.selectbox), 1)
         self.assertGreaterEqual(len(at.dataframe), 2)
+
+    def test_stale_result_renderer_shows_rescan_prompt_without_crash(self):
+        at = AppTest.from_function(stale_result_app)
+
+        at.run(timeout=10)
+
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(len(at.selectbox), 0)
+        self.assertTrue(
+            any("請重新執行一次波段掃描以產生完整明細" in item.value for item in at.info)
+        )
+
+    def test_stale_current_result_keeps_scan_summary_and_detail_prompt(self):
+        at = AppTest.from_function(stale_current_result_app)
+
+        at.run(timeout=10)
+
+        self.assertEqual(len(at.exception), 0)
+        self.assertGreaterEqual(len(at.metric), 5)
+        self.assertTrue(
+            any("請重新執行一次波段掃描以產生完整明細" in item.value for item in at.info)
+        )
 
     def test_render_contract_covers_all_swing_dashboard_references(self):
         import app as app_module

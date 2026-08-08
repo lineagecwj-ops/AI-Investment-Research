@@ -168,7 +168,9 @@ HISTORICAL_CASE_X_MODE_LABELS = {
 
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
+    "STALE_TECHNICAL_DETAIL_RESULT_MESSAGE",
     "technical_detail_selector_matches",
+    "technical_detail_result_is_stale",
     "technical_detail_selector_label",
     "build_technical_condition_detail_view",
     "build_beginner_indicator_explanations",
@@ -2066,6 +2068,9 @@ def render_swing_technical_condition_detail(result) -> None:
     st.caption(swing_dashboard.TECHNICAL_DETAIL_CAPTION)
     detail_matches = swing_dashboard.technical_detail_selector_matches(result)
     if not detail_matches:
+        if swing_dashboard.technical_detail_result_is_stale(result):
+            st.info(swing_dashboard.STALE_TECHNICAL_DETAIL_RESULT_MESSAGE)
+            return
         st.info("本次掃描沒有可顯示完整技術條件的股票。資料不足或掃描失敗的股票不會被顯示成完整技術評估。")
         return
 

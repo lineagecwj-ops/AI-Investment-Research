@@ -46,6 +46,10 @@ TECHNICAL_DETAIL_CAPTION = (
     "技術條件明細是 presentation / education UX，僅顯示本次掃描已計算的實際值、V1 要求與既有符合 / 不符合判定。"
     "符合項數不是股票分數、勝率或推薦。"
 )
+STALE_TECHNICAL_DETAIL_RESULT_MESSAGE = (
+    "目前掃描結果來自較舊的工作階段，尚未包含技術條件明細資料。"
+    "請重新執行一次波段掃描以產生完整明細。"
+)
 
 
 @dataclass(frozen=True)
@@ -356,16 +360,21 @@ def candidate_selector_label(candidate: SwingOpportunityCandidate) -> str:
 
 
 def technical_detail_selector_matches(result: SwingScannerResult) -> tuple[SignalMatch, ...]:
-    if result.current_signal_details:
+    current_signal_details = getattr(result, "current_signal_details", None)
+    if current_signal_details:
         return tuple(
             signal_match
-            for signal_match in result.current_signal_details
+            for signal_match in current_signal_details
             if signal_match.status in {
                 SignalEvaluationStatus.MATCH,
                 SignalEvaluationStatus.NO_MATCH,
             }
         )
     return tuple(candidate.signal_match for candidate in result.matched_candidates)
+
+
+def technical_detail_result_is_stale(result: SwingScannerResult) -> bool:
+    return not hasattr(result, "current_signal_details")
 
 
 def technical_detail_selector_label(signal_match: SignalMatch) -> str:

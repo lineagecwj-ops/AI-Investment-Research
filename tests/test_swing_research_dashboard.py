@@ -72,6 +72,7 @@ from swing_research_dashboard import replay_candidate_selector_label
 from swing_research_dashboard import replay_fingerprint_from_config
 from swing_research_dashboard import sample_status_label
 from swing_research_dashboard import technical_detail_selector_matches
+from swing_research_dashboard import technical_detail_result_is_stale
 from swing_research_dashboard import walk_forward_fingerprint_from_config
 from swing_research_dashboard import walk_forward_period_selector_label
 from historical_replay_service import HistoricalReplayConfig
@@ -411,6 +412,49 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         }
         values.update(overrides)
         return SwingScannerResult(**values)
+
+    def legacy_result_without_current_signal_details(self, **overrides):
+        class LegacySwingScannerResult:
+            @property
+            def requested_count(self):
+                return len(self.requested_symbols)
+
+            @property
+            def scanned_count(self):
+                return len(self.normalized_symbols)
+
+            @property
+            def matched_count(self):
+                return len(self.matched_candidates)
+
+            @property
+            def no_match_count(self):
+                return len(self.no_match_symbols)
+
+            @property
+            def not_evaluable_count(self):
+                return len(self.not_evaluable_symbols)
+
+            @property
+            def failure_count(self):
+                return len(self.failed_symbols)
+
+        legacy = LegacySwingScannerResult()
+        values = {
+            "config": self.config(),
+            "requested_symbols": ("2330", "0050"),
+            "normalized_symbols": ("2330.TW", "0050.TW"),
+            "matched_candidates": tuple(),
+            "no_match_symbols": ("2330.TW", "0050.TW"),
+            "no_match_details": tuple(),
+            "not_evaluable_symbols": tuple(),
+            "failed_symbols": tuple(),
+            "generated_at": GENERATED_AT,
+        }
+        values.update(overrides)
+        for name, value in values.items():
+            setattr(legacy, name, value)
+        return legacy
 
     def test_symbol_input_supports_newlines_commas_and_dedupes(self):
         self.assertEqual(
@@ -861,11 +905,18 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual([item.symbol for item in selector_matches], ["MATCH", "NO_MATCH"])
         self.assertEqual(selector_matches[1].status, SignalEvaluationStatus.NO_MATCH)
 
+    def test_technical_detail_selector_handles_legacy_result_without_current_signal_details(self):
+        legacy = self.legacy_result_without_current_signal_details()
+
+        self.assertTrue(technical_detail_result_is_stale(legacy))
+        self.assertEqual(technical_detail_selector_matches(legacy), tuple())
+
     def test_technical_detail_falls_back_to_matched_candidates_for_older_results(self):
         candidate = self.candidate("MATCH")
         result = self.result(candidates=(candidate,), current_signal_details=tuple())
 
         self.assertEqual(technical_detail_selector_matches(result), (candidate.signal_match,))
+        self.assertFalse(technical_detail_result_is_stale(result))
 
     def test_technical_detail_does_not_include_not_evaluable_or_failed_as_complete(self):
         not_evaluable = replace(
