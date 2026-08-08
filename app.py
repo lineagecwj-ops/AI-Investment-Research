@@ -170,12 +170,23 @@ HISTORICAL_CASE_X_MODE_LABELS = {
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
     "STALE_TECHNICAL_DETAIL_RESULT_MESSAGE",
+    "TechnicalConditionDetailView",
     "technical_detail_selector_matches",
     "technical_detail_result_is_stale",
     "technical_detail_selector_label",
     "build_technical_condition_detail_view",
+    "build_technical_condition_visual_specs",
     "build_beginner_indicator_explanations",
     "build_technical_condition_developer_rows",
+)
+SWING_TECHNICAL_DETAIL_VIEW_REQUIRED_FIELDS = (
+    "signal_match",
+    "matched_count",
+    "total_count",
+    "condition_rows",
+    "category_rows",
+    "visualization_rows",
+    "visual_specs",
 )
 SWING_SCANNER_RESULT_REQUIRED_FIELDS = (
     "current_signal_details",
@@ -2118,7 +2129,7 @@ def render_swing_technical_condition_detail(result) -> None:
     ]
     selected_label = st.selectbox("查看股票技術狀態", detail_labels, key="swing_technical_detail_selector")
     selected_match = detail_matches[detail_labels.index(selected_label)]
-    detail = swing_dashboard.build_technical_condition_detail_view(selected_match)
+    detail = ensure_current_technical_detail_view(selected_match)
 
     st.markdown(f"#### {selected_match.symbol}｜目前技術狀態")
     st.metric("符合技術條件", f"{detail.matched_count} / {detail.total_count}")
@@ -2194,9 +2205,24 @@ def render_swing_technical_condition_detail(result) -> None:
         )
 
 
-def ensure_swing_technical_detail_contract() -> None:
+def ensure_current_technical_detail_view(signal_match):
+    ensure_swing_technical_detail_contract()
+    detail = swing_dashboard.build_technical_condition_detail_view(signal_match)
+    if _technical_detail_view_missing_fields(detail):
+        ensure_swing_technical_detail_contract(force_reload=True)
+        detail = swing_dashboard.build_technical_condition_detail_view(signal_match)
+    missing = _technical_detail_view_missing_fields(detail)
+    if missing:
+        raise AttributeError(
+            "TechnicalConditionDetailView missing required fields: "
+            + ", ".join(missing)
+        )
+    return detail
+
+
+def ensure_swing_technical_detail_contract(*, force_reload: bool = False) -> None:
     global swing_dashboard
-    if all(hasattr(swing_dashboard, name) for name in SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES):
+    if not force_reload and _swing_technical_detail_contract_is_current():
         return
     swing_dashboard = importlib.reload(swing_dashboard)
     missing = [
@@ -2204,11 +2230,37 @@ def ensure_swing_technical_detail_contract() -> None:
         for name in SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES
         if not hasattr(swing_dashboard, name)
     ]
+    missing.extend(_technical_detail_view_schema_missing_fields())
     if missing:
         raise AttributeError(
             "swing_research_dashboard missing Technical Condition Detail attributes: "
             + ", ".join(missing)
         )
+
+
+def _swing_technical_detail_contract_is_current() -> bool:
+    return all(
+        hasattr(swing_dashboard, name)
+        for name in SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES
+    ) and not _technical_detail_view_schema_missing_fields()
+
+
+def _technical_detail_view_schema_missing_fields() -> list[str]:
+    view_class = getattr(swing_dashboard, "TechnicalConditionDetailView", None)
+    view_fields = getattr(view_class, "__dataclass_fields__", {})
+    return [
+        field_name
+        for field_name in SWING_TECHNICAL_DETAIL_VIEW_REQUIRED_FIELDS
+        if field_name not in view_fields
+    ]
+
+
+def _technical_detail_view_missing_fields(detail) -> list[str]:
+    return [
+        field_name
+        for field_name in SWING_TECHNICAL_DETAIL_VIEW_REQUIRED_FIELDS
+        if not hasattr(detail, field_name)
+    ]
 
 
 def render_swing_candidate_detail(candidate) -> None:

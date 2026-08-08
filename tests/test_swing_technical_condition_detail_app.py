@@ -56,6 +56,57 @@ def stale_current_result_app():
     render_swing_research_result(case.legacy_result_without_current_signal_details())
 
 
+def stale_detail_view_schema_app():
+    import app as app_module
+    import importlib
+    from dataclasses import dataclass
+    from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+    from signal_outcome_service import evaluate_signal_conditions
+    from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+    @dataclass(frozen=True)
+    class LegacyTechnicalConditionDetailView:
+        signal_match: object
+        matched_count: int
+        total_count: int
+        condition_rows: list
+        category_rows: list
+        visualization_rows: list
+
+    case = SwingResearchDashboardTestCase()
+    signal_match = evaluate_signal_conditions(
+        case.snapshot(
+            symbol="2330.TW",
+            volume_ratio_20=0.64,
+            rsi_14=50.6,
+            distance_to_prior_60d_high=-0.0651,
+        ),
+        TECHNICAL_EXAMPLE_SIGNAL_V1,
+    )
+    result = case.result(
+        current_signal_details=(signal_match,),
+        no_match_symbols=("2330.TW",),
+    )
+    original_builder = app_module.swing_dashboard.build_technical_condition_detail_view
+
+    def legacy_builder(selected_match):
+        fresh = original_builder(selected_match)
+        return LegacyTechnicalConditionDetailView(
+            signal_match=fresh.signal_match,
+            matched_count=fresh.matched_count,
+            total_count=fresh.total_count,
+            condition_rows=fresh.condition_rows,
+            category_rows=fresh.category_rows,
+            visualization_rows=fresh.visualization_rows,
+        )
+
+    app_module.swing_dashboard.build_technical_condition_detail_view = legacy_builder
+    try:
+        app_module.render_swing_technical_condition_detail(result)
+    finally:
+        app_module.swing_dashboard = importlib.reload(app_module.swing_dashboard)
+
+
 class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
 
     def test_detail_renderer_smoke_has_selector_table_and_chart(self):
@@ -66,6 +117,37 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(len(at.selectbox), 1)
         self.assertGreaterEqual(len(at.dataframe), 2)
+
+    def test_fresh_detail_view_schema_has_beginner_visual_specs(self):
+        import app as app_module
+        from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+        from signal_outcome_service import evaluate_signal_conditions
+        from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+        case = SwingResearchDashboardTestCase()
+        signal_match = evaluate_signal_conditions(
+            case.snapshot(symbol="2330.TW"),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+
+        detail = app_module.ensure_current_technical_detail_view(signal_match)
+
+        self.assertTrue(hasattr(detail, "visual_specs"))
+        self.assertEqual(
+            [spec.title for spec in detail.visual_specs],
+            ["成交量活躍度", "RSI 動能", "接近前高程度"],
+        )
+
+    def test_stale_detail_view_schema_rebuilds_without_attribute_error(self):
+        at = AppTest.from_function(stale_detail_view_schema_app)
+
+        at.run(timeout=10)
+
+        self.assertEqual(len(at.exception), 0)
+        markdown_text = "\n".join(item.value for item in at.markdown)
+        self.assertIn("成交量活躍度", markdown_text)
+        self.assertIn("RSI 動能", markdown_text)
+        self.assertIn("接近前高程度", markdown_text)
 
     def test_stale_result_renderer_shows_rescan_prompt_without_crash(self):
         at = AppTest.from_function(stale_result_app)
@@ -108,10 +190,26 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
             and node.value.id == "swing_dashboard"
         }
 
-        self.assertEqual(
-            references,
-            set(app_module.SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES),
-        )
+        self.assertTrue(references.issubset(set(app_module.SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES)))
+
+    def test_view_schema_contract_requires_visual_specs(self):
+        import app as app_module
+        import swing_research_dashboard
+
+        try:
+            stale_fields = dict(swing_research_dashboard.TechnicalConditionDetailView.__dataclass_fields__)
+            stale_fields.pop("visual_specs")
+            swing_research_dashboard.TechnicalConditionDetailView.__dataclass_fields__ = stale_fields
+
+            app_module.ensure_swing_technical_detail_contract()
+
+            self.assertIn(
+                "visual_specs",
+                app_module.swing_dashboard.TechnicalConditionDetailView.__dataclass_fields__,
+            )
+        finally:
+            importlib.reload(swing_research_dashboard)
+            app_module.swing_dashboard = swing_research_dashboard
 
     def test_render_contract_recovers_stale_helper_module(self):
         import app as app_module
