@@ -225,6 +225,8 @@ class SwingScannerResult:
 
     generated_at: datetime
 
+    current_signal_details: tuple[SignalMatch, ...] = tuple()
+
     limitations: tuple[str, ...] = (LATEST_BAR_PROVISIONAL_LIMITATION,)
 
     @property
@@ -277,6 +279,7 @@ class SwingScannerService:
         no_match_details = []
         not_evaluable_symbols = []
         failed_symbols = []
+        current_signal_details = []
 
         for symbol in normalized_symbols:
             try:
@@ -290,8 +293,10 @@ class SwingScannerService:
             signal_match = scan_result.signal_match
             if signal_match.status is SignalEvaluationStatus.MATCH:
                 candidates.append(scan_result.candidate)
+                current_signal_details.append(signal_match)
             elif signal_match.status is SignalEvaluationStatus.NO_MATCH:
                 no_match_symbols.append(symbol)
+                current_signal_details.append(signal_match)
                 no_match_details.append(
                     _current_signal_audit(symbol, signal_match, config.signal_definition)
                 )
@@ -319,6 +324,7 @@ class SwingScannerService:
             not_evaluable_symbols=tuple(not_evaluable_symbols),
             failed_symbols=tuple(failed_symbols),
             generated_at=datetime.now(UTC),
+            current_signal_details=tuple(current_signal_details),
         )
 
     def _scan_symbol(self, symbol: str, config: SwingScannerConfig):
