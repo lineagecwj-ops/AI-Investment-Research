@@ -25,7 +25,7 @@ For each selectable stock, the dashboard shows:
 - V1 thresholds
 - existing PASS / FAIL status from scanner evaluation
 - neutral gap-to-threshold text
-- factual visual markers for RSI, volume ratio, and distance to prior 60-day high
+- three beginner-friendly visual bars for volume activity, RSI momentum, and distance to prior 60-day high
 - beginner explanations
 - developer traceability for internal IDs and raw metric names
 
@@ -72,12 +72,25 @@ Gap text is factual:
 
 The gap is not converted into probability, expected return, timing, buy point language, or recommendation language.
 
-## Visualization
+## Beginner Visual Bars
 
-The visualization uses Streamlit / Altair native rendering and only displays current markers and V1 thresholds:
+The visualization uses Streamlit / Altair native rendering and shows three independent visual bars. The dashboard does not put volume ratio, RSI, and distance-to-high on one shared numeric axis because their units and domains are different.
 
-- RSI current value plus `50` and `70`
-- volume ratio current value plus `1.20`
-- distance to prior 60-day high current value plus `-5%` and `0%`
+Each visual uses scan-time actual values and existing `SignalMatch.evaluated_conditions` status:
 
-It does not visualize predicted price, future return, strategy P&L, or expected outcome.
+- `成交量活躍度`: current `volume_ratio_20`, V1 threshold `1.20`, neutral gap, and dynamic scale starting at `0`.
+- `RSI 動能`: current `RSI 14`, V1 range `50-70`, and fixed RSI domain `0-100`.
+- `接近前高程度`: current `distance_to_prior_60d_high`, V1 threshold `-5%`, `0%` prior-high reference, and dynamic range that keeps the current value, threshold, and `0%` visible.
+
+Missing visual metrics display `N/A` and the safe message `目前沒有足夠資料顯示此指標。`
+
+The detailed table remains the source of full numeric context:
+
+- `技術條件`
+- `目前實際值`
+- `V1 要求`
+- `狀態`
+- `距離門檻`
+- `白話解釋`
+
+The visual bars do not create a score, buy score, opportunity score, win rate, probability, recommendation, buy-point label, predicted price, future return, strategy P&L, or expected outcome.

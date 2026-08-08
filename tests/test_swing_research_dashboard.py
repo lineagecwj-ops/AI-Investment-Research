@@ -52,9 +52,13 @@ from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_beginner_indicator_explanations
 from swing_research_dashboard import build_technical_condition_detail_rows
 from swing_research_dashboard import build_technical_condition_detail_view
+from swing_research_dashboard import build_technical_condition_visual_specs
 from swing_research_dashboard import build_technical_condition_visualization_rows
+from swing_research_dashboard import build_distance_to_high_visual
+from swing_research_dashboard import build_rsi_visual
 from swing_research_dashboard import build_technical_condition_developer_rows
 from swing_research_dashboard import build_technical_snapshot_rows
+from swing_research_dashboard import build_volume_ratio_visual
 from swing_research_dashboard import build_walk_forward_outcome_count_rows
 from swing_research_dashboard import build_replay_analytics_candidate_set_rows
 from swing_research_dashboard import build_walk_forward_summary_rows
@@ -970,6 +974,152 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         self.assertIn({"指標": "20 日成交量比率", "標記": "V1 門檻", "數值": 1.2, "說明": "1.20", "備註": "V1 threshold = 1.20"}, rows)
         self.assertIn({"指標": "距離前 60 日高點", "標記": "前 60 日高點", "數值": 0.0, "說明": "0.00%", "備註": "0% = prior 60-day high；-5% = V1 threshold"}, rows)
+
+    def test_volume_visual_uses_actual_value_threshold_and_fail_gap(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=0.64),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        volume = next(condition for condition in signal_match.evaluated_conditions if condition.metric == "volume_ratio_20")
+
+        spec = build_volume_ratio_visual(volume)
+
+        self.assertEqual(spec.title, "成交量活躍度")
+        self.assertEqual(spec.status_label, "尚未符合")
+        self.assertEqual(spec.current_label, "0.64")
+        self.assertEqual(spec.threshold_label, "V1 門檻 1.20")
+        self.assertEqual(spec.gap_text, "目前 0.64，距離 V1 門檻 1.20 尚差 0.56。")
+        self.assertIn({"指標": "成交量活躍度", "標記": "目前值", "數值": 0.64, "說明": "0.64", "狀態": "尚未符合"}, spec.marker_rows)
+        self.assertIn({"指標": "成交量活躍度", "標記": "V1 門檻", "數值": 1.2, "說明": "1.20", "狀態": "尚未符合"}, spec.marker_rows)
+
+    def test_volume_visual_pass_wording_and_dynamic_scale(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=2.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        volume = next(condition for condition in signal_match.evaluated_conditions if condition.metric == "volume_ratio_20")
+
+        spec = build_volume_ratio_visual(volume)
+
+        self.assertEqual(spec.status_label, "符合")
+        self.assertEqual(spec.gap_text, "目前 2.00，已達 V1 門檻 1.20。")
+        self.assertGreaterEqual(spec.x_domain[1], 2.2)
+
+    def test_rsi_visual_current_range_and_inside_wording(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", rsi_14=50.6),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        rsi = next(condition for condition in signal_match.evaluated_conditions if condition.metric == "rsi_14")
+
+        spec = build_rsi_visual(rsi)
+
+        self.assertEqual(spec.status_label, "符合")
+        self.assertEqual(spec.current_label, "50.6")
+        self.assertEqual(spec.threshold_label, "V1 區間 50～70")
+        self.assertEqual(spec.x_domain, (0.0, 100.0))
+        self.assertEqual(spec.gap_text, "目前 RSI 50.6，位於 V1 設定的 50～70 區間內。")
+        self.assertIn({"指標": "RSI 動能", "起點": 50.0, "終點": 70.0, "標記": "V1 區間", "說明": "V1 區間 50～70", "狀態": "符合"}, spec.range_rows)
+
+    def test_rsi_visual_below_and_above_range_gaps(self):
+        below_match = evaluate_signal_conditions(
+            self.snapshot(symbol="LOW", rsi_14=47.3),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        above_match = evaluate_signal_conditions(
+            self.snapshot(symbol="HIGH", rsi_14=74.2),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+
+        below = build_rsi_visual(next(condition for condition in below_match.evaluated_conditions if condition.metric == "rsi_14"))
+        above = build_rsi_visual(next(condition for condition in above_match.evaluated_conditions if condition.metric == "rsi_14"))
+
+        self.assertEqual(below.gap_text, "目前 RSI 47.3，距離 V1 下限 50 尚差 2.7。")
+        self.assertEqual(above.gap_text, "目前 RSI 74.2，高於 V1 上限 70 4.2。")
+
+    def test_distance_visual_current_threshold_reference_and_fail_gap(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", distance_to_prior_60d_high=-0.0651),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        distance = next(condition for condition in signal_match.evaluated_conditions if condition.metric == "distance_to_prior_60d_high")
+
+        spec = build_distance_to_high_visual(distance)
+
+        self.assertEqual(spec.title, "接近前高程度")
+        self.assertEqual(spec.status_label, "尚未符合")
+        self.assertEqual(spec.current_label, "-6.51%")
+        self.assertEqual(spec.threshold_label, "V1 門檻 -5.00%；前高 0.00%")
+        self.assertEqual(spec.gap_text, "目前距離前 60 日高點 -6.51%，距離 V1 門檻 -5% 尚差 1.51 個百分點。")
+        self.assertIn({"指標": "接近前高程度", "標記": "V1 門檻", "數值": -5.0, "說明": "-5.00%", "狀態": "尚未符合"}, spec.marker_rows)
+        self.assertIn({"指標": "接近前高程度", "標記": "前 60 日高點", "數值": 0.0, "說明": "0.00%", "狀態": "尚未符合"}, spec.marker_rows)
+
+    def test_distance_visual_pass_wording_and_positive_distance_not_clamped(self):
+        pass_match = evaluate_signal_conditions(
+            self.snapshot(symbol="PASS", distance_to_prior_60d_high=-0.03),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        positive_match = evaluate_signal_conditions(
+            self.snapshot(symbol="POSITIVE", distance_to_prior_60d_high=0.02),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+
+        passed = build_distance_to_high_visual(next(condition for condition in pass_match.evaluated_conditions if condition.metric == "distance_to_prior_60d_high"))
+        positive = build_distance_to_high_visual(next(condition for condition in positive_match.evaluated_conditions if condition.metric == "distance_to_prior_60d_high"))
+
+        self.assertEqual(passed.gap_text, "目前距離前 60 日高點 -3.00%，已進入 V1 要求的 -5% 以內範圍。")
+        self.assertIn({"指標": "接近前高程度", "標記": "目前值", "數值": 2.0, "說明": "+2.00%", "狀態": "符合"}, positive.marker_rows)
+        self.assertGreaterEqual(positive.x_domain[1], 4.0)
+
+    def test_visual_specs_handle_missing_values_without_crash(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="MISS", volume_ratio_20=None, rsi_14=None, distance_to_prior_60d_high=None),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+
+        specs = build_technical_condition_visual_specs(signal_match)
+
+        self.assertEqual([spec.current_label for spec in specs], ["N/A", "N/A", "N/A"])
+        self.assertTrue(all(spec.gap_text == "目前沒有足夠資料顯示此指標。" for spec in specs))
+
+    def test_visual_status_is_sourced_from_existing_condition_evaluation(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=0.64),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        volume = next(condition for condition in signal_match.evaluated_conditions if condition.metric == "volume_ratio_20")
+        forced_match = replace(volume, status=SignalEvaluationStatus.MATCH, matched=True)
+
+        spec = build_volume_ratio_visual(forced_match)
+
+        self.assertEqual(spec.status_label, "符合")
+        self.assertEqual(spec.status_value, SignalEvaluationStatus.MATCH.value)
+
+    def test_visual_helper_does_not_mutate_scanner_result_or_semantics(self):
+        signal_match = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=0.64, rsi_14=50.6, distance_to_prior_60d_high=-0.0651),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        result = self.result(current_signal_details=(signal_match,), no_match_symbols=("2330.TW",))
+        before_statuses = tuple(condition.status for condition in result.current_signal_details[0].evaluated_conditions)
+        before_count = (
+            result.matched_count,
+            result.no_match_count,
+            result.not_evaluable_count,
+            result.failure_count,
+        )
+
+        build_technical_condition_detail_view(result.current_signal_details[0])
+
+        after_statuses = tuple(condition.status for condition in result.current_signal_details[0].evaluated_conditions)
+        after_count = (
+            result.matched_count,
+            result.no_match_count,
+            result.not_evaluable_count,
+            result.failure_count,
+        )
+        self.assertEqual(after_statuses, before_statuses)
+        self.assertEqual(after_count, before_count)
 
     def test_technical_detail_primary_rows_use_traditional_chinese_not_raw_snake_case(self):
         signal_match = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)

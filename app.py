@@ -2135,20 +2135,47 @@ def render_swing_technical_condition_detail(result) -> None:
         hide_index=True,
     )
 
-    visual_df = pd.DataFrame(detail.visualization_rows)
-    if not visual_df.empty:
+    if detail.visual_specs:
         st.markdown("#### 視覺化理解")
-        chart = (
-            alt.Chart(visual_df)
-            .mark_tick(thickness=3, size=28)
-            .encode(
-                x=alt.X("數值:Q", title="目前值與 V1 門檻"),
-                y=alt.Y("指標:N", title=None),
-                color=alt.Color("標記:N", title="標記"),
-                tooltip=["指標", "標記", "說明", "備註"],
-            )
-        )
-        st.altair_chart(chart, width="stretch")
+        visual_cols = st.columns(3)
+        for col, spec in zip(visual_cols, detail.visual_specs):
+            with col:
+                st.markdown(f"##### {spec.title}")
+                st.metric("狀態", spec.status_label)
+                st.caption(spec.explanation)
+                st.write(f"目前值：{spec.current_label}")
+                st.write(spec.threshold_label)
+                st.caption(spec.gap_text)
+                marker_df = pd.DataFrame(spec.marker_rows)
+                if not marker_df.empty:
+                    marker_chart = (
+                        alt.Chart(marker_df)
+                        .mark_tick(thickness=3, size=28)
+                        .encode(
+                            x=alt.X(
+                                "數值:Q",
+                                title=None,
+                                scale=alt.Scale(domain=list(spec.x_domain)),
+                            ),
+                            y=alt.value(20),
+                            color=alt.Color("標記:N", title="標記"),
+                            tooltip=["指標", "標記", "說明", "狀態"],
+                        )
+                    )
+                    if spec.range_rows:
+                        range_df = pd.DataFrame(spec.range_rows)
+                        range_chart = (
+                            alt.Chart(range_df)
+                            .mark_rule(size=8)
+                            .encode(
+                                x=alt.X("起點:Q", scale=alt.Scale(domain=list(spec.x_domain))),
+                                x2="終點:Q",
+                                y=alt.value(20),
+                                tooltip=["指標", "標記", "說明", "狀態"],
+                            )
+                        )
+                        marker_chart = range_chart + marker_chart
+                    st.altair_chart(marker_chart, width="stretch")
 
     with st.expander("這些指標代表什麼？", expanded=False):
         st.dataframe(

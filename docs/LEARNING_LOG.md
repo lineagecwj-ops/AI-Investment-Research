@@ -2,6 +2,14 @@
 
 ## 2026-08-08 — V1.0 Post-Release UX Technical Condition Detail
 
+### Beginner Visual Bars Update
+
+- `技術條件明細` 的 `視覺化理解` 改為三個獨立 beginner-friendly visual bars：`成交量活躍度`、`RSI 動能`、`接近前高程度`。
+- 三個 visual 不再共用單一 numeric axis；成交量比率、RSI、距離前高分別使用自己的 deterministic scale / domain。
+- 每個 visual 顯示 scan-time current value、V1 threshold / range、既有 scanner PASS / FAIL status、neutral gap 與短白話說明。
+- 完整詳細表格仍保留，visual 只作為 beginner education layer。
+- 本次不新增 score、probability、recommendation、買點、值得買、即將突破或任何 AI analysis。
+
 ### Completed Features
 
 - Current Scan `掃描結果摘要` 後新增 `技術條件明細`，支援 `MATCH` 與 `NO_MATCH` 股票查看完整技術條件。

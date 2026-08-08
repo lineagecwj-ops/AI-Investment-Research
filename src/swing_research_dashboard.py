@@ -67,6 +67,32 @@ class TechnicalConditionDetailView:
 
     visualization_rows: list[dict[str, object]]
 
+    visual_specs: list["TechnicalConditionVisualSpec"]
+
+
+@dataclass(frozen=True)
+class TechnicalConditionVisualSpec:
+
+    title: str
+
+    explanation: str
+
+    status_label: str
+
+    status_value: str
+
+    current_label: str
+
+    threshold_label: str
+
+    gap_text: str
+
+    x_domain: tuple[float, float]
+
+    marker_rows: list[dict[str, object]]
+
+    range_rows: list[dict[str, object]]
+
 
 def parse_swing_symbol_input(user_input: str) -> tuple[str, ...]:
     return parse_universe_symbol_text(user_input)
@@ -394,6 +420,7 @@ def build_technical_condition_detail_view(signal_match: SignalMatch) -> Technica
         condition_rows=build_technical_condition_detail_rows(signal_match),
         category_rows=build_technical_condition_category_rows(signal_match),
         visualization_rows=build_technical_condition_visualization_rows(signal_match),
+        visual_specs=build_technical_condition_visual_specs(signal_match),
     )
 
 
@@ -465,6 +492,127 @@ def build_technical_condition_visualization_rows(signal_match: SignalMatch) -> l
     if distance is not None:
         rows.extend(_visual_marker_rows("距離前 60 日高點", _ratio_to_percent(distance.actual_value), (-5.0, 0.0), "0% = prior 60-day high；-5% = V1 threshold"))
     return rows
+
+
+def build_technical_condition_visual_specs(signal_match: SignalMatch) -> list[TechnicalConditionVisualSpec]:
+    condition_by_metric = {
+        condition.metric: condition
+        for condition in signal_match.evaluated_conditions
+    }
+    return [
+        build_volume_ratio_visual(condition_by_metric.get("volume_ratio_20")),
+        build_rsi_visual(condition_by_metric.get("rsi_14")),
+        build_distance_to_high_visual(condition_by_metric.get("distance_to_prior_60d_high")),
+    ]
+
+
+def build_volume_ratio_visual(condition: EvaluatedSignalCondition | None) -> TechnicalConditionVisualSpec:
+    threshold = 1.2
+    current = _condition_current_float(condition)
+    domain_max = max(1.5, threshold * 1.25, current * 1.1 if current is not None else 0.0)
+    status_label = _visual_status_label(condition)
+    current_label = _format_optional_number(current, "N/A", decimals=2)
+    threshold_label = f"{threshold:.2f}"
+    gap_text = _volume_visual_gap_text(current, threshold, status_label)
+    return TechnicalConditionVisualSpec(
+        title="成交量活躍度",
+        explanation="觀察近期成交量是否達到 V1 設定的活躍程度。",
+        status_label=status_label,
+        status_value=_visual_status_value(condition),
+        current_label=current_label,
+        threshold_label=f"V1 門檻 {threshold_label}",
+        gap_text=gap_text,
+        x_domain=(0.0, domain_max),
+        marker_rows=_visual_marker_data(
+            "成交量活躍度",
+            current,
+            "目前值",
+            current_label,
+            threshold,
+            "V1 門檻",
+            threshold_label,
+            status_label,
+        ),
+        range_rows=[],
+    )
+
+
+def build_rsi_visual(condition: EvaluatedSignalCondition | None) -> TechnicalConditionVisualSpec:
+    lower = 50.0
+    upper = 70.0
+    current = _condition_current_float(condition)
+    status_label = _visual_status_label(condition)
+    current_label = _format_optional_number(current, "N/A", decimals=1)
+    gap_text = _rsi_visual_gap_text(current, lower, upper, status_label)
+    return TechnicalConditionVisualSpec(
+        title="RSI 動能",
+        explanation="觀察近期價格動能是否位於 V1 設定的 50～70 區間。",
+        status_label=status_label,
+        status_value=_visual_status_value(condition),
+        current_label=current_label,
+        threshold_label="V1 區間 50～70",
+        gap_text=gap_text,
+        x_domain=(0.0, 100.0),
+        marker_rows=_visual_marker_data(
+            "RSI 動能",
+            current,
+            "目前值",
+            current_label,
+            lower,
+            "V1 下限",
+            f"{lower:.0f}",
+            status_label,
+        )
+        + [
+            _visual_marker_row("RSI 動能", "V1 上限", upper, f"{upper:.0f}", status_label),
+        ],
+        range_rows=[
+            {
+                "指標": "RSI 動能",
+                "起點": lower,
+                "終點": upper,
+                "標記": "V1 區間",
+                "說明": "V1 區間 50～70",
+                "狀態": status_label,
+            }
+        ],
+    )
+
+
+def build_distance_to_high_visual(condition: EvaluatedSignalCondition | None) -> TechnicalConditionVisualSpec:
+    threshold = -5.0
+    reference = 0.0
+    current_ratio = _condition_current_float(condition)
+    current = current_ratio * 100 if current_ratio is not None else None
+    left_bound = min(-10.0, threshold - 2.0, current - 2.0 if current is not None else -10.0)
+    right_bound = max(reference, threshold + 2.0, current + 2.0 if current is not None else 0.0)
+    status_label = _visual_status_label(condition)
+    current_label = _format_optional_percent(current)
+    gap_text = _distance_visual_gap_text(current, threshold, status_label)
+    return TechnicalConditionVisualSpec(
+        title="接近前高程度",
+        explanation="觀察目前價格是否已接近前 60 個交易日高點。",
+        status_label=status_label,
+        status_value=_visual_status_value(condition),
+        current_label=current_label,
+        threshold_label="V1 門檻 -5.00%；前高 0.00%",
+        gap_text=gap_text,
+        x_domain=(left_bound, right_bound),
+        marker_rows=_visual_marker_data(
+            "接近前高程度",
+            current,
+            "目前值",
+            current_label,
+            threshold,
+            "V1 門檻",
+            f"{threshold:.2f}%",
+            status_label,
+        )
+        + [
+            _visual_marker_row("接近前高程度", "前 60 日高點", reference, "0.00%", status_label),
+        ],
+        range_rows=[],
+    )
 
 
 def build_beginner_indicator_explanations() -> list[dict[str, str]]:
@@ -627,6 +775,104 @@ def _visual_marker_rows(metric_label: str, current_value, thresholds: tuple[floa
     for threshold in thresholds:
         rows.append({"指標": metric_label, "標記": "V1 門檻" if threshold != 0.0 else "前 60 日高點", "數值": threshold, "說明": _format_visual_value(metric_label, threshold), "備註": note})
     return rows
+
+
+def _condition_current_float(condition: EvaluatedSignalCondition | None) -> float | None:
+    if condition is None:
+        return None
+    return _as_float(condition.actual_value)
+
+
+def _visual_status_label(condition: EvaluatedSignalCondition | None) -> str:
+    if condition is None:
+        return "資料不足"
+    if condition.status is SignalEvaluationStatus.MATCH:
+        return "符合"
+    if condition.status is SignalEvaluationStatus.NO_MATCH:
+        return "尚未符合"
+    return "資料不足"
+
+
+def _visual_status_value(condition: EvaluatedSignalCondition | None) -> str:
+    if condition is None:
+        return SignalEvaluationStatus.NOT_EVALUABLE.value
+    return condition.status.value
+
+
+def _visual_marker_data(
+    metric_label: str,
+    current: float | None,
+    current_marker: str,
+    current_label: str,
+    threshold: float,
+    threshold_marker: str,
+    threshold_label: str,
+    status_label: str,
+) -> list[dict[str, object]]:
+    rows = []
+    if current is not None:
+        rows.append(_visual_marker_row(metric_label, current_marker, current, current_label, status_label))
+    rows.append(_visual_marker_row(metric_label, threshold_marker, threshold, threshold_label, status_label))
+    return rows
+
+
+def _visual_marker_row(
+    metric_label: str,
+    marker: str,
+    value: float,
+    display_value: str,
+    status_label: str,
+) -> dict[str, object]:
+    return {
+        "指標": metric_label,
+        "標記": marker,
+        "數值": value,
+        "說明": display_value,
+        "狀態": status_label,
+    }
+
+
+def _format_optional_number(value: float | None, missing: str, *, decimals: int) -> str:
+    if value is None:
+        return missing
+    return f"{value:.{decimals}f}"
+
+
+def _format_optional_percent(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:+.2f}%"
+
+
+def _volume_visual_gap_text(current: float | None, threshold: float, status_label: str) -> str:
+    if current is None:
+        return "目前沒有足夠資料顯示此指標。"
+    if status_label == "符合":
+        return f"目前 {current:.2f}，已達 V1 門檻 {threshold:.2f}。"
+    return f"目前 {current:.2f}，距離 V1 門檻 {threshold:.2f} 尚差 {max(threshold - current, 0.0):.2f}。"
+
+
+def _rsi_visual_gap_text(current: float | None, lower: float, upper: float, status_label: str) -> str:
+    if current is None:
+        return "目前沒有足夠資料顯示此指標。"
+    if status_label == "符合":
+        return f"目前 RSI {current:.1f}，位於 V1 設定的 {lower:.0f}～{upper:.0f} 區間內。"
+    if current < lower:
+        return f"目前 RSI {current:.1f}，距離 V1 下限 {lower:.0f} 尚差 {lower - current:.1f}。"
+    if current > upper:
+        return f"目前 RSI {current:.1f}，高於 V1 上限 {upper:.0f} {current - upper:.1f}。"
+    return "目前沒有足夠資料顯示此指標。"
+
+
+def _distance_visual_gap_text(current: float | None, threshold: float, status_label: str) -> str:
+    if current is None:
+        return "目前沒有足夠資料顯示此指標。"
+    if status_label == "符合":
+        return f"目前距離前 60 日高點 {current:+.2f}%，已進入 V1 要求的 -5% 以內範圍。"
+    return (
+        f"目前距離前 60 日高點 {current:+.2f}%，"
+        f"距離 V1 門檻 {threshold:.0f}% 尚差 {max(threshold - current, 0.0):.2f} 個百分點。"
+    )
 
 
 def _format_detail_value(metric: str, value) -> str:

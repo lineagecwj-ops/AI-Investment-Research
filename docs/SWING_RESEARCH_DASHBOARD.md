@@ -181,11 +181,19 @@ The detail view shows:
 - V1 thresholds
 - PASS / FAIL copied from `SignalMatch.evaluated_conditions`
 - neutral gap-to-threshold text
-- factual marker charts for RSI, volume ratio, and distance to prior 60-day high
+- independent beginner visual bars for volume activity, RSI momentum, and distance to prior 60-day high
 - beginner explanations
 - developer traceability for `technical_example_v1`, scanner status, and raw metric names
 
 `X / 5` is a factual count only. It is not a score, recommendation, expected return, or future probability.
+
+The three visual bars use separate scales because the metrics have different units:
+
+- volume ratio shows current value vs V1 threshold `1.20`
+- RSI shows current value within the standard `0-100` RSI domain and highlights V1 range `50-70`
+- distance to prior 60-day high shows current percentage distance, V1 threshold `-5%`, and `0%` as the prior-high reference
+
+The detailed technical condition table remains visible and is not replaced by the visual bars.
 
 The dashboard does not fetch Yahoo, rerun scanner, rerun backtest, rerun replay, or rerun OOS validation when the user changes the technical detail selector.
 
