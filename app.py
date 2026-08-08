@@ -29,6 +29,9 @@ from dashboard import historical_metric_help
 from dashboard import query_stock_batch
 from dashboard import StockQueryFailure
 from dashboard import stock_display_data
+from backtest_service import BacktestConfig
+from backtest_service import BacktestDataError
+from backtest_service import run_historical_backtest
 from ai_config import MAX_RESEARCH_QUESTION_LENGTH
 from ai_config import get_ai_research_config
 from ai_dashboard import build_request_fingerprint
@@ -58,12 +61,30 @@ from ai_research_service import generate_grounded_research_answer
 from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
+from historical_price_service import get_historical_prices
 from historical_interpretation_presentation import ATTENTION_COLOR_EXPLANATION
 from historical_interpretation_presentation import build_historical_highlights
 from historical_interpretation_presentation import build_next_step_display_groups
 from historical_interpretation_presentation import FY_PERIOD_CAPTION
 from historical_interpretation_presentation import group_detailed_interpretation
 from historical_research_service import build_historical_research_report
+from historical_case_dashboard import STATUS_FILTER_OPTIONS
+from historical_case_dashboard import SORT_OPTIONS
+from historical_case_dashboard import build_case_chart
+from historical_case_dashboard import build_case_request_fingerprint
+from historical_case_dashboard import build_case_summary_rows
+from historical_case_dashboard import build_condition_detail_rows
+from historical_case_dashboard import build_technical_summary_rows
+from historical_case_dashboard import case_selector_label
+from historical_case_dashboard import filter_case_views
+from historical_case_dashboard import format_date_value
+from historical_case_dashboard import format_optional_int
+from historical_case_dashboard import format_percentage_value
+from historical_case_dashboard import format_price_value
+from historical_case_dashboard import sort_case_views
+from historical_case_service import HistoricalCaseDataError
+from historical_case_service import HistoricalCaseWindowConfig
+from historical_case_service import build_historical_case_views
 from research_context import build_research_context
 from research_context_selector import ResearchSelectionRequest
 from research_context_selector import select_research_context
@@ -71,10 +92,15 @@ from research_glossary import get_research_glossary
 from research_service import build_research_report
 from symbol_utils import normalize_stock_symbol
 from symbol_utils import parse_stock_symbols
+from technical_indicator_service import build_technical_indicator_series
 from watchlist_service import add_stock
 from watchlist_service import list_watchlist
 from watchlist_service import remove_stock
 from watchlist_service import WatchlistDataError
+from models import OutcomeEvaluationStatus
+from models import OverlappingSignalPolicy
+from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
+from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 
 
 st.set_page_config(
@@ -100,6 +126,8 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("ai_research_last_error_details", None)
     st.session_state.setdefault("ai_followup_question_draft", "")
     st.session_state.setdefault("ai_followup_question_type", None)
+    st.session_state.setdefault("historical_case_result", None)
+    st.session_state.setdefault("historical_case_last_error", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1192,6 +1220,196 @@ def render_ai_request_details(metadata) -> None:
         )
 
 
+def build_historical_case_result(
+    *,
+    symbol: str,
+    overlap_policy: OverlappingSignalPolicy,
+    cooldown_bars: int | None,
+    start_date,
+    end_date,
+    pre_signal_bars: int,
+    post_signal_bars: int,
+    force_refresh: bool = False,
+) -> dict:
+    price_series = get_historical_prices(symbol, force_refresh=force_refresh)
+    technical_series = build_technical_indicator_series(price_series)
+    config = BacktestConfig(
+        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+        overlap_policy=overlap_policy,
+        cooldown_bars=cooldown_bars,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    report = run_historical_backtest(price_series, technical_series, config)
+    window_config = HistoricalCaseWindowConfig(
+        pre_signal_bars=pre_signal_bars,
+        post_signal_bars=post_signal_bars,
+    )
+    case_views = build_historical_case_views(price_series, report, window_config)
+    fingerprint = build_case_request_fingerprint(
+        symbol=price_series.symbol,
+        signal_id=report.signal_definition_id,
+        outcome_definition_id=report.outcome_definition_id,
+        overlap_policy=report.overlap_policy.value,
+        cooldown_bars=report.cooldown_bars,
+        start_date=report.start_date,
+        end_date=report.end_date,
+    )
+    return {
+        "symbol": price_series.symbol,
+        "currency": price_series.currency,
+        "price_is_stale": price_series.is_stale,
+        "report": report,
+        "case_views": case_views,
+        "fingerprint": fingerprint,
+    }
+
+
+def render_historical_cases() -> None:
+    st.header("Historical Cases（歷史案例）")
+    st.caption(
+        "Historical Case Explorer 是歷史案例檢視工具。HIT 代表指定 historical outcome target 曾在 horizon 內觸發；"
+        "MISS 代表完整 horizon 內沒有觸發。這不是交易損益分類，也不是未來預測。"
+    )
+
+    with st.form("historical_case_form"):
+        input_symbol = st.text_input(
+            "Symbol",
+            placeholder="2454 或 2330",
+            key="historical_case_symbol_input",
+        )
+        st.text_input("Signal Definition", value=TECHNICAL_EXAMPLE_SIGNAL_V1.id, disabled=True)
+        st.text_input("Outcome", value=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id, disabled=True)
+        overlap_label = st.selectbox("Overlap Policy", ["ALLOW_ALL", "COOLDOWN"])
+        cooldown_bars = None
+        if overlap_label == "COOLDOWN":
+            cooldown_bars = st.number_input("Cooldown Bars", min_value=1, value=20, step=1)
+        date_cols = st.columns(2)
+        start_date = date_cols[0].date_input("Backtest Start", value=pd.to_datetime("2018-01-01").date())
+        end_date = date_cols[1].date_input("Backtest End", value=pd.to_datetime("2025-12-31").date())
+        window_cols = st.columns(2)
+        pre_signal_bars = window_cols[0].number_input("Pre-signal bars", min_value=0, value=60, step=5)
+        post_signal_bars = window_cols[1].number_input("Post-signal bars", min_value=0, value=20, step=5)
+        force_refresh = st.checkbox("Force Yahoo refresh", value=False)
+        submitted = st.form_submit_button("建立歷史案例")
+
+    parsed_symbols = parse_stock_symbols(input_symbol)
+    current_symbol = parsed_symbols[0] if parsed_symbols else ""
+    current_fingerprint = build_case_request_fingerprint(
+        symbol=current_symbol,
+        signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
+        outcome_definition_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
+        overlap_policy=overlap_label,
+        cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    if submitted:
+        if not parsed_symbols:
+            st.session_state["historical_case_result"] = None
+            st.session_state["historical_case_last_error"] = "請輸入至少一個股票代號。"
+        else:
+            if len(parsed_symbols) > 1:
+                st.info(f"Historical Cases 頁面目前顯示第一支股票：{parsed_symbols[0]}")
+            try:
+                result = build_historical_case_result(
+                    symbol=parsed_symbols[0],
+                    overlap_policy=OverlappingSignalPolicy(overlap_label),
+                    cooldown_bars=int(cooldown_bars) if cooldown_bars is not None else None,
+                    start_date=start_date,
+                    end_date=end_date,
+                    pre_signal_bars=int(pre_signal_bars),
+                    post_signal_bars=int(post_signal_bars),
+                    force_refresh=force_refresh,
+                )
+                st.session_state["historical_case_result"] = result
+                st.session_state["historical_case_last_error"] = None
+            except (ValueError, BacktestDataError, HistoricalCaseDataError) as error:
+                st.session_state["historical_case_result"] = None
+                st.session_state["historical_case_last_error"] = str(error)
+            except Exception as error:
+                st.session_state["historical_case_result"] = None
+                st.session_state["historical_case_last_error"] = safe_error_message(error)
+
+    if st.button("清除案例結果"):
+        st.session_state["historical_case_result"] = None
+        st.session_state["historical_case_last_error"] = None
+
+    if st.session_state["historical_case_last_error"]:
+        st.error(f"Historical Cases 建立失敗：{st.session_state['historical_case_last_error']}")
+
+    result = st.session_state["historical_case_result"]
+    if result is None:
+        st.info("輸入單一 symbol 並按下「建立歷史案例」後，系統才會讀取價格、建立 technical indicators、執行 backtest，並產生案例檢視。")
+        return
+
+    report = result["report"]
+    case_views = result["case_views"]
+    if result["fingerprint"] != current_fingerprint:
+        st.warning("目前顯示的是上一組設定建立的案例結果；若要更新，請重新按「建立歷史案例」。")
+    if result["price_is_stale"]:
+        st.warning("目前使用 stale historical price cache；請留意資料新鮮度。")
+
+    st.subheader(f"{result['symbol']} · Historical Case Explorer")
+    st.caption("Main price line = analysis close；Reference High / First Target Hit 使用 raw high basis。")
+    st.caption("Historical Hit Rate 是歷史條件事件比例，不代表未來發生機率。MFE / MAE / End Return 是 close-based historical return metrics，不是實際交易報酬。")
+
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Historical Hit Rate", format_percentage_value(report.historical_hit_rate))
+    metric_cols[1].metric("Resolved", report.resolved_count)
+    metric_cols[2].metric("HIT", report.hit_count)
+    metric_cols[3].metric("MISS", report.miss_count)
+    metric_cols[4].metric("INCOMPLETE", report.incomplete_count)
+    st.caption(
+        f"Overlap Policy: {report.overlap_policy.value} · Cooldown Bars: {format_optional_int(report.cooldown_bars)} · "
+        f"Backtest Signal Range: {format_date_value(report.start_date)} -> {format_date_value(report.end_date)}"
+    )
+
+    if not case_views:
+        st.info("此設定在指定期間沒有找到歷史 Signal Events。")
+        return
+
+    controls = st.columns(3)
+    status_filter = controls[0].selectbox("Outcome Status", STATUS_FILTER_OPTIONS)
+    sort_option = controls[1].selectbox("Case Sort", SORT_OPTIONS)
+    x_mode = controls[2].selectbox("Chart X Axis", ["Relative Bars", "Actual Dates"])
+    filtered_cases = sort_case_views(filter_case_views(case_views, status_filter), sort_option)
+    st.dataframe(build_case_summary_rows(filtered_cases), width="stretch", hide_index=True)
+
+    if not filtered_cases:
+        st.info("目前 filter 下沒有案例。")
+        return
+
+    selected_labels = [case_selector_label(case) for case in filtered_cases]
+    selected_case_label = st.selectbox("Case", selected_labels)
+    selected_case = filtered_cases[selected_labels.index(selected_case_label)]
+
+    top_metrics = st.columns(4)
+    top_metrics[0].metric("Outcome Status", selected_case.outcome_status.value)
+    top_metrics[1].metric("Signal Date", selected_case.signal_date.isoformat())
+    top_metrics[2].metric("Reference High", format_price_value(selected_case.reference_high, selected_case.currency))
+    top_metrics[3].metric("First Hit", format_date_value(selected_case.target_hit_date))
+
+    return_metrics = st.columns(4)
+    return_metrics[0].metric("Hit Bar Index", format_optional_int(selected_case.target_hit_bar_index))
+    return_metrics[1].metric("MFE", format_percentage_value(selected_case.max_close_return))
+    return_metrics[2].metric("MAE", format_percentage_value(selected_case.max_adverse_return))
+    return_metrics[3].metric("End Return", format_percentage_value(selected_case.end_of_window_return))
+
+    if selected_case.outcome_status is OutcomeEvaluationStatus.INCOMPLETE:
+        st.warning("Outcome window incomplete：此案例尚未完整走完 outcome horizon，不可視為 MISS。")
+
+    st.altair_chart(build_case_chart(selected_case, x_mode=x_mode), use_container_width=True)
+
+    with st.expander("Signal Date Technical Metrics", expanded=False):
+        st.dataframe(build_technical_summary_rows(selected_case), width="stretch", hide_index=True)
+
+    with st.expander("Signal Condition Trace", expanded=False):
+        st.dataframe(build_condition_detail_rows(selected_case), width="stretch", hide_index=True)
+
+
 def read_watchlist_for_ui() -> list[str]:
     try:
         return list_watchlist()
@@ -1308,8 +1526,8 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, historical_tab, ai_research_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Historical Trends", "AI Research", "Watchlist", "Comparison"]
+    dashboard_tab, research_tab, historical_tab, ai_research_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
+        ["Dashboard", "Research", "Historical Trends", "AI Research", "Historical Cases", "Watchlist", "Comparison"]
     )
 
     with dashboard_tab:
@@ -1323,6 +1541,9 @@ def main() -> None:
 
     with ai_research_tab:
         render_ai_research()
+
+    with historical_cases_tab:
+        render_historical_cases()
 
     with watchlist_tab:
         render_watchlist()
