@@ -242,8 +242,8 @@ class OosValidationDashboardTestCase(unittest.TestCase):
     def test_outcome_count_rows_are_side_by_side(self):
         rows = build_outcome_count_rows(self.result())
         self.assertEqual(rows[0]["Outcome"], "HIT")
-        self.assertIn("Development", rows[0])
-        self.assertIn("Holdout / Out-of-Sample", rows[0])
+        self.assertIn("開發期間", rows[0])
+        self.assertIn("保留樣本期間（樣本外）", rows[0])
 
     def test_symbol_cross_period_table(self):
         rows = build_cross_period_symbol_presence_rows(self.result())
@@ -255,7 +255,7 @@ class OosValidationDashboardTestCase(unittest.TestCase):
         rows = build_cross_period_symbol_presence_rows(self.result())
         nvda = next(row for row in rows if row["Symbol"] == "NVDA")
         self.assertEqual(nvda["Development Occurrences"], 0)
-        self.assertIn("Holdout / Out-of-Sample", nvda["Appeared In Periods"])
+        self.assertIn("保留樣本期間（樣本外）", nvda["Appeared In Periods"])
 
     def test_zero_candidates_symbol_table_empty(self):
         period = self.period(ValidationPeriodRole.DEVELOPMENT, with_candidates=0, unique=0, occurrences=0, symbols=())
@@ -331,7 +331,7 @@ class OosValidationDashboardTestCase(unittest.TestCase):
 
     def test_period_summary_rows_include_small_sample_context_metric(self):
         rows = build_period_summary_rows(self.result().validation_result)
-        self.assertIn({"Metric": "Resolved n", "Value": 2}, rows)
+        self.assertIn({"Metric": "已解析樣本", "Value": 2}, rows)
         self.assertEqual(SMALL_SAMPLE_WARNING, "此期間已解析歷史樣本低於偏好門檻。")
 
     def test_mode_label_is_explicit(self):

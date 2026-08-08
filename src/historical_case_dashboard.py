@@ -5,6 +5,9 @@ import pandas as pd
 
 from historical_case_service import HistoricalCaseView
 from models import OutcomeEvaluationStatus
+from ui_terminology import get_outcome_status_label
+from ui_terminology import get_signal_status_label
+from ui_terminology import get_technical_metric_label
 
 
 RESOLVED_STATUSES = (
@@ -76,21 +79,21 @@ def sort_case_views(
 def case_selector_label(case: HistoricalCaseView) -> str:
     hit_text = ""
     if case.target_hit_bar_index is not None:
-        hit_text = f" | hit bar {case.target_hit_bar_index}"
-    return f"{case.signal_date.isoformat()} | {case.outcome_status.value}{hit_text}"
+        hit_text = f" | 第 {case.target_hit_bar_index} 個交易日達標"
+    return f"{case.signal_date.isoformat()} | {get_outcome_status_label(case.outcome_status.value)}{hit_text}"
 
 
 def build_case_summary_rows(case_views: tuple[HistoricalCaseView, ...]) -> list[dict[str, str]]:
     return [
         {
-            "Signal Date": case.signal_date.isoformat(),
-            "Status": case.outcome_status.value,
-            "Reference High": format_price_value(case.reference_high, case.currency),
-            "First Hit": format_date_value(case.target_hit_date),
-            "Hit Bar": format_optional_int(case.target_hit_bar_index),
-            "MFE": format_percentage_value(case.max_close_return),
-            "MAE": format_percentage_value(case.max_adverse_return),
-            "End Return": format_percentage_value(case.end_of_window_return),
+            "訊號日期": case.signal_date.isoformat(),
+            "結果狀態": get_outcome_status_label(case.outcome_status.value),
+            "參考高點": format_price_value(case.reference_high, case.currency),
+            "首次達標日期": format_date_value(case.target_hit_date),
+            "第幾個交易日達標": format_optional_int(case.target_hit_bar_index),
+            "最大有利變動": format_percentage_value(case.max_close_return),
+            "最大不利變動": format_percentage_value(case.max_adverse_return),
+            "觀察期末變動": format_percentage_value(case.end_of_window_return),
         }
         for case in case_views
     ]
@@ -99,13 +102,13 @@ def build_case_summary_rows(case_views: tuple[HistoricalCaseView, ...]) -> list[
 def build_condition_detail_rows(case: HistoricalCaseView) -> list[dict[str, str]]:
     return [
         {
-            "Metric": detail.metric,
-            "Actual": format_raw_value(detail.actual_value),
-            "Operator": detail.operator,
-            "Expected / Secondary Metric": detail.secondary_metric or format_raw_value(detail.expected_value),
-            "Secondary Actual": format_raw_value(detail.secondary_actual_value),
-            "Status": detail.evaluation_status,
-            "Matched": format_bool_value(detail.matched),
+            "指標": get_technical_metric_label(detail.metric),
+            "實際值": format_raw_value(detail.actual_value),
+            "運算子": detail.operator,
+            "預期值／比較指標": _expected_or_secondary_metric_label(detail),
+            "比較指標實際值": format_raw_value(detail.secondary_actual_value),
+            "判定狀態": get_signal_status_label(detail.evaluation_status),
+            "是否符合": format_bool_value(detail.matched),
         }
         for detail in case.condition_details
     ]
@@ -114,8 +117,8 @@ def build_condition_detail_rows(case: HistoricalCaseView) -> list[dict[str, str]
 def build_technical_summary_rows(case: HistoricalCaseView) -> list[dict[str, str]]:
     return [
         {
-            "Metric": metric,
-            "Value": format_technical_metric_value(metric, value),
+            "指標": get_technical_metric_label(metric),
+            "數值": format_technical_metric_value(metric, value),
         }
         for metric, value in case.technical_snapshot_summary
     ]
@@ -125,26 +128,26 @@ def build_case_chart(case: HistoricalCaseView, *, x_mode: str = "Relative Bars")
     rows = _chart_rows(case)
     data = pd.DataFrame(rows)
     x_field = "Relative Bar:Q" if x_mode == "Relative Bars" else "Trading Date:T"
-    x_title = "Relative Trading Bars" if x_mode == "Relative Bars" else "Trading Date"
+    x_title = "相對交易日" if x_mode == "Relative Bars" else "實際交易日期"
 
     base = alt.Chart(data).encode(
         x=alt.X(x_field, title=x_title),
         tooltip=[
-            alt.Tooltip("Trading Date:T", title="Trading Date"),
-            alt.Tooltip("Relative Bar:Q", title="Relative Bar"),
-            alt.Tooltip("Analysis Close:Q", title="Analysis Close", format=",.2f"),
-            alt.Tooltip("Raw High:Q", title="Raw High", format=",.2f"),
-            alt.Tooltip("Raw Low:Q", title="Raw Low", format=",.2f"),
-            alt.Tooltip("Volume:Q", title="Volume", format=","),
-            alt.Tooltip("Is Signal:N", title="Signal?"),
-            alt.Tooltip("Is First Hit:N", title="First Hit?"),
+            alt.Tooltip("Trading Date:T", title="交易日期"),
+            alt.Tooltip("Relative Bar:Q", title="相對交易日"),
+            alt.Tooltip("Analysis Close:Q", title="分析價格", format=",.2f"),
+            alt.Tooltip("Raw High:Q", title="原始高價", format=",.2f"),
+            alt.Tooltip("Raw Low:Q", title="原始低價", format=",.2f"),
+            alt.Tooltip("Volume:Q", title="成交量", format=","),
+            alt.Tooltip("Is Signal:N", title="是否為訊號日"),
+            alt.Tooltip("Is First Hit:N", title="是否首次達標"),
         ],
     )
     analysis_close_line = base.mark_line(point=True, color="#2563eb").encode(
-        y=alt.Y("Analysis Close:Q", title=f"Price ({case.currency or 'currency'})"),
+        y=alt.Y("Analysis Close:Q", title=f"價格（{case.currency or 'currency'}）"),
     )
     raw_high_line = base.mark_line(color="#94a3b8", opacity=0.65, strokeDash=[4, 3]).encode(
-        y=alt.Y("Raw High:Q", title=f"Price ({case.currency or 'currency'})"),
+        y=alt.Y("Raw High:Q", title=f"價格（{case.currency or 'currency'}）"),
     )
     signal_rule = alt.Chart(pd.DataFrame([_signal_rule_row(case, x_mode)])).mark_rule(
         color="#334155",
@@ -166,16 +169,22 @@ def build_case_chart(case: HistoricalCaseView, *, x_mode: str = "Relative Bars")
             x=alt.X(x_field, title=x_title),
             y=alt.Y("Raw High:Q"),
             tooltip=[
-                alt.Tooltip("Trading Date:T", title="First Hit"),
-                alt.Tooltip("Relative Bar:Q", title="Hit Bar"),
-                alt.Tooltip("Raw High:Q", title="Raw High", format=",.2f"),
+                alt.Tooltip("Trading Date:T", title="首次達標日期"),
+                alt.Tooltip("Relative Bar:Q", title="第幾個交易日達標"),
+                alt.Tooltip("Raw High:Q", title="原始高價", format=",.2f"),
             ],
         )
         layers.append(hit_point)
 
     return alt.layer(*layers).properties(
-        title=f"{case.symbol} - {case.signal_date.isoformat()} - {case.outcome_status.value}",
+        title=f"{case.symbol} - {case.signal_date.isoformat()} - {get_outcome_status_label(case.outcome_status.value)}",
     ).resolve_scale(y="shared")
+
+
+def _expected_or_secondary_metric_label(detail) -> str:
+    if detail.secondary_metric:
+        return get_technical_metric_label(detail.secondary_metric)
+    return format_raw_value(detail.expected_value)
 
 
 def format_percentage_value(value: float | None) -> str:
@@ -229,7 +238,7 @@ def format_optional_int(value: int | None) -> str:
 def format_bool_value(value: bool | None) -> str:
     if value is None:
         return "N/A"
-    return "Yes" if value else "No"
+    return "是" if value else "否"
 
 
 def _chart_rows(case: HistoricalCaseView) -> list[dict[str, object]]:

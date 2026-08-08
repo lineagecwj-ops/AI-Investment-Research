@@ -123,6 +123,16 @@ from out_of_sample_validation_service import ValidationPeriod
 from out_of_sample_validation_service import ValidationPeriodRole
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
+from ui_terminology import format_condition_labels
+from ui_terminology import get_frequency_label
+from ui_terminology import get_outcome_definition_label
+from ui_terminology import get_outcome_status_label
+from ui_terminology import get_overlap_policy_label
+from ui_terminology import get_scan_mode_label
+from ui_terminology import get_signal_definition_label
+from ui_terminology import get_signal_status_label
+from ui_terminology import get_source_label
+from ui_terminology import get_technical_metric_label
 from walk_forward_replay_service import WalkForwardReplayConfig
 from walk_forward_replay_service import WalkForwardReplayFrequency
 from walk_forward_replay_service import WalkForwardReplayService
@@ -135,6 +145,37 @@ st.set_page_config(
     page_title="AI Investment Research",
     layout="wide",
 )
+
+HISTORICAL_CASE_STATUS_FILTER_LABELS = {
+    "Resolved Cases": "已解析案例（HIT / MISS）",
+    "All": "全部案例",
+    "HIT": "達成研究目標（HIT）",
+    "MISS": "未達研究目標（MISS）",
+    "INCOMPLETE": "觀察期間尚未完整",
+    "NOT_EVALUABLE": "資料不足",
+}
+
+HISTORICAL_CASE_SORT_LABELS = {
+    "Newest": "最新在前",
+    "Oldest": "最舊在前",
+}
+
+HISTORICAL_CASE_X_MODE_LABELS = {
+    "Relative Bars": "相對交易日",
+    "Actual Dates": "實際交易日期",
+}
+
+
+def historical_case_status_filter_label(option: str) -> str:
+    return HISTORICAL_CASE_STATUS_FILTER_LABELS.get(option, option)
+
+
+def historical_case_sort_label(option: str) -> str:
+    return HISTORICAL_CASE_SORT_LABELS.get(option, option)
+
+
+def historical_case_x_mode_label(option: str) -> str:
+    return HISTORICAL_CASE_X_MODE_LABELS.get(option, option)
 
 
 def initialize_session_state() -> None:
@@ -1372,21 +1413,22 @@ def build_oos_validation_result(
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
-        "整合 Swing Scanner、Historical Backtest 與 Historical Cases 的日常研究流程。"
-        "Current MATCH 是研究候選，不是交易清單；Research Priority 只是研究檢視順序。"
+        "整合波段掃描、歷史驗證與歷史案例的日常研究流程。"
+        "符合條件的股票只是研究候選，不是交易清單；研究優先順序只是檢視順序。"
     )
 
     universes = read_universes_for_ui()
     watchlist_symbols = read_watchlist_for_ui(show_error=False)
-    st.markdown("### Scan Setup")
+    st.markdown("### 掃描設定")
     scan_mode = st.radio(
-        "Scan Mode",
+        "掃描模式",
         [
             swing_dashboard.CURRENT_SCAN_MODE,
             swing_dashboard.HISTORICAL_REPLAY_MODE,
             swing_dashboard.WALK_FORWARD_REPLAY_MODE,
             oos_dashboard.OOS_VALIDATION_MODE,
         ],
+        format_func=get_scan_mode_label,
         horizontal=True,
         key="swing_research_scan_mode",
     )
@@ -1396,8 +1438,9 @@ def render_swing_research() -> None:
         universe_ui.SAVED_UNIVERSE_SOURCE,
     ]
     source_type = st.selectbox(
-        "Symbol Source",
+        "股票來源",
         source_options,
+        format_func=get_source_label,
         key="swing_research_symbol_source",
     )
     selected_universe = None
@@ -1408,13 +1451,14 @@ def render_swing_research() -> None:
             input_symbols = st.text_area(
                 "股票池",
                 placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
+                help="每行輸入一個股票代號。例如：2330、2454、NVDA、6488.TWO",
                 key="swing_research_symbol_input",
                 height=140,
             )
         elif source_type == universe_ui.WATCHLIST_SOURCE:
-            st.caption(f"Watchlist symbols: {len(watchlist_symbols)}")
+            st.caption(f"觀察清單股票數：{len(watchlist_symbols)}")
             if not watchlist_symbols:
-                st.info("Watchlist 目前沒有股票。")
+                st.info("觀察清單目前沒有股票。")
         else:
             if universes:
                 universe_labels = [
@@ -1422,26 +1466,29 @@ def render_swing_research() -> None:
                     for universe in universes
                 ]
                 selected_label = st.selectbox(
-                    "Universe",
+                    "研究股票池",
                     universe_labels,
                     key="swing_research_universe_selector",
                 )
                 selected_universe = universes[universe_labels.index(selected_label)]
                 st.caption(
                     f"{selected_universe.name} · "
-                    f"{selected_universe.symbol_count} symbols · "
-                    f"Updated At: {universe_ui.format_universe_updated_at(selected_universe)}"
+                    f"{selected_universe.symbol_count} 檔股票 · "
+                    f"更新時間：{universe_ui.format_universe_updated_at(selected_universe)}"
                 )
-                with st.expander("Symbols", expanded=False):
+                with st.expander("股票", expanded=False):
                     st.write(universe_ui.symbols_to_text(selected_universe.symbols) or "N/A")
             else:
-                st.info("尚未建立自訂股票池。Manual Input 仍可使用。")
-        st.text_input("Signal Definition", value=TECHNICAL_EXAMPLE_SIGNAL_V1.id, disabled=True)
-        st.text_input("Outcome Definition", value=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id, disabled=True)
-        overlap_label = st.selectbox("Overlap Policy", ["ALLOW_ALL", "COOLDOWN"])
+                st.info("尚未建立自訂股票池。仍可使用手動輸入。")
+        st.text_input("篩選規則", value=get_signal_definition_label(TECHNICAL_EXAMPLE_SIGNAL_V1.id), disabled=True, key="swing_signal_definition_label")
+        st.caption("依均線、動能、成交量與接近前高等技術條件，判斷目前是否符合研究條件。")
+        st.text_input("歷史研究目標", value=get_outcome_definition_label(RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id), disabled=True, key="swing_outcome_definition_label")
+        st.caption("用來判斷歷史案例是否達成研究目標。這是歷史研究目標，不代表實際交易獲利。")
+        overlap_label = st.selectbox("歷史訊號樣本處理方式", ["ALLOW_ALL", "COOLDOWN"], format_func=get_overlap_policy_label)
+        st.caption("保留全部訊號可能包含同一段行情中彼此相近的歷史事件。")
         cooldown_bars = None
         if overlap_label == "COOLDOWN":
-            cooldown_bars = st.number_input("Cooldown Trading Bars", min_value=1, value=20, step=1)
+            cooldown_bars = st.number_input("訊號間隔交易日數", min_value=1, value=20, step=1)
         date_cols = st.columns(2)
         frequency_label = None
         walk_forward_start_date = None
@@ -1454,52 +1501,51 @@ def render_swing_research() -> None:
         holdout_end_date = None
         historical_start_date = None
         if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
-            start_date = date_cols[0].date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
-            replay_date = date_cols[1].date_input("Replay Date", value=pd.to_datetime("2024-06-30").date())
+            start_date = date_cols[0].date_input("歷史研究開始日期", value=pd.to_datetime("2018-01-01").date(), key="swing_replay_historical_start_date")
+            replay_date = date_cols[1].date_input("指定回放日期", value=pd.to_datetime("2024-06-30").date(), key="swing_replay_date")
             end_date = None
         elif scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
-            st.caption("Out-of-Sample Validation 會比較 Development / Validation / Holdout 三段固定規則結果；只有按下執行才會讀取完整 historical price series。")
+            st.caption("樣本外驗證會比較開發期間、驗證期間與保留樣本期間三段固定規則結果；只有按下執行才會讀取完整歷史價格資料。")
             development_cols = st.columns(2)
-            development_start_date = development_cols[0].date_input("Development Start", value=pd.to_datetime("2018-01-01").date())
-            development_end_date = development_cols[1].date_input("Development End", value=pd.to_datetime("2022-12-31").date())
+            development_start_date = development_cols[0].date_input("開發期間開始日期", value=pd.to_datetime("2018-01-01").date(), key="oos_development_start_date")
+            development_end_date = development_cols[1].date_input("開發期間結束日期", value=pd.to_datetime("2022-12-31").date(), key="oos_development_end_date")
             validation_cols = st.columns(2)
-            validation_start_date = validation_cols[0].date_input("Validation Start", value=pd.to_datetime("2023-01-01").date())
-            validation_end_date = validation_cols[1].date_input("Validation End", value=pd.to_datetime("2024-12-31").date())
+            validation_start_date = validation_cols[0].date_input("驗證期間開始日期", value=pd.to_datetime("2023-01-01").date(), key="oos_validation_start_date")
+            validation_end_date = validation_cols[1].date_input("驗證期間結束日期", value=pd.to_datetime("2024-12-31").date(), key="oos_validation_end_date")
             holdout_cols = st.columns(2)
-            holdout_start_date = holdout_cols[0].date_input("Holdout Start", value=pd.to_datetime("2025-01-01").date())
-            holdout_end_date = holdout_cols[1].date_input("Holdout End", value=date.today())
-            frequency_label = st.selectbox("Replay Frequency", ["MONTHLY", "WEEKLY"], index=0)
-            historical_start_date = st.date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
+            holdout_start_date = holdout_cols[0].date_input("保留樣本期間開始日期", value=pd.to_datetime("2025-01-01").date(), key="oos_holdout_start_date")
+            holdout_end_date = holdout_cols[1].date_input("保留樣本期間結束日期", value=date.today(), key="oos_holdout_end_date")
+            frequency_label = st.selectbox("回放頻率", ["MONTHLY", "WEEKLY"], index=0, format_func=get_frequency_label)
+            historical_start_date = st.date_input("歷史研究開始日期", value=pd.to_datetime("2018-01-01").date(), key="oos_historical_start_date")
             start_date = development_start_date
             replay_date = None
             end_date = holdout_end_date
         elif scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
-            walk_forward_start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2024-01-01").date())
-            walk_forward_end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2024-06-30").date())
-            frequency_label = st.selectbox("Frequency", ["MONTHLY", "WEEKLY"], index=0)
-            historical_start_date = st.date_input("Historical Start", value=pd.to_datetime("2018-01-01").date())
+            walk_forward_start_date = date_cols[0].date_input("歷史研究開始日期", value=pd.to_datetime("2024-01-01").date(), key="walk_forward_start_date")
+            walk_forward_end_date = date_cols[1].date_input("歷史研究結束日期", value=pd.to_datetime("2024-06-30").date(), key="walk_forward_end_date")
+            frequency_label = st.selectbox("回放頻率", ["MONTHLY", "WEEKLY"], index=0, format_func=get_frequency_label)
+            historical_start_date = st.date_input("歷史研究開始日期（統計資料）", value=pd.to_datetime("2018-01-01").date(), key="walk_forward_historical_start_date")
             start_date = walk_forward_start_date
             replay_date = None
             end_date = walk_forward_end_date
         else:
-            start_date = date_cols[0].date_input("Start Date", value=pd.to_datetime("2018-01-01").date())
+            start_date = date_cols[0].date_input("歷史研究開始日期", value=pd.to_datetime("2018-01-01").date(), key="current_historical_start_date")
             replay_date = None
-            end_date = date_cols[1].date_input("End Date", value=pd.to_datetime("2025-12-31").date())
+            end_date = date_cols[1].date_input("歷史研究結束日期", value=pd.to_datetime("2025-12-31").date(), key="current_historical_end_date")
         preferred_sample_minimum = st.number_input(
-            "Preferred Resolved Sample Minimum",
+            "偏好最低有效歷史樣本數",
             min_value=0,
             value=20,
             step=1,
-            help="這只是 research ranking / presentation threshold，不是 statistical significance threshold。",
+            help="歷史樣本數較多時，統計結果通常較容易判讀；此設定只是研究提示，不是買賣門檻。",
         )
-        st.caption("Current Scan button label: 執行波段掃描")
         submitted = st.form_submit_button(
             "執行樣本外驗證"
             if scan_mode == oos_dashboard.OOS_VALIDATION_MODE
             else
-            "執行 Walk-Forward Replay"
+            "執行多日期歷史回放"
             if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE
-            else "執行 Replay Scan"
+            else "執行歷史回放"
             if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE
             else "執行波段掃描"
         )
@@ -1543,35 +1589,39 @@ def render_swing_research() -> None:
             preferred_sample_minimum=int(preferred_sample_minimum),
         )
 
-    with st.expander("研究條件說明", expanded=False):
-        st.write(f"Signal Definition: {TECHNICAL_EXAMPLE_SIGNAL_V1.name}")
+    with st.expander("查看篩選條件", expanded=False):
+        st.write(f"篩選規則：{get_signal_definition_label(TECHNICAL_EXAMPLE_SIGNAL_V1.id)}")
         signal_rows = [
             {
-                "Metric": condition.metric,
+                "條件": get_technical_metric_label(condition.metric),
                 "Operator": condition.operator.value,
-                "Expected / Secondary": condition.secondary_metric or swing_dashboard.format_raw_value(condition.value),
+                "Expected / Secondary": get_technical_metric_label(condition.secondary_metric) if condition.secondary_metric else swing_dashboard.format_raw_value(condition.value),
             }
             for condition in TECHNICAL_EXAMPLE_SIGNAL_V1.conditions
         ]
         st.dataframe(signal_rows, width="stretch", hide_index=True)
-        st.write(f"Outcome Definition: {RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id}")
-        st.caption("Within 20 future trading bars, future raw high > frozen prior 60D raw high。")
-        st.caption("本 scanner 目前只包含 technical conditions；Fundamental conditions are not yet included in this scanner.")
-        st.caption("Historical Hit Rate 必須和 Resolved Sample Size 一起閱讀；它不是未來發生機率。")
+        st.write(f"歷史研究目標：{get_outcome_definition_label(RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id)}")
+        st.caption("20 個交易日內突破前 60 日高點。")
+        st.caption("本掃描目前只包含技術條件；基本面條件尚未納入這個掃描器。")
+        st.caption("歷史命中率必須和已解析歷史樣本數一起閱讀；它不是未來上漲機率。")
         if scan_mode == swing_dashboard.HISTORICAL_REPLAY_MODE:
-            st.caption("Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。")
+            st.caption("歷史回放只使用回放日期當下可取得的價格歷史與已知歷史結果統計產生研究排序。回放日期之後資料只用於事後驗證。")
         if scan_mode == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
-            st.caption("Walk-Forward Replay 會依頻率重複執行 Single-Date Historical Replay。Candidate occurrences 是重複觀察，不是獨立樣本，也不是績效評分。")
+            st.caption("多日期歷史回放會依頻率重複執行單日期歷史回放。候選出現次數是重複觀察，不是獨立樣本，也不是績效評分。")
         if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
-            st.caption("三段 period 使用相同 Frozen Research Specification；Holdout 不參與規則建立與調整。")
+            st.caption("三段期間使用相同固定研究規格；保留樣本期間不參與規則建立與調整。")
             st.caption(oos_dashboard.HISTORICAL_HIT_RATE_CAPTION)
             st.caption(oos_dashboard.OUTCOME_CAPTION)
             st.caption(oos_dashboard.CANDIDATE_SHARE_CAPTION)
+        with st.expander("開發者資訊", expanded=False):
+            st.write(f"Signal Definition ID：{TECHNICAL_EXAMPLE_SIGNAL_V1.id}")
+            st.write(f"Outcome Definition ID：{RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id}")
+            st.write(f"Overlap Policy ID：{overlap_label}")
 
     if overlap_label == "ALLOW_ALL":
-        st.info("ALLOW_ALL：historical signal events may overlap.")
+        st.info("保留全部訊號：可能包含同一段行情中的重複事件。")
     else:
-        st.info("COOLDOWN：reduces nearby repeated events but does not guarantee independence.")
+        st.info("訊號間隔限制：會減少彼此相近的重複事件，但不代表事件完全獨立。")
 
     if submitted:
         if not normalized_symbols:
@@ -1583,9 +1633,9 @@ def render_swing_research() -> None:
                 st.session_state["swing_research_result"] = None
                 st.session_state["swing_research_config_fingerprint"] = None
             if source_type == universe_ui.SAVED_UNIVERSE_SOURCE:
-                error_message = "股票池目前沒有 symbols。"
+                error_message = "股票池目前沒有股票。"
             elif source_type == universe_ui.WATCHLIST_SOURCE:
-                error_message = "Watchlist 目前沒有 symbols。"
+                error_message = "觀察清單目前沒有股票。"
             else:
                 error_message = "請輸入至少一個股票代號。"
             if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
@@ -1641,7 +1691,7 @@ def render_swing_research() -> None:
                         historical_start_date=start_date,
                         preferred_resolved_samples=int(preferred_sample_minimum),
                     )
-                    with st.spinner("正在執行 Historical Replay..."):
+                    with st.spinner("正在執行歷史回放..."):
                         scan_payload = build_swing_research_replay_result(
                             symbols=normalized_symbols,
                             config=config,
@@ -1659,7 +1709,7 @@ def render_swing_research() -> None:
                         historical_start_date=historical_start_date,
                         preferred_resolved_samples=int(preferred_sample_minimum),
                     )
-                    with st.spinner("正在執行 Walk-Forward Replay..."):
+                    with st.spinner("正在執行多日期歷史回放..."):
                         scan_payload = build_swing_research_walk_forward_result(
                             symbols=normalized_symbols,
                             config=config,
@@ -1714,7 +1764,7 @@ def render_swing_research() -> None:
         st.error(f"Swing Research 掃描失敗：{st.session_state['swing_research_last_error']}")
 
     if st.session_state["oos_validation_last_error"]:
-        st.error(f"Out-of-Sample Validation 失敗：{st.session_state['oos_validation_last_error']}")
+        st.error(f"樣本外驗證失敗：{st.session_state['oos_validation_last_error']}")
 
     if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
         result = st.session_state["oos_validation_result"]
@@ -1788,29 +1838,29 @@ def resolve_swing_research_source(
 
 
 def render_oos_validation_result(result, source_context=None) -> None:
-    st.markdown("### Out-of-Sample Validation")
+    st.markdown("### 樣本外驗證")
     st.caption(oos_dashboard.HISTORICAL_HIT_RATE_CAPTION)
     st.caption(oos_dashboard.OUTCOME_CAPTION)
     st.caption(oos_dashboard.CANDIDATE_SHARE_CAPTION)
 
     if source_context:
         st.caption(
-            "Source Context Copy: "
+            "股票來源："
             f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
-            f"Symbols: {source_context['symbol_count']}"
+            f"股票數：{source_context['symbol_count']}"
         )
-        with st.expander("Source Symbols Copy", expanded=False):
+        with st.expander("來源股票清單", expanded=False):
             st.write("\n".join(source_context.get("symbols", tuple())) or "N/A")
 
     spec_cols = st.columns(2)
-    spec_cols[0].metric("Research Specification Fingerprint", result.research_fingerprint)
+    spec_cols[0].metric("研究規格識別碼", result.research_fingerprint)
     spec_cols[1].metric(
-        "Same Specification Across All Periods",
-        "Yes" if result.all_periods_same_fingerprint else "No",
+        "三個期間是否使用相同研究規則",
+        "是" if result.all_periods_same_fingerprint else "否",
     )
-    st.caption("UI request fingerprint 只用於判斷目前畫面設定是否和 session-state result 相同；Research Specification Fingerprint 來自 fixed research specification。")
+    st.caption("畫面請求識別碼只用於判斷目前設定是否和畫面結果相同；研究規格識別碼來自固定研究規格。")
 
-    with st.expander("Frozen Research Specification", expanded=False):
+    with st.expander("開發者資訊：固定研究規格", expanded=False):
         spec = result.frozen_specification
         st.dataframe(
             pd.DataFrame([
@@ -1826,20 +1876,20 @@ def render_oos_validation_result(result, source_context=None) -> None:
             hide_index=True,
         )
 
-    st.markdown("#### Period Summary")
+    st.markdown("#### 期間摘要")
     for period_result in oos_dashboard.ordered_period_results(result):
         with st.container(border=True):
             st.subheader(oos_dashboard.period_label(period_result))
             if period_result.role is ValidationPeriodRole.HOLDOUT:
                 st.caption(oos_dashboard.HOLDOUT_CAPTION)
             metric_cols = st.columns(3)
-            metric_cols[0].metric("Date Range", f"{oos_dashboard.format_date(period_result.start_date)} -> {oos_dashboard.format_date(period_result.end_date)}")
-            metric_cols[1].metric("Replay Periods", period_result.requested_replay_period_count)
-            metric_cols[2].metric("Candidate Period Share", oos_dashboard.format_candidate_period_share(period_result))
+            metric_cols[0].metric("日期範圍", f"{oos_dashboard.format_date(period_result.start_date)} -> {oos_dashboard.format_date(period_result.end_date)}")
+            metric_cols[1].metric("回放期數", period_result.requested_replay_period_count)
+            metric_cols[2].metric("候選出現期間比例", oos_dashboard.format_candidate_period_share(period_result))
             hit_cols = st.columns(3)
-            hit_cols[0].metric("Historical Hit Rate", oos_dashboard.format_percentage(period_result.historical_hit_rate))
-            hit_cols[1].metric("Resolved n", period_result.resolved_count)
-            hit_cols[2].metric("Candidate Occurrences", period_result.total_candidate_occurrences)
+            hit_cols[0].metric("歷史命中率", oos_dashboard.format_percentage(period_result.historical_hit_rate))
+            hit_cols[1].metric("已解析樣本", period_result.resolved_count)
+            hit_cols[2].metric("候選出現次數", period_result.total_candidate_occurrences)
             if period_result.resolved_count < result.config.minimum_resolved_samples:
                 st.warning(oos_dashboard.SMALL_SAMPLE_WARNING)
             st.dataframe(
@@ -1848,47 +1898,47 @@ def render_oos_validation_result(result, source_context=None) -> None:
                 hide_index=True,
             )
 
-    st.markdown("#### Cross-Period Comparison")
+    st.markdown("#### 跨期間比較")
     st.dataframe(
         pd.DataFrame(oos_dashboard.build_cross_period_comparison_rows(result)).astype(str),
         width="stretch",
         hide_index=True,
     )
-    st.caption("Difference columns are raw differences；percentage metrics use percentage points, not relative change.")
+    st.caption("差異欄位是原始差值；百分比指標使用百分點，不是相對變化。")
 
     observations = oos_dashboard.build_factual_observations(result)
     if observations:
-        st.markdown("#### Factual Observations")
+        st.markdown("#### 事實觀察")
         for observation in observations:
             st.write(f"- {observation}")
 
     chart_rows = oos_dashboard.build_candidate_count_chart_rows(result)
     if chart_rows:
-        st.markdown("#### Candidate Count by Replay Period")
+        st.markdown("#### 各回放期間候選數")
         chart_df = pd.DataFrame(chart_rows)
         chart = (
             alt.Chart(chart_df)
             .mark_bar()
             .encode(
-                x=alt.X("Replay Date:N", title="Replay Date"),
-                y=alt.Y("Candidate Count:Q", title="Candidate Count"),
-                color=alt.Color("Validation Role:N", title="Validation Role"),
+                x=alt.X("Replay Date:N", title="回放日期"),
+                y=alt.Y("Candidate Count:Q", title="候選數"),
+                color=alt.Color("Validation Role:N", title="驗證期間"),
                 tooltip=["Validation Role", "Replay Date", "Candidate Count", "HIT", "MISS", "INCOMPLETE", "NOT_EVALUABLE", "FAILED"],
             )
         )
         st.altair_chart(chart, width="stretch")
     else:
-        st.info("此 validation result 沒有可顯示的 replay dates。")
+        st.info("此驗證結果沒有可顯示的回放日期。")
 
     share_df = pd.DataFrame(oos_dashboard.build_candidate_share_chart_rows(result))
     if not share_df.empty:
-        st.markdown("#### Candidate Period Share by Validation Role")
+        st.markdown("#### 各驗證期間候選出現期間比例")
         share_chart = (
             alt.Chart(share_df)
             .mark_bar()
             .encode(
-                x=alt.X("Validation Role:N", title="Validation Role"),
-                y=alt.Y("Candidate Period Share:Q", title="Candidate Period Share", axis=alt.Axis(format="%")),
+                x=alt.X("Validation Role:N", title="驗證期間"),
+                y=alt.Y("Candidate Period Share:Q", title="候選出現期間比例", axis=alt.Axis(format="%")),
                 tooltip=["Validation Role", "Candidate Period Share Label"],
             )
         )
@@ -1897,94 +1947,96 @@ def render_oos_validation_result(result, source_context=None) -> None:
     hit_rate_df = pd.DataFrame(oos_dashboard.build_historical_hit_rate_chart_rows(result))
     hit_rate_df = hit_rate_df.dropna(subset=["Historical Hit Rate"])
     if not hit_rate_df.empty:
-        st.markdown("#### Historical Hit Rate + Resolved n")
+        st.markdown("#### 歷史命中率與已解析樣本")
         hit_rate_chart = (
             alt.Chart(hit_rate_df)
             .mark_bar()
             .encode(
-                x=alt.X("Validation Role:N", title="Validation Role"),
-                y=alt.Y("Historical Hit Rate:Q", title="Historical Hit Rate", axis=alt.Axis(format="%")),
+                x=alt.X("Validation Role:N", title="驗證期間"),
+                y=alt.Y("Historical Hit Rate:Q", title="歷史命中率", axis=alt.Axis(format="%")),
                 tooltip=["Label", "Resolved n"],
             )
         )
         st.altair_chart(hit_rate_chart, width="stretch")
 
-    st.markdown("#### Outcome Counts")
+    st.markdown("#### 歷史結果統計")
     st.dataframe(
         pd.DataFrame(oos_dashboard.build_outcome_count_rows(result)).astype(str),
         width="stretch",
         hide_index=True,
     )
 
-    st.markdown("#### Cross-Period Symbol Presence")
+    st.markdown("#### 跨期間股票出現情形")
     symbol_presence_rows = oos_dashboard.build_cross_period_symbol_presence_rows(result)
     if symbol_presence_rows:
         st.dataframe(pd.DataFrame(symbol_presence_rows).astype(str), width="stretch", hide_index=True)
     else:
-        st.info("三段 period 都沒有 candidate symbols。")
+        st.info("三段期間都沒有候選股票。")
 
     for period_result in oos_dashboard.ordered_period_results(result):
-        with st.expander(f"{oos_dashboard.period_label(period_result)} Candidate Stability", expanded=False):
+        with st.expander(f"{oos_dashboard.period_label(period_result)} 候選穩定性", expanded=False):
             symbol_rows = oos_dashboard.build_period_symbol_rows(period_result)
             if symbol_rows:
                 st.dataframe(pd.DataFrame(symbol_rows).astype(str), width="stretch", hide_index=True)
             else:
-                st.info("此期間沒有 candidates。")
+                st.info("此期間沒有候選股票。")
             timeline_rows = oos_dashboard.build_period_timeline_rows(period_result)
             if timeline_rows:
                 st.dataframe(pd.DataFrame(timeline_rows).astype(str), width="stretch", hide_index=True)
             else:
-                st.info("此期間沒有 replay dates。")
+                st.info("此期間沒有回放日期。")
 
     failure_rows = oos_dashboard.build_failure_summary_rows(result)
     if failure_rows:
-        with st.expander("Safe Failure Summary", expanded=False):
+        with st.expander("安全錯誤摘要", expanded=False):
             st.dataframe(pd.DataFrame(failure_rows).astype(str), width="stretch", hide_index=True)
 
 
 def render_swing_research_result(result, source_context=None) -> None:
-    st.markdown("### Scan Summary")
+    st.markdown("### 掃描結果摘要")
     if source_context:
         st.caption(
-            "Source: "
+            "股票來源："
             f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
-            f"Symbols scanned: {source_context['symbol_count']}"
+            f"掃描股票數：{source_context['symbol_count']}"
         )
     st.caption(
-        f"Requested symbols: {len(result.requested_symbols)} · "
-        f"Unique normalized symbols: {len(result.normalized_symbols)}"
+        f"輸入股票數：{len(result.requested_symbols)} · "
+        f"有效股票數：{len(result.normalized_symbols)}"
     )
+    st.caption("符合條件：目前符合「波段技術篩選 V1」。不符合條件：目前至少有一項篩選條件未達標，不代表看跌。資料不足：目前無法取得足夠資料完成判斷。掃描失敗：取得資料或計算過程發生錯誤。")
     summary_cols = st.columns(5)
     for col, row in zip(summary_cols, swing_dashboard.build_scan_summary_rows(result)):
         col.metric(row["Metric"], row["Value"])
 
     if result.failed_symbols:
-        with st.expander("Failed Symbols", expanded=False):
+        with st.expander("掃描失敗的股票", expanded=False):
             st.dataframe(swing_dashboard.build_failure_rows(result), width="stretch", hide_index=True)
 
     if result.no_match_count:
-        with st.expander("NO_MATCH Symbols", expanded=False):
+        with st.expander("不符合條件的股票", expanded=False):
             rows = swing_dashboard.build_no_match_rows(result)
             if rows:
                 st.dataframe(rows, width="stretch", hide_index=True)
             else:
-                st.dataframe({"Symbol": list(result.no_match_symbols)}, width="stretch", hide_index=True)
+                st.dataframe({"股票": list(result.no_match_symbols)}, width="stretch", hide_index=True)
 
     if result.not_evaluable_count:
-        with st.expander("NOT_EVALUABLE", expanded=False):
+        with st.expander("資料不足", expanded=False):
             st.dataframe(swing_dashboard.build_not_evaluable_rows(result), width="stretch", hide_index=True)
 
-    st.markdown("### Candidate Table")
-    with st.expander("How Research Priority is ordered", expanded=False):
+    st.markdown("### 符合條件的研究候選")
+    with st.expander("研究優先順序如何排列", expanded=False):
         st.caption("Research Ranking Policy: swing_research_rank_v1")
         st.write(swing_dashboard.RESEARCH_RANKING_EXPLANATION)
-        st.caption("Research Priority 是研究檢視順序，不是 recommendation、prediction 或交易排序。")
+        st.caption("研究優先順序是研究檢視順序，不是推薦、預測或交易排序。")
 
     candidate_rows = swing_dashboard.build_candidate_table_rows(result.matched_candidates)
     st.dataframe(candidate_rows, width="stretch", hide_index=True)
 
     if result.matched_count == 0:
-        st.info("目前沒有股票符合這組 Signal Definition。")
+        st.info("目前沒有股票符合這組篩選條件。")
+        st.caption("這不代表股票看跌，只代表目前未符合波段技術篩選 V1。")
         return
 
     candidate_labels = [
@@ -1997,64 +2049,64 @@ def render_swing_research_result(result, source_context=None) -> None:
 
 
 def render_swing_candidate_detail(candidate) -> None:
-    st.markdown("### Selected Candidate Detail")
+    st.markdown("### 研究候選明細")
     if candidate.source_price_is_stale:
-        st.warning("Historical price data is from stale cache.")
+        st.warning("歷史價格資料來自過期快取。")
     if candidate.is_provisional_possible:
-        st.caption("Latest daily bar may be provisional if the trading session is not complete.")
+        st.caption("若交易日尚未結束，最新日線資料可能仍是暫定值。")
 
-    st.markdown("#### Current Signal")
+    st.markdown("#### 目前篩選結果")
     signal_cols = st.columns(3)
-    signal_cols[0].metric("Latest Trading Date", swing_dashboard.format_date(candidate.latest_trading_date))
+    signal_cols[0].metric("最新交易日", swing_dashboard.format_date(candidate.latest_trading_date))
     current_features = getattr(candidate, "current_" + "snap" + "shot")
-    signal_cols[1].metric("Analysis Close", f"{current_features.analysis_close:,.2f}")
-    signal_cols[2].metric("Signal Status", candidate.signal_match.status.value)
+    signal_cols[1].metric("分析價格", f"{current_features.analysis_close:,.2f}")
+    signal_cols[2].metric("篩選狀態", get_signal_status_label(candidate.signal_match.status.value))
 
     if not swing_dashboard.current_match_trace_is_consistent(candidate.signal_match):
-        st.error("Current signal trace is inconsistent with MATCH status.")
+        st.error("目前篩選條件明細與符合狀態不一致。")
     st.dataframe(
         swing_dashboard.build_condition_trace_rows(candidate.signal_match),
         width="stretch",
         hide_index=True,
     )
 
-    with st.expander("Current Technical Metrics", expanded=False):
+    with st.expander("目前技術指標", expanded=False):
         st.dataframe(
             getattr(swing_dashboard, "build_technical_" + "snap" + "shot_rows")(current_features),
             width="stretch",
             hide_index=True,
         )
 
-    st.markdown("#### Historical Backtest Context")
+    st.markdown("#### 歷史驗證資料")
     context_cols = st.columns(4)
-    context_cols[0].metric("Historical Hit Rate", swing_dashboard.format_percentage(candidate.historical_hit_rate))
-    context_cols[1].metric("Resolved Samples", f"n = {candidate.resolved_count}")
+    context_cols[0].metric("歷史命中率", swing_dashboard.format_percentage(candidate.historical_hit_rate), help="過去符合相同條件且已解析的歷史事件中，達成指定研究目標的比例。不是未來上漲機率。")
+    context_cols[1].metric("已解析歷史樣本數", f"n = {candidate.resolved_count}", help="已能判定 HIT 或 MISS 的歷史案例數。")
     context_cols[2].metric("HIT", candidate.hit_count)
     context_cols[3].metric("MISS", candidate.miss_count)
     st.caption(swing_dashboard.HISTORICAL_HIT_RATE_CAPTION)
 
     detail_cols = st.columns(4)
-    detail_cols[0].metric("INCOMPLETE", candidate.incomplete_count)
-    detail_cols[1].metric("NOT_EVALUABLE", candidate.not_evaluable_count)
-    detail_cols[2].metric("Raw Signals", candidate.raw_signal_count)
-    detail_cols[3].metric("Evaluated Signals", candidate.filtered_signal_count)
+    detail_cols[0].metric("觀察期間尚未完整", candidate.incomplete_count)
+    detail_cols[1].metric("無法判定", candidate.not_evaluable_count)
+    detail_cols[2].metric("原始訊號數", candidate.raw_signal_count)
+    detail_cols[3].metric("已評估訊號數", candidate.filtered_signal_count)
     st.caption(
-        f"Backtest Range: {swing_dashboard.format_date(candidate.backtest_start_date)} -> "
+        f"歷史驗證範圍：{swing_dashboard.format_date(candidate.backtest_start_date)} -> "
         f"{swing_dashboard.format_date(candidate.backtest_end_date)} · "
-        f"Overlap Policy: {candidate.overlap_policy.value} · "
-        f"Cooldown: {format_optional_int(candidate.cooldown_bars)}"
+        f"歷史訊號樣本處理方式：{get_overlap_policy_label(candidate.overlap_policy.value)} · "
+        f"訊號間隔交易日數：{format_optional_int(candidate.cooldown_bars)}"
     )
 
     return_cols = st.columns(4)
-    return_cols[0].metric("Median MFE", swing_dashboard.format_percentage(candidate.median_max_close_return))
-    return_cols[1].metric("Median MAE", swing_dashboard.format_percentage(candidate.median_max_adverse_return))
-    return_cols[2].metric("Median End Return", swing_dashboard.format_percentage(candidate.median_end_return))
-    return_cols[3].metric("Median Hit Bars", swing_dashboard.format_optional_number(candidate.median_hit_bar_index))
+    return_cols[0].metric("最大有利變動（MFE）中位數", swing_dashboard.format_percentage(candidate.median_max_close_return), help="訊號後指定觀察期間內，分析價格曾出現的最大有利變動。")
+    return_cols[1].metric("最大不利變動（MAE）中位數", swing_dashboard.format_percentage(candidate.median_max_adverse_return), help="訊號後指定觀察期間內，分析價格曾出現的最大不利變動。")
+    return_cols[2].metric("觀察期末變動中位數", swing_dashboard.format_percentage(candidate.median_end_return), help="指定觀察期間結束時，相對訊號日分析價格的變動。")
+    return_cols[3].metric("中位達標交易日數", swing_dashboard.format_optional_number(candidate.median_hit_bar_index))
     average_cols = st.columns(4)
-    average_cols[0].metric("Average MFE", swing_dashboard.format_percentage(candidate.average_max_close_return))
-    average_cols[1].metric("Average MAE", swing_dashboard.format_percentage(candidate.average_max_adverse_return))
-    average_cols[2].metric("Average End Return", swing_dashboard.format_percentage(candidate.average_end_return))
-    average_cols[3].metric("Average Hit Bars", swing_dashboard.format_optional_number(candidate.average_hit_bar_index))
+    average_cols[0].metric("最大有利變動平均", swing_dashboard.format_percentage(candidate.average_max_close_return))
+    average_cols[1].metric("最大不利變動平均", swing_dashboard.format_percentage(candidate.average_max_adverse_return))
+    average_cols[2].metric("觀察期末變動平均", swing_dashboard.format_percentage(candidate.average_end_return))
+    average_cols[3].metric("平均達標交易日數", swing_dashboard.format_optional_number(candidate.average_hit_bar_index))
 
     if (
         candidate.historical_hit_rate is not None
@@ -2063,41 +2115,40 @@ def render_swing_candidate_detail(candidate) -> None:
         and candidate.median_end_return < 0
     ):
         st.info(
-            "Target events may occur before the end of the evaluation window; "
-            "a HIT does not imply a positive end-of-window return."
+            "目標事件可能在觀察期間結束前發生；HIT 不代表觀察期末變動一定為正。"
         )
 
     render_swing_case_preview(candidate)
 
 
 def render_swing_research_replay_result(result, source_context=None) -> None:
-    st.markdown("### Historical Replay")
+    st.markdown("### 歷史回放")
     st.caption(
-        f"Requested Replay Date: {swing_dashboard.format_date(result.config.replay_date)}"
+        f"指定回放日期：{swing_dashboard.format_date(result.config.replay_date)}"
     )
     st.caption(
-        "Replay 模式只使用 Replay Date 當下可取得的價格歷史與已知 historical outcome 統計產生研究排序。"
-        "Replay Date 之後資料只用於 Post-Replay Outcome 事後驗證。"
+        "歷史回放只使用回放日期當下可取得的價格歷史與已知歷史結果統計產生研究排序。"
+        "回放日期之後的資料只用於事後驗證，沒有用於產生當時的篩選結果。"
     )
     if source_context:
         st.caption(
-            "Source: "
+            "股票來源："
             f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
-            f"Symbols scanned: {source_context['symbol_count']}"
+            f"掃描股票數：{source_context['symbol_count']}"
         )
     st.caption(
-        f"Requested symbols: {len(result.requested_symbols)} · "
-        f"Unique normalized symbols: {len(result.normalized_symbols)}"
+        f"輸入股票數：{len(result.requested_symbols)} · "
+        f"有效股票數：{len(result.normalized_symbols)}"
     )
     summary_cols = st.columns(5)
     for col, row in zip(summary_cols, swing_dashboard.build_replay_summary_rows(result)):
         col.metric(row["Metric"], row["Value"])
 
     if result.failed_symbols:
-        with st.expander("Failed Symbols", expanded=False):
+        with st.expander("掃描失敗的股票", expanded=False):
             rows = [
                 {
-                    "Symbol": failure.symbol,
+                    "股票": failure.symbol,
                     "Safe Error Type": failure.error_type,
                     "Safe Message": failure.message,
                 }
@@ -2106,35 +2157,35 @@ def render_swing_research_replay_result(result, source_context=None) -> None:
             st.dataframe(rows, width="stretch", hide_index=True)
 
     if result.no_match_count:
-        with st.expander("NO_MATCH Symbols", expanded=False):
+        with st.expander("不符合條件的股票", expanded=False):
             rows = [
                 {
-                    "Symbol": detail.symbol,
-                    "Actual Trading Date": swing_dashboard.format_date(detail.actual_signal_date),
-                    "Failed Conditions": ", ".join(detail.failed_conditions) or "N/A",
+                    "股票": detail.symbol,
+                    "實際使用交易日": swing_dashboard.format_date(detail.actual_signal_date),
+                    "未符合的條件": format_condition_labels(detail.failed_conditions),
                 }
                 for detail in result.no_match_details
             ]
             st.dataframe(rows, width="stretch", hide_index=True)
 
     if result.not_evaluable_count:
-        with st.expander("NOT_EVALUABLE", expanded=False):
+        with st.expander("資料不足", expanded=False):
             rows = [
                 {
-                    "Symbol": detail.symbol,
-                    "Requested Replay Date": swing_dashboard.format_date(detail.requested_replay_date),
-                    "Actual Trading Date": swing_dashboard.format_date(detail.actual_signal_date),
-                    "Reason": detail.reason or ", ".join(detail.missing_required_features) or "N/A",
+                    "股票": detail.symbol,
+                    "指定回放日期": swing_dashboard.format_date(detail.requested_replay_date),
+                    "實際使用交易日": swing_dashboard.format_date(detail.actual_signal_date),
+                    "原因": detail.reason or format_condition_labels(detail.missing_required_features),
                 }
                 for detail in result.not_evaluable_symbols
             ]
             st.dataframe(rows, width="stretch", hide_index=True)
 
-    st.markdown("### Replay Candidate Table")
-    with st.expander("How Research Priority is ordered", expanded=False):
+    st.markdown("### 回放研究候選")
+    with st.expander("研究優先順序如何排列", expanded=False):
         st.caption("Research Ranking Policy: swing_research_rank_v1")
         st.write(swing_dashboard.RESEARCH_RANKING_EXPLANATION)
-        st.caption("Replay ranking uses point-in-time historical statistics only; Post-Replay Outcome is not a ranking input.")
+        st.caption("回放排序只使用當時可知的歷史統計；回放日期後的實際歷史結果不參與排序。")
     st.dataframe(
         swing_dashboard.build_replay_candidate_table_rows(result.match_candidates),
         width="stretch",
@@ -2142,68 +2193,68 @@ def render_swing_research_replay_result(result, source_context=None) -> None:
     )
 
     if result.matched_count == 0:
-        st.info("此 Replay Date 下沒有股票符合這組 Signal Definition。")
+        st.info("此回放日期下沒有股票符合這組篩選條件。")
         return
 
     candidate_labels = [
         swing_dashboard.replay_candidate_selector_label(candidate)
         for candidate in result.match_candidates
     ]
-    selected_label = st.selectbox("選擇 Replay 研究候選", candidate_labels)
+    selected_label = st.selectbox("選擇回放研究候選", candidate_labels)
     selected_candidate = result.match_candidates[candidate_labels.index(selected_label)]
     render_swing_replay_candidate_detail(selected_candidate, result.config)
 
 
 def render_swing_research_walk_forward_result(result, source_context=None) -> None:
-    st.markdown("### Walk-Forward Replay")
+    st.markdown("### 多日期歷史回放")
     st.caption(
-        f"Replay Range: {swing_dashboard.format_date(result.config.start_date)} -> "
+        f"回放範圍：{swing_dashboard.format_date(result.config.start_date)} -> "
         f"{swing_dashboard.format_date(result.config.end_date)} · "
-        f"Frequency: {result.config.frequency.value}"
+        f"回放頻率：{get_frequency_label(result.config.frequency.value)}"
     )
     st.caption(
-        "同一股票可能在相鄰 Replay Period 重複出現，因此 candidate occurrences 並非獨立統計樣本。"
-        "本頁只顯示 occurrence counts，不顯示 aggregate hit-rate 或 probability。"
+        "同一股票可能在相鄰回放期間重複出現，因此候選出現次數並非獨立統計樣本。"
+        "本頁只顯示出現次數，不顯示整體命中率或機率。"
     )
     if source_context:
         st.caption(
-            "Source: "
+            "股票來源："
             f"{universe_ui.source_display_name(source_type=source_context['source_type'], universe_name=source_context.get('source_universe_name'))} · "
-            f"Symbols scanned: {source_context['symbol_count']}"
+            f"掃描股票數：{source_context['symbol_count']}"
         )
 
-    st.markdown("### Replay Analytics")
+    st.markdown("### 回放穩定性分析")
     summary_rows = swing_dashboard.build_walk_forward_summary_rows(result)
     summary_cols = st.columns(3)
     for col, row in zip(summary_cols, summary_rows):
         col.metric(row["Metric"], row["Value"])
     for col, row in zip(summary_cols, summary_rows[3:]):
         col.metric(row["Metric"], row["Value"])
-    st.caption("Candidate Period Share 代表有出現至少一個研究候選的 replay periods 比例，不是未來發生機率。")
+    st.caption("候選出現期間比例代表有出現至少一個研究候選的回放期間比例，不是未來發生機率。")
 
-    with st.expander("Post-Replay Outcome Counts", expanded=False):
-        st.caption("Post-Replay Outcome 是事後驗證資訊，不參與 replay 當時的 Research Priority，也不代表策略報酬或未來機率。")
+    with st.expander("回放後歷史結果統計", expanded=False):
+        st.caption("回放後歷史結果是事後驗證資訊，不參與回放當時的研究優先順序，也不代表策略報酬或未來機率。")
         st.dataframe(
             swing_dashboard.build_walk_forward_outcome_count_rows(result),
             width="stretch",
             hide_index=True,
         )
 
-    st.markdown("#### Candidate Occurrence")
+    st.markdown("#### 候選出現次數")
     st.dataframe(
         swing_dashboard.build_walk_forward_symbol_summary_rows(result),
         width="stretch",
         hide_index=True,
     )
 
-    st.markdown("#### Period Timeline")
+    st.markdown("#### 回放期間時間線")
     st.dataframe(
         swing_dashboard.build_walk_forward_timeline_rows(result),
         width="stretch",
         hide_index=True,
     )
 
-    st.markdown("#### Candidate Set Stability")
+    st.markdown("#### 候選名單穩定性")
     st.dataframe(
         swing_dashboard.build_replay_analytics_candidate_set_rows(result),
         width="stretch",
@@ -2211,70 +2262,70 @@ def render_swing_research_walk_forward_result(result, source_context=None) -> No
     )
 
     if not result.period_results:
-        st.info("此 Walk-Forward Replay 沒有可顯示的 replay periods。")
+        st.info("此多日期歷史回放沒有可顯示的回放期間。")
         return
 
     labels = [
         swing_dashboard.walk_forward_period_selector_label(period)
         for period in result.period_results
     ]
-    selected_label = st.selectbox("選擇 Replay Period", labels)
+    selected_label = st.selectbox("選擇回放期間", labels)
     selected_period = result.period_results[labels.index(selected_label)]
     if selected_period.failure is not None:
         st.warning(
-            "此 Replay Period 執行失敗："
+            "此回放期間執行失敗："
             f"{selected_period.failure.error_type} - {selected_period.failure.safe_message}"
         )
         return
     if selected_period.replay_result is None:
-        st.info("此 Replay Period 沒有結果。")
+        st.info("此回放期間沒有結果。")
         return
     if selected_period.matched_count == 0:
-        st.info("此 Replay Period 沒有符合條件的股票。")
+        st.info("此回放期間沒有符合條件的股票。")
     render_swing_research_replay_result(selected_period.replay_result, source_context)
 
 
 def render_swing_replay_candidate_detail(candidate, config: HistoricalReplayConfig) -> None:
-    st.markdown("### Selected Replay Candidate Detail")
+    st.markdown("### 回放候選明細")
     if candidate.source_price_is_stale:
-        st.warning("Historical price data is from stale cache.")
+        st.warning("歷史價格資料來自過期快取。")
 
-    st.markdown("#### Signal Evidence As Of")
+    st.markdown("#### 回放當時篩選結果")
     replay_features = getattr(candidate, "technical_" + "snap" + "shot")
     signal_cols = st.columns(4)
-    signal_cols[0].metric("Requested Replay Date", swing_dashboard.format_date(candidate.requested_replay_date))
-    signal_cols[1].metric("Actual Trading Date", swing_dashboard.format_date(candidate.actual_signal_date))
-    signal_cols[2].metric("Analysis Close", f"{replay_features.analysis_close:,.2f}")
-    signal_cols[3].metric("Signal Status", candidate.signal_match.status.value)
+    signal_cols[0].metric("指定回放日期", swing_dashboard.format_date(candidate.requested_replay_date))
+    signal_cols[1].metric("實際使用交易日", swing_dashboard.format_date(candidate.actual_signal_date))
+    signal_cols[2].metric("分析價格", f"{replay_features.analysis_close:,.2f}")
+    signal_cols[3].metric("篩選狀態", get_signal_status_label(candidate.signal_match.status.value))
     st.dataframe(
         swing_dashboard.build_condition_trace_rows(candidate.signal_match),
         width="stretch",
         hide_index=True,
     )
 
-    with st.expander("Signal Technical Metrics As Of", expanded=False):
+    with st.expander("回放當時技術指標", expanded=False):
         st.dataframe(
             getattr(swing_dashboard, "build_technical_" + "snap" + "shot_rows")(replay_features),
             width="stretch",
             hide_index=True,
         )
 
-    st.markdown("#### Historical Context Available As Of Replay Date")
+    st.markdown("#### 回放當時可知歷史資料")
     summary = candidate.point_in_time_backtest_summary
     context_cols = st.columns(4)
-    context_cols[0].metric("Historical Hit Rate (As Of)", swing_dashboard.format_percentage(summary.historical_hit_rate_as_of))
-    context_cols[1].metric("Resolved n (As Of)", f"n = {summary.resolved_as_of_count}")
+    context_cols[0].metric("回放當時可知歷史命中率", swing_dashboard.format_percentage(summary.historical_hit_rate_as_of))
+    context_cols[1].metric("回放當時可知已解析樣本數", f"n = {summary.resolved_as_of_count}")
     context_cols[2].metric("HIT As Of", summary.hit_as_of_count)
     context_cols[3].metric("MISS As Of", summary.miss_as_of_count)
-    st.caption("Historical Hit Rate (As Of) 是回放當時可知歷史命中率，不是 future probability。")
+    st.caption("回放當時可知歷史命中率不是未來機率。")
 
     return_cols = st.columns(4)
-    return_cols[0].metric("Median MFE As Of", swing_dashboard.format_percentage(summary.median_max_close_return_as_of))
-    return_cols[1].metric("Median MAE As Of", swing_dashboard.format_percentage(summary.median_max_adverse_return_as_of))
-    return_cols[2].metric("Median End Return As Of", swing_dashboard.format_percentage(summary.median_end_return_as_of))
-    return_cols[3].metric("Median Hit Bars As Of", swing_dashboard.format_optional_number(summary.median_hit_bar_index_as_of))
+    return_cols[0].metric("回放當時可知中位最大有利變動", swing_dashboard.format_percentage(summary.median_max_close_return_as_of))
+    return_cols[1].metric("回放當時可知中位最大不利變動", swing_dashboard.format_percentage(summary.median_max_adverse_return_as_of))
+    return_cols[2].metric("回放當時可知期末中位變動", swing_dashboard.format_percentage(summary.median_end_return_as_of))
+    return_cols[3].metric("回放當時可知中位達標交易日數", swing_dashboard.format_optional_number(summary.median_hit_bar_index_as_of))
 
-    st.markdown("#### What Happened After Replay Date")
+    st.markdown("#### 回放日期之後的實際歷史結果")
     st.caption("以下資料只用於歷史事後驗證，沒有用於產生當時訊號或排序。")
     st.dataframe(
         swing_dashboard.post_replay_outcome_rows(candidate),
@@ -2323,18 +2374,18 @@ def render_swing_replay_outcome_chart(candidate, config: HistoricalReplayConfig)
         st.warning(str(error))
         return
 
-    st.markdown("#### Replay Outcome Case Chart")
+    st.markdown("#### 回放結果案例圖")
     chart_cols = st.columns(4)
-    chart_cols[0].metric("Signal Date", case_view.signal_date.isoformat())
-    chart_cols[1].metric("Outcome Status", case_view.outcome_status.value)
-    chart_cols[2].metric("First Hit", format_date_value(case_view.target_hit_date))
-    chart_cols[3].metric("Hit Bar", format_optional_int(case_view.target_hit_bar_index))
+    chart_cols[0].metric("訊號日期", case_view.signal_date.isoformat())
+    chart_cols[1].metric("結果狀態", get_outcome_status_label(case_view.outcome_status.value))
+    chart_cols[2].metric("首次達標日期", format_date_value(case_view.target_hit_date))
+    chart_cols[3].metric("第幾個交易日達標", format_optional_int(case_view.target_hit_bar_index))
     st.altair_chart(build_case_chart(case_view, x_mode="Relative Bars"), use_container_width=True)
     st.caption("圖中 signal date 之後資料只用於歷史事後驗證，沒有用於產生當時訊號。")
 
 
 def render_swing_case_preview(candidate) -> None:
-    st.markdown("#### Historical Cases Preview")
+    st.markdown("#### 歷史案例預覽")
     st.caption(swing_dashboard.CASE_SELECTION_BIAS_CAPTION)
     price_series_by_symbol = st.session_state.get("swing_research_price_series_by_symbol", {})
     try:
@@ -2345,38 +2396,38 @@ def render_swing_case_preview(candidate) -> None:
         )
     except HistoricalCaseDataError as error:
         st.warning(str(error))
-        st.caption("Case preview 不會在 candidate selection 時重新 fetch；請重新執行掃描以重建 scan-time price cache。")
+        st.caption("案例預覽不會在選擇候選時重新抓取資料；請重新執行掃描以重建掃描時的價格快取。")
         return
 
     count_cols = st.columns(3)
     for col, row in zip(count_cols, swing_dashboard.build_case_preview_count_rows(case_views)):
         col.metric(row["Metric"], row["Value"])
 
-    status_filter = st.selectbox("Case Preview Filter", swing_dashboard.CASE_PREVIEW_FILTER_OPTIONS)
+    status_filter = st.selectbox("案例篩選", swing_dashboard.CASE_PREVIEW_FILTER_OPTIONS)
     filtered_cases = swing_dashboard.filter_case_preview_views(case_views, status_filter)
     preview_cases = swing_dashboard.latest_case_preview_rows(filtered_cases)
     st.dataframe(build_case_summary_rows(preview_cases), width="stretch", hide_index=True)
 
     if not preview_cases:
-        st.info("目前 filter 下有 0 cases。")
+        st.info("目前篩選條件下沒有歷史案例。")
         return
 
     selected_labels = [case_selector_label(case) for case in preview_cases]
-    selected_case_label = st.selectbox("Selected Historical Case chart", selected_labels)
+    selected_case_label = st.selectbox("選擇歷史案例圖", selected_labels)
     selected_case = preview_cases[selected_labels.index(selected_case_label)]
 
     chart_cols = st.columns(4)
-    chart_cols[0].metric("Signal Date", selected_case.signal_date.isoformat())
-    chart_cols[1].metric("Outcome Status", selected_case.outcome_status.value)
-    chart_cols[2].metric("Reference High", format_price_value(selected_case.reference_high, selected_case.currency))
-    chart_cols[3].metric("First Hit", format_date_value(selected_case.target_hit_date))
+    chart_cols[0].metric("訊號日期", selected_case.signal_date.isoformat())
+    chart_cols[1].metric("結果狀態", get_outcome_status_label(selected_case.outcome_status.value))
+    chart_cols[2].metric("參考高點", format_price_value(selected_case.reference_high, selected_case.currency))
+    chart_cols[3].metric("首次達標日期", format_date_value(selected_case.target_hit_date))
     return_cols = st.columns(4)
-    return_cols[0].metric("Hit Bar", format_optional_int(selected_case.target_hit_bar_index))
-    return_cols[1].metric("MFE", format_percentage_value(selected_case.max_close_return))
-    return_cols[2].metric("MAE", format_percentage_value(selected_case.max_adverse_return))
-    return_cols[3].metric("End Return", format_percentage_value(selected_case.end_of_window_return))
+    return_cols[0].metric("第幾個交易日達標", format_optional_int(selected_case.target_hit_bar_index))
+    return_cols[1].metric("最大有利變動", format_percentage_value(selected_case.max_close_return))
+    return_cols[2].metric("最大不利變動", format_percentage_value(selected_case.max_adverse_return))
+    return_cols[3].metric("觀察期末變動", format_percentage_value(selected_case.end_of_window_return))
     st.altair_chart(build_case_chart(selected_case, x_mode="Relative Bars"), use_container_width=True)
-    st.caption("可至 Historical Cases（歷史案例）頁面查看更多完整案例線圖。")
+    st.caption("可至「歷史案例」頁面查看更多完整案例線圖。")
 
 
 def build_historical_case_result(
@@ -2426,31 +2477,34 @@ def build_historical_case_result(
 
 
 def render_historical_cases() -> None:
-    st.header("Historical Cases（歷史案例）")
+    st.header("歷史案例")
     st.caption(
-        "Historical Case Explorer 是歷史案例檢視工具。HIT 代表指定 historical outcome target 曾在 horizon 內觸發；"
-        "MISS 代表完整 horizon 內沒有觸發。這不是交易損益分類，也不是未來預測。"
+        "歷史案例用來檢視過去符合研究條件後的實際走勢。HIT 代表指定歷史研究目標曾在觀察期間內觸發；"
+        "MISS 代表完整觀察期間內沒有觸發。這不是交易損益分類，也不是未來預測。"
     )
 
     with st.form("historical_case_form"):
         input_symbol = st.text_input(
-            "Symbol",
+            "股票",
             placeholder="2454 或 2330",
             key="historical_case_symbol_input",
         )
-        st.text_input("Signal Definition", value=TECHNICAL_EXAMPLE_SIGNAL_V1.id, disabled=True)
-        st.text_input("Outcome", value=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id, disabled=True)
-        overlap_label = st.selectbox("Overlap Policy", ["ALLOW_ALL", "COOLDOWN"])
+        st.text_input("篩選規則", value=get_signal_definition_label(TECHNICAL_EXAMPLE_SIGNAL_V1.id), disabled=True, key="historical_case_signal_definition_label")
+        st.text_input("歷史研究目標", value=get_outcome_definition_label(RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id), disabled=True, key="historical_case_outcome_definition_label")
+        overlap_label = st.selectbox("歷史訊號樣本處理方式", ["ALLOW_ALL", "COOLDOWN"], format_func=get_overlap_policy_label)
         cooldown_bars = None
         if overlap_label == "COOLDOWN":
-            cooldown_bars = st.number_input("Cooldown Bars", min_value=1, value=20, step=1)
+            cooldown_bars = st.number_input("訊號間隔交易日數", min_value=1, value=20, step=1, key="historical_case_cooldown_bars")
         date_cols = st.columns(2)
-        start_date = date_cols[0].date_input("Backtest Start", value=pd.to_datetime("2018-01-01").date())
-        end_date = date_cols[1].date_input("Backtest End", value=pd.to_datetime("2025-12-31").date())
+        start_date = date_cols[0].date_input("歷史研究開始日期", value=pd.to_datetime("2018-01-01").date(), key="historical_case_start_date")
+        end_date = date_cols[1].date_input("歷史研究結束日期", value=pd.to_datetime("2025-12-31").date(), key="historical_case_end_date")
         window_cols = st.columns(2)
-        pre_signal_bars = window_cols[0].number_input("Pre-signal bars", min_value=0, value=60, step=5)
-        post_signal_bars = window_cols[1].number_input("Post-signal bars", min_value=0, value=20, step=5)
-        force_refresh = st.checkbox("Force Yahoo refresh", value=False)
+        pre_signal_bars = window_cols[0].number_input("訊號前顯示交易日數", min_value=0, value=60, step=5)
+        post_signal_bars = window_cols[1].number_input("訊號後顯示交易日數", min_value=0, value=20, step=5)
+        force_refresh = st.checkbox("強制重新抓取 Yahoo 資料", value=False)
+        with st.expander("開發者資訊", expanded=False):
+            st.write(f"Signal Definition ID：{TECHNICAL_EXAMPLE_SIGNAL_V1.id}")
+            st.write(f"Outcome Definition ID：{RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id}")
         submitted = st.form_submit_button("建立歷史案例")
 
     parsed_symbols = parse_stock_symbols(input_symbol)
@@ -2471,7 +2525,7 @@ def render_historical_cases() -> None:
             st.session_state["historical_case_last_error"] = "請輸入至少一個股票代號。"
         else:
             if len(parsed_symbols) > 1:
-                st.info(f"Historical Cases 頁面目前顯示第一支股票：{parsed_symbols[0]}")
+                st.info(f"歷史案例頁面目前顯示第一支股票：{parsed_symbols[0]}")
             try:
                 result = build_historical_case_result(
                     symbol=parsed_symbols[0],
@@ -2497,11 +2551,11 @@ def render_historical_cases() -> None:
         st.session_state["historical_case_last_error"] = None
 
     if st.session_state["historical_case_last_error"]:
-        st.error(f"Historical Cases 建立失敗：{st.session_state['historical_case_last_error']}")
+        st.error(f"歷史案例建立失敗：{st.session_state['historical_case_last_error']}")
 
     result = st.session_state["historical_case_result"]
     if result is None:
-        st.info("輸入單一 symbol 並按下「建立歷史案例」後，系統才會讀取價格、建立 technical indicators、執行 backtest，並產生案例檢視。")
+        st.info("輸入單一股票並按下「建立歷史案例」後，系統才會讀取價格、建立技術指標、執行歷史驗證，並產生案例檢視。")
         return
 
     report = result["report"]
@@ -2509,63 +2563,71 @@ def render_historical_cases() -> None:
     if result["fingerprint"] != current_fingerprint:
         st.warning("目前顯示的是上一組設定建立的案例結果；若要更新，請重新按「建立歷史案例」。")
     if result["price_is_stale"]:
-        st.warning("目前使用 stale historical price cache；請留意資料新鮮度。")
+        st.warning("目前使用過期歷史價格快取；請留意資料新鮮度。")
 
-    st.subheader(f"{result['symbol']} · Historical Case Explorer")
-    st.caption("Main price line = analysis close；Reference High / First Target Hit 使用 raw high basis。")
-    st.caption("Historical Hit Rate 是歷史條件事件比例，不代表未來發生機率。MFE / MAE / End Return 是 close-based historical return metrics，不是實際交易報酬。")
+    st.subheader(f"{result['symbol']} · 歷史案例檢視")
+    st.caption("主價格線使用分析價格；參考高點與首次達標使用原始高價基準。")
+    st.caption("歷史命中率是歷史條件事件比例，不代表未來上漲機率。MFE、MAE 與觀察期末變動是以收盤價計算的歷史變動指標，不是實際交易報酬。")
 
     metric_cols = st.columns(5)
-    metric_cols[0].metric("Historical Hit Rate", format_percentage_value(report.historical_hit_rate))
-    metric_cols[1].metric("Resolved", report.resolved_count)
+    metric_cols[0].metric("歷史命中率", format_percentage_value(report.historical_hit_rate))
+    metric_cols[1].metric("已解析案例", report.resolved_count)
     metric_cols[2].metric("HIT", report.hit_count)
     metric_cols[3].metric("MISS", report.miss_count)
-    metric_cols[4].metric("INCOMPLETE", report.incomplete_count)
+    metric_cols[4].metric("觀察期間尚未完整", report.incomplete_count)
     st.caption(
-        f"Overlap Policy: {report.overlap_policy.value} · Cooldown Bars: {format_optional_int(report.cooldown_bars)} · "
-        f"Backtest Signal Range: {format_date_value(report.start_date)} -> {format_date_value(report.end_date)}"
+        f"歷史訊號樣本處理方式：{get_overlap_policy_label(report.overlap_policy.value)} · 訊號間隔交易日數：{format_optional_int(report.cooldown_bars)} · "
+        f"歷史訊號範圍：{format_date_value(report.start_date)} -> {format_date_value(report.end_date)}"
     )
 
     if not case_views:
-        st.info("此設定在指定期間沒有找到歷史 Signal Events。")
+        st.info("此設定在指定期間沒有找到歷史訊號事件。")
         return
 
     controls = st.columns(3)
-    status_filter = controls[0].selectbox("Outcome Status", STATUS_FILTER_OPTIONS)
-    sort_option = controls[1].selectbox("Case Sort", SORT_OPTIONS)
-    x_mode = controls[2].selectbox("Chart X Axis", ["Relative Bars", "Actual Dates"])
+    status_filter = controls[0].selectbox(
+        "結果狀態",
+        STATUS_FILTER_OPTIONS,
+        format_func=historical_case_status_filter_label,
+    )
+    sort_option = controls[1].selectbox("案例排序", SORT_OPTIONS, format_func=historical_case_sort_label)
+    x_mode = controls[2].selectbox(
+        "圖表 X 軸",
+        ["Relative Bars", "Actual Dates"],
+        format_func=historical_case_x_mode_label,
+    )
     filtered_cases = sort_case_views(filter_case_views(case_views, status_filter), sort_option)
     st.dataframe(build_case_summary_rows(filtered_cases), width="stretch", hide_index=True)
 
     if not filtered_cases:
-        st.info("目前 filter 下沒有案例。")
+        st.info("目前篩選條件下沒有案例。")
         return
 
     selected_labels = [case_selector_label(case) for case in filtered_cases]
-    selected_case_label = st.selectbox("Case", selected_labels)
+    selected_case_label = st.selectbox("選擇歷史案例", selected_labels)
     selected_case = filtered_cases[selected_labels.index(selected_case_label)]
 
     top_metrics = st.columns(4)
-    top_metrics[0].metric("Outcome Status", selected_case.outcome_status.value)
-    top_metrics[1].metric("Signal Date", selected_case.signal_date.isoformat())
-    top_metrics[2].metric("Reference High", format_price_value(selected_case.reference_high, selected_case.currency))
-    top_metrics[3].metric("First Hit", format_date_value(selected_case.target_hit_date))
+    top_metrics[0].metric("結果狀態", get_outcome_status_label(selected_case.outcome_status.value))
+    top_metrics[1].metric("訊號日期", selected_case.signal_date.isoformat())
+    top_metrics[2].metric("參考高點", format_price_value(selected_case.reference_high, selected_case.currency))
+    top_metrics[3].metric("首次達標日期", format_date_value(selected_case.target_hit_date))
 
     return_metrics = st.columns(4)
-    return_metrics[0].metric("Hit Bar Index", format_optional_int(selected_case.target_hit_bar_index))
-    return_metrics[1].metric("MFE", format_percentage_value(selected_case.max_close_return))
-    return_metrics[2].metric("MAE", format_percentage_value(selected_case.max_adverse_return))
-    return_metrics[3].metric("End Return", format_percentage_value(selected_case.end_of_window_return))
+    return_metrics[0].metric("第幾個交易日達標", format_optional_int(selected_case.target_hit_bar_index))
+    return_metrics[1].metric("最大有利變動（MFE）", format_percentage_value(selected_case.max_close_return))
+    return_metrics[2].metric("最大不利變動（MAE）", format_percentage_value(selected_case.max_adverse_return))
+    return_metrics[3].metric("觀察期末變動", format_percentage_value(selected_case.end_of_window_return))
 
     if selected_case.outcome_status is OutcomeEvaluationStatus.INCOMPLETE:
-        st.warning("Outcome window incomplete：此案例尚未完整走完 outcome horizon，不可視為 MISS。")
+        st.warning("觀察期間尚未完整：此案例尚未完整走完研究目標觀察期，不可視為 MISS。")
 
     st.altair_chart(build_case_chart(selected_case, x_mode=x_mode), use_container_width=True)
 
-    with st.expander("Signal Date Technical Metrics", expanded=False):
+    with st.expander("訊號日技術指標", expanded=False):
         st.dataframe(build_technical_summary_rows(selected_case), width="stretch", hide_index=True)
 
-    with st.expander("Signal Condition Trace", expanded=False):
+    with st.expander("篩選條件明細", expanded=False):
         st.dataframe(build_condition_detail_rows(selected_case), width="stretch", hide_index=True)
 
 
@@ -2574,7 +2636,7 @@ def read_watchlist_for_ui(*, show_error: bool = True) -> list[str]:
         return list_watchlist()
     except WatchlistDataError as error:
         if show_error:
-            st.error(f"Watchlist 讀取失敗：{error}")
+            st.error(f"觀察清單讀取失敗：{error}")
         return []
 
 
@@ -2587,7 +2649,7 @@ def read_universes_for_ui() -> list:
 
 
 def render_universe_management() -> None:
-    st.header("Universes（股票池）")
+    st.header("研究股票池")
     st.caption(universe_ui.UNIVERSE_SEMANTICS_CAPTION)
 
     universes = read_universes_for_ui()
@@ -2596,14 +2658,14 @@ def render_universe_management() -> None:
     with create_col:
         st.markdown("### 建立股票池")
         with st.form("universe_create_form"):
-            name = st.text_input("Name", key="universe_create_name")
+            name = st.text_input("股票池名稱", key="universe_create_name")
             description = st.text_area(
-                "Description",
+                "說明",
                 key="universe_create_description",
                 height=80,
             )
             symbol_text = st.text_area(
-                "Symbols",
+                "股票",
                 placeholder="2330\n2454\nNVDA\nAAPL\n6488.TWO",
                 key="universe_create_symbols",
                 height=160,
@@ -2612,14 +2674,14 @@ def render_universe_management() -> None:
         if submitted:
             symbols = universe_ui.parse_universe_symbol_text(symbol_text)
             if universe_ui.should_warn_large_universe(symbols):
-                st.warning("Large universes may take longer to scan.")
+                st.warning("股票池較大時，掃描時間可能較長。")
             try:
                 created = create_universe(
                     name=name,
                     description=description,
                     symbols=symbols,
                 )
-                st.success(f"已建立股票池「{created.name}」，共 {created.symbol_count} symbols。")
+                st.success(f"已建立股票池「{created.name}」，共 {created.symbol_count} 檔股票。")
             except (UniverseValidationError, UniverseAlreadyExistsError) as error:
                 st.error(str(error))
             except UniverseError as error:
@@ -2633,29 +2695,29 @@ def render_universe_management() -> None:
 
         labels = [universe_ui.universe_selector_label(universe) for universe in universes]
         selected_label = st.selectbox(
-            "Existing Universe",
+            "已儲存股票池",
             labels,
             key="universe_edit_selector",
         )
         selected_universe = universes[labels.index(selected_label)]
         st.caption(
-            f"Updated At: {universe_ui.format_universe_updated_at(selected_universe)}"
+            f"更新時間：{universe_ui.format_universe_updated_at(selected_universe)}"
         )
         defaults = universe_ui.build_universe_form_defaults(selected_universe)
         with st.form(f"universe_edit_form_{selected_universe.id}"):
             next_name = st.text_input(
-                "Name",
+                "股票池名稱",
                 value=defaults["name"],
                 key=f"universe_edit_name_{selected_universe.id}",
             )
             next_description = st.text_area(
-                "Description",
+                "說明",
                 value=defaults["description"],
                 key=f"universe_edit_description_{selected_universe.id}",
                 height=80,
             )
             next_symbols_text = st.text_area(
-                "Symbols",
+                "股票",
                 value=defaults["symbols"],
                 key=f"universe_edit_symbols_{selected_universe.id}",
                 height=160,
@@ -2664,7 +2726,7 @@ def render_universe_management() -> None:
         if saved:
             symbols = universe_ui.parse_universe_symbol_text(next_symbols_text)
             if universe_ui.should_warn_large_universe(symbols):
-                st.warning("Large universes may take longer to scan.")
+                st.warning("股票池較大時，掃描時間可能較長。")
             try:
                 updated = update_universe(
                     selected_universe.id,
@@ -2672,7 +2734,7 @@ def render_universe_management() -> None:
                     description=next_description,
                     symbols=symbols,
                 )
-                st.success(f"已更新股票池「{updated.name}」，共 {updated.symbol_count} symbols。")
+                st.success(f"已更新股票池「{updated.name}」，共 {updated.symbol_count} 檔股票。")
             except (UniverseValidationError, UniverseAlreadyExistsError) as error:
                 st.error(str(error))
             except UniverseNotFoundError as error:
@@ -2700,14 +2762,14 @@ def render_universe_management() -> None:
 
 
 def render_watchlist() -> None:
-    st.header("Watchlist")
+    st.header("觀察清單（Watchlist）")
     symbols = read_watchlist_for_ui()
 
     if symbols:
-        st.write("目前 Watchlist：")
+        st.write("目前觀察清單：")
         st.dataframe({"Symbol": symbols}, width="stretch", hide_index=True)
     else:
-        st.info("Watchlist 目前沒有股票。")
+        st.info("觀察清單目前沒有股票。")
 
     add_col, remove_col = st.columns(2)
 
@@ -2724,13 +2786,13 @@ def render_watchlist() -> None:
                 try:
                     added = add_stock(symbol)
                 except WatchlistDataError as error:
-                    st.error(f"Watchlist 寫入失敗：{error}")
+                    st.error(f"觀察清單寫入失敗：{error}")
                 else:
                     if added:
                         st.success(f"已新增：{symbol}")
                         st.rerun()
                     else:
-                        st.info(f"Watchlist 已存在：{symbol}")
+                        st.info(f"觀察清單已存在：{symbol}")
 
     with remove_col:
         if symbols:
@@ -2742,18 +2804,18 @@ def render_watchlist() -> None:
                 try:
                     removed = remove_stock(symbol_to_remove)
                 except WatchlistDataError as error:
-                    st.error(f"Watchlist 寫入失敗：{error}")
+                    st.error(f"觀察清單寫入失敗：{error}")
                 else:
                     if removed:
                         st.success(f"已移除：{symbol_to_remove}")
                         st.rerun()
                     else:
-                        st.info(f"Watchlist 找不到：{symbol_to_remove}")
+                        st.info(f"觀察清單找不到：{symbol_to_remove}")
         else:
             st.write("移除股票")
             st.info("目前沒有可移除的股票。")
 
-    if st.button("查詢 Watchlist 股票", disabled=not symbols):
+    if st.button("查詢觀察清單股票", disabled=not symbols):
         stocks, failures = query_stock_batch(symbols)
         st.session_state["watchlist_query_stocks"] = stocks
         st.session_state["watchlist_query_failures"] = failures
@@ -2763,7 +2825,7 @@ def render_watchlist() -> None:
 
 
 def render_comparison() -> None:
-    st.header("Comparison")
+    st.header("多股票比較")
     symbols = read_watchlist_for_ui()
 
     with st.form("comparison_form"):
@@ -2773,7 +2835,7 @@ def render_comparison() -> None:
             key="comparison_input",
         )
         selected_watchlist_symbols = st.multiselect(
-            "或從 Watchlist 選擇",
+            "或從觀察清單選擇",
             symbols,
         )
         submitted = st.form_submit_button("比較")
@@ -2808,7 +2870,17 @@ def main() -> None:
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
     dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, universe_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
-        ["Dashboard", "Research", "Historical Trends", "AI Research", "Swing Research", "Universes", "Historical Cases", "Watchlist", "Comparison"]
+        [
+            "Dashboard",
+            "Research",
+            "Historical Trends",
+            "AI Research",
+            "Swing Research（波段研究）",
+            "研究股票池",
+            "歷史案例",
+            "觀察清單",
+            "Comparison（多股票比較）",
+        ]
     )
 
     with dashboard_tab:

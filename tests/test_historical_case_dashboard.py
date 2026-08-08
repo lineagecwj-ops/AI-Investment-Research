@@ -133,30 +133,30 @@ class HistoricalCaseDashboardTestCase(unittest.TestCase):
         self.assertEqual(sort_case_views((newer, older), "Oldest")[0].signal_date, date(2025, 1, 2))
 
     def test_selector_label_uses_neutral_case_language(self):
-        self.assertEqual(case_selector_label(self.case()), "2025-01-02 | HIT | hit bar 1")
-        self.assertEqual(case_selector_label(self.case(OutcomeEvaluationStatus.MISS)), "2025-01-02 | MISS")
+        self.assertEqual(case_selector_label(self.case()), "2025-01-02 | 達成研究目標（HIT） | 第 1 個交易日達標")
+        self.assertEqual(case_selector_label(self.case(OutcomeEvaluationStatus.MISS)), "2025-01-02 | 未達研究目標（MISS）")
 
     def test_summary_rows_use_display_formatting(self):
         rows = build_case_summary_rows((self.case(),))
 
-        self.assertEqual(rows[0]["Status"], "HIT")
-        self.assertEqual(rows[0]["Reference High"], "USD 110.00")
-        self.assertEqual(rows[0]["MFE"], "12.00%")
-        self.assertEqual(rows[0]["MAE"], "-4.00%")
+        self.assertEqual(rows[0]["結果狀態"], "達成研究目標（HIT）")
+        self.assertEqual(rows[0]["參考高點"], "USD 110.00")
+        self.assertEqual(rows[0]["最大有利變動"], "12.00%")
+        self.assertEqual(rows[0]["最大不利變動"], "-4.00%")
 
     def test_condition_rows_preserve_trace_fields(self):
         rows = build_condition_detail_rows(self.case())
 
-        self.assertEqual(rows[0]["Metric"], "analysis_close")
-        self.assertEqual(rows[0]["Operator"], ">")
-        self.assertEqual(rows[0]["Expected / Secondary Metric"], "sma_20")
-        self.assertEqual(rows[0]["Matched"], "Yes")
+        self.assertEqual(rows[0]["指標"], "分析價格")
+        self.assertEqual(rows[0]["運算子"], ">")
+        self.assertEqual(rows[0]["預期值／比較指標"], "20 日均線")
+        self.assertEqual(rows[0]["是否符合"], "是")
 
     def test_technical_summary_rows_are_display_ready(self):
         rows = build_technical_summary_rows(self.case())
 
-        self.assertEqual(rows[0], {"Metric": "sma_20", "Value": "95.0000"})
-        self.assertEqual(rows[1], {"Metric": "return_20d", "Value": "4.00%"})
+        self.assertEqual(rows[0], {"指標": "20 日均線", "數值": "95.0000"})
+        self.assertEqual(rows[1], {"指標": "20 日價格變化", "數值": "4.00%"})
 
     def test_request_fingerprint_changes_when_config_changes(self):
         base = build_case_request_fingerprint(
@@ -185,13 +185,13 @@ class HistoricalCaseDashboardTestCase(unittest.TestCase):
         chart_spec = build_case_chart(self.case()).to_dict()
 
         self.assertEqual(len(chart_spec["layer"]), 5)
-        self.assertIn("TEST - 2025-01-02 - HIT", chart_spec["title"])
+        self.assertIn("TEST - 2025-01-02 - 達成研究目標（HIT）", chart_spec["title"])
 
     def test_miss_chart_does_not_include_hit_point_layer(self):
         chart_spec = build_case_chart(self.case(OutcomeEvaluationStatus.MISS)).to_dict()
 
         self.assertEqual(len(chart_spec["layer"]), 4)
-        self.assertIn("TEST - 2025-01-02 - MISS", chart_spec["title"])
+        self.assertIn("TEST - 2025-01-02 - 未達研究目標（MISS）", chart_spec["title"])
 
     def test_chart_uses_relative_bar_axis_by_default(self):
         chart_spec = build_case_chart(self.case()).to_dict()

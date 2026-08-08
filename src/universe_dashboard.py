@@ -6,6 +6,7 @@ from models import ResearchUniverse
 from universe_service import MAX_UNIVERSE_DESCRIPTION_LENGTH
 from universe_service import MAX_UNIVERSE_NAME_LENGTH
 from universe_service import normalize_universe_symbols
+from ui_terminology import get_source_label
 
 
 MANUAL_SOURCE = "Manual Input"
@@ -43,10 +44,8 @@ def source_display_name(
     universe_name: str | None = None,
 ) -> str:
     if source_type == SAVED_UNIVERSE_SOURCE and universe_name:
-        return f"Saved Universe - {universe_name}"
-    if source_type == WATCHLIST_SOURCE:
-        return "Watchlist"
-    return "Manual Input"
+        return f"{get_source_label(SAVED_UNIVERSE_SOURCE)} - {universe_name}"
+    return get_source_label(source_type)
 
 
 def build_source_context(

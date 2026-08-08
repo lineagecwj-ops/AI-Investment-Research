@@ -15,6 +15,14 @@ from swing_scanner_service import SampleSizeStatus
 from swing_scanner_service import SwingOpportunityCandidate
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerResult
+from ui_terminology import format_condition_labels
+from ui_terminology import get_frequency_label
+from ui_terminology import get_outcome_status_label
+from ui_terminology import get_overlap_policy_label
+from ui_terminology import get_sample_status_label
+from ui_terminology import get_scan_status_label
+from ui_terminology import get_signal_status_label
+from ui_terminology import get_technical_metric_label
 from universe_dashboard import MANUAL_SOURCE
 from universe_dashboard import parse_universe_symbol_text
 
@@ -25,10 +33,10 @@ WALK_FORWARD_REPLAY_MODE = "Walk-Forward Replay"
 CASE_PREVIEW_FILTER_OPTIONS = ("Resolved", "HIT", "MISS")
 CASE_PREVIEW_LIMIT = 5
 RESEARCH_RANKING_EXPLANATION = (
-    "Sample-size tier -> Historical Hit Rate -> Resolved n -> Median MAE -> "
-    "Median MFE -> Median End Return -> Symbol"
+    "樣本數狀態 -> 歷史命中率 -> 已解析歷史樣本數 -> 歷史中位最大不利變動 -> "
+    "歷史中位最大有利變動 -> 歷史期末中位變動 -> 股票"
 )
-HISTORICAL_HIT_RATE_CAPTION = "歷史命中率是歷史條件事件比例，不代表未來發生機率。"
+HISTORICAL_HIT_RATE_CAPTION = "歷史命中率（Historical Hit Rate）是歷史條件事件比例，不代表未來上漲機率。"
 CASE_SELECTION_BIAS_CAPTION = "請同時查看 HIT 與 MISS；只檢視命中案例可能造成選擇偏誤。"
 
 
@@ -138,43 +146,43 @@ def walk_forward_fingerprint_from_config(
 
 def build_scan_summary_rows(result: SwingScannerResult) -> list[dict[str, object]]:
     return [
-        {"Metric": "Scanned", "Value": result.scanned_count},
-        {"Metric": "MATCH", "Value": result.matched_count},
-        {"Metric": "NO_MATCH", "Value": result.no_match_count},
-        {"Metric": "NOT_EVALUABLE", "Value": result.not_evaluable_count},
-        {"Metric": "FAILED", "Value": result.failure_count},
+        {"Metric": get_scan_status_label("Scanned"), "Value": result.scanned_count},
+        {"Metric": get_scan_status_label("MATCH"), "Value": result.matched_count},
+        {"Metric": get_scan_status_label("NO_MATCH"), "Value": result.no_match_count},
+        {"Metric": get_scan_status_label("NOT_EVALUABLE"), "Value": result.not_evaluable_count},
+        {"Metric": get_scan_status_label("FAILED"), "Value": result.failure_count},
     ]
 
 
 def build_replay_summary_rows(result) -> list[dict[str, object]]:
     return [
-        {"Metric": "Scanned", "Value": result.scanned_count},
-        {"Metric": "MATCH", "Value": result.matched_count},
-        {"Metric": "NO_MATCH", "Value": result.no_match_count},
-        {"Metric": "NOT_EVALUABLE", "Value": result.not_evaluable_count},
-        {"Metric": "FAILED", "Value": result.failure_count},
+        {"Metric": get_scan_status_label("Scanned"), "Value": result.scanned_count},
+        {"Metric": get_scan_status_label("MATCH"), "Value": result.matched_count},
+        {"Metric": get_scan_status_label("NO_MATCH"), "Value": result.no_match_count},
+        {"Metric": get_scan_status_label("NOT_EVALUABLE"), "Value": result.not_evaluable_count},
+        {"Metric": get_scan_status_label("FAILED"), "Value": result.failure_count},
     ]
 
 
 def build_walk_forward_summary_rows(result) -> list[dict[str, object]]:
     summary = build_replay_analytics(result).stability_summary
     return [
-        {"Metric": "Total Replay Periods", "Value": summary.total_period_count},
-        {"Metric": "Periods With Candidates", "Value": summary.periods_with_candidates},
-        {"Metric": "Periods Without Candidates", "Value": summary.periods_without_candidates},
-        {"Metric": "Unique Candidate Symbols", "Value": summary.unique_candidate_symbols},
-        {"Metric": "Total Candidate Occurrences", "Value": summary.total_candidate_occurrences},
-        {"Metric": "Candidate Period Share", "Value": format_percentage(summary.candidate_period_share)},
+        {"Metric": "回放期數", "Value": summary.total_period_count},
+        {"Metric": "有研究候選的期間", "Value": summary.periods_with_candidates},
+        {"Metric": "沒有研究候選的期間", "Value": summary.periods_without_candidates},
+        {"Metric": "不重複候選股票數", "Value": summary.unique_candidate_symbols},
+        {"Metric": "候選出現次數", "Value": summary.total_candidate_occurrences},
+        {"Metric": "候選出現期間比例", "Value": format_percentage(summary.candidate_period_share)},
     ]
 
 
 def build_walk_forward_outcome_count_rows(result) -> list[dict[str, object]]:
     distribution = build_replay_analytics(result).post_replay_outcome_distribution
     return [
-        {"Metric": "Post-Replay HIT", "Value": distribution.post_replay_hit_count},
-        {"Metric": "Post-Replay MISS", "Value": distribution.post_replay_miss_count},
-        {"Metric": "Post-Replay INCOMPLETE", "Value": distribution.post_replay_incomplete_count},
-        {"Metric": "Post-Replay NOT_EVALUABLE", "Value": distribution.post_replay_not_evaluable_count},
+        {"Metric": "回放後達成研究目標", "Value": distribution.post_replay_hit_count},
+        {"Metric": "回放後未達研究目標", "Value": distribution.post_replay_miss_count},
+        {"Metric": "回放後觀察期間尚未完整", "Value": distribution.post_replay_incomplete_count},
+        {"Metric": "回放後無法判定", "Value": distribution.post_replay_not_evaluable_count},
     ]
 
 
@@ -185,26 +193,26 @@ def build_walk_forward_timeline_rows(result) -> list[dict[str, object]]:
 def walk_forward_period_selector_label(period) -> str:
     return (
         f"{format_date(period.requested_replay_date)} | "
-        f"MATCH {period.matched_count}"
+        f"符合條件 {period.matched_count}"
     )
 
 
 def build_walk_forward_symbol_summary_rows(result) -> list[dict[str, object]]:
     return [
         {
-            "Symbol": item.symbol,
-            "Candidate Occurrences": item.candidate_occurrence_count,
-            "Candidate Period Share": format_percentage(item.candidate_period_share),
-            "First Appearance": format_date(item.first_candidate_date),
-            "Last Appearance": format_date(item.last_candidate_date),
-            "Longest Consecutive Periods": item.longest_consecutive_candidate_periods,
-            "Best Research Priority": format_optional_number(item.best_research_priority_rank),
-            "Median Research Priority": format_optional_number(item.median_research_priority_rank),
-            "Worst Research Priority": format_optional_number(item.worst_research_priority_rank),
-            "Post-Replay HIT": item.post_replay_hit_count,
-            "Post-Replay MISS": item.post_replay_miss_count,
-            "Post-Replay INCOMPLETE": item.post_replay_incomplete_count,
-            "Post-Replay NOT_EVALUABLE": item.post_replay_not_evaluable_count,
+            "股票": item.symbol,
+            "候選出現次數": item.candidate_occurrence_count,
+            "候選出現期間比例": format_percentage(item.candidate_period_share),
+            "首次出現日期": format_date(item.first_candidate_date),
+            "最後出現日期": format_date(item.last_candidate_date),
+            "最長連續出現期數": item.longest_consecutive_candidate_periods,
+            "最佳研究優先順序": format_optional_number(item.best_research_priority_rank),
+            "中位研究優先順序": format_optional_number(item.median_research_priority_rank),
+            "最低研究優先順序": format_optional_number(item.worst_research_priority_rank),
+            "回放後達成研究目標": item.post_replay_hit_count,
+            "回放後未達研究目標": item.post_replay_miss_count,
+            "回放後觀察期間尚未完整": item.post_replay_incomplete_count,
+            "回放後無法判定": item.post_replay_not_evaluable_count,
         }
         for item in build_replay_analytics(result).symbol_summaries
     ]
@@ -214,16 +222,16 @@ def build_replay_analytics_period_rows(result) -> list[dict[str, object]]:
     analytics = build_replay_analytics(result)
     return [
         {
-            "Replay Date": format_date(item.requested_replay_date),
-            "Candidates": item.candidate_count,
-            "Candidate Symbols": ", ".join(item.candidate_symbols) or "N/A",
-            "NO_MATCH": item.no_match_count,
-            "NOT_EVALUABLE": item.not_evaluable_count,
-            "FAILED": item.failure_count,
-            "Post-Replay HIT": item.post_replay_hit_count,
-            "Post-Replay MISS": item.post_replay_miss_count,
-            "Post-Replay INCOMPLETE": item.post_replay_incomplete_count,
-            "Post-Replay NOT_EVALUABLE Outcome": item.post_replay_not_evaluable_count,
+            "回放日期": format_date(item.requested_replay_date),
+            "候選數": item.candidate_count,
+            "候選股票": ", ".join(item.candidate_symbols) or "N/A",
+            get_scan_status_label("NO_MATCH"): item.no_match_count,
+            get_scan_status_label("NOT_EVALUABLE"): item.not_evaluable_count,
+            get_scan_status_label("FAILED"): item.failure_count,
+            "回放後達成研究目標": item.post_replay_hit_count,
+            "回放後未達研究目標": item.post_replay_miss_count,
+            "回放後觀察期間尚未完整": item.post_replay_incomplete_count,
+            "回放後無法判定": item.post_replay_not_evaluable_count,
         }
         for item in analytics.period_summaries
     ]
@@ -233,13 +241,13 @@ def build_replay_analytics_candidate_set_rows(result) -> list[dict[str, object]]
     analytics = build_replay_analytics(result)
     return [
         {
-            "Previous Replay Date": format_date(item.previous_requested_date),
-            "Current Replay Date": format_date(item.current_requested_date),
-            "Previous Candidate Count": item.previous_candidate_count,
-            "Current Candidate Count": item.current_candidate_count,
-            "Shared Candidates": item.shared_candidate_count,
-            "Candidate Set Similarity": format_percentage(item.candidate_jaccard_similarity),
-            "Candidate Set Turnover": format_percentage(item.candidate_turnover),
+            "前一回放日期": format_date(item.previous_requested_date),
+            "目前回放日期": format_date(item.current_requested_date),
+            "前一候選數": item.previous_candidate_count,
+            "目前候選數": item.current_candidate_count,
+            "共同候選數": item.shared_candidate_count,
+            "候選名單相似度": format_percentage(item.candidate_jaccard_similarity),
+            "候選名單變動率": format_percentage(item.candidate_turnover),
         }
         for item in analytics.stability_summary.candidate_set_transitions
     ]
@@ -250,20 +258,20 @@ def build_candidate_table_rows(
 ) -> list[dict[str, object]]:
     return [
         {
-            "Research Priority": candidate.research_rank,
-            "Symbol": candidate.symbol,
-            "Latest Trading Date": format_date(candidate.latest_trading_date),
-            "Historical Hit Rate": format_percentage(candidate.historical_hit_rate),
-            "Resolved n": candidate.resolved_count,
+            "研究優先順序": candidate.research_rank,
+            "股票": candidate.symbol,
+            "最新交易日": format_date(candidate.latest_trading_date),
+            "歷史命中率": format_percentage(candidate.historical_hit_rate),
+            "已解析歷史樣本數": candidate.resolved_count,
             "HIT": candidate.hit_count,
             "MISS": candidate.miss_count,
-            "Median MFE": format_percentage(candidate.median_max_close_return),
-            "Median MAE": format_percentage(candidate.median_max_adverse_return),
-            "Median End Return": format_percentage(candidate.median_end_return),
-            "Median Hit Bars": format_optional_number(candidate.median_hit_bar_index),
-            "Sample Status": sample_status_label(candidate.sample_size_status),
-            "Overlap Policy": candidate.overlap_policy.value,
-            "Stale?": "Yes" if candidate.source_price_is_stale else "No",
+            "歷史中位最大有利變動": format_percentage(candidate.median_max_close_return),
+            "歷史中位最大不利變動": format_percentage(candidate.median_max_adverse_return),
+            "歷史期末中位變動": format_percentage(candidate.median_end_return),
+            "中位達標交易日數": format_optional_number(candidate.median_hit_bar_index),
+            "樣本狀態": sample_status_label(candidate.sample_size_status),
+            "歷史訊號樣本處理方式": get_overlap_policy_label(candidate.overlap_policy.value),
+            "資料是否過期": "是" if candidate.source_price_is_stale else "否",
         }
         for candidate in candidates
     ]
@@ -275,20 +283,20 @@ def build_replay_candidate_table_rows(candidates) -> list[dict[str, object]]:
         summary = candidate.point_in_time_backtest_summary
         rows.append(
             {
-                "Research Priority": candidate.research_rank,
-                "Symbol": candidate.symbol,
-                "Requested Replay Date": format_date(candidate.requested_replay_date),
-                "Actual Trading Date": format_date(candidate.actual_signal_date),
-                "Historical Hit Rate (As Of)": format_percentage(summary.historical_hit_rate_as_of),
-                "Resolved n (As Of)": summary.resolved_as_of_count,
+                "研究優先順序": candidate.research_rank,
+                "股票": candidate.symbol,
+                "指定回放日期": format_date(candidate.requested_replay_date),
+                "實際使用交易日": format_date(candidate.actual_signal_date),
+                "回放當時可知歷史命中率": format_percentage(summary.historical_hit_rate_as_of),
+                "回放當時可知已解析樣本數": summary.resolved_as_of_count,
                 "HIT As Of": summary.hit_as_of_count,
                 "MISS As Of": summary.miss_as_of_count,
-                "Median MFE As Of": format_percentage(summary.median_max_close_return_as_of),
-                "Median MAE As Of": format_percentage(summary.median_max_adverse_return_as_of),
-                "Median End Return As Of": format_percentage(summary.median_end_return_as_of),
-                "Sample Status": sample_status_label(candidate.sample_size_status),
-                "Post-Replay Outcome": candidate.post_replay_outcome.status.value,
-                "Stale?": "Yes" if candidate.source_price_is_stale else "No",
+                "回放當時可知中位最大有利變動": format_percentage(summary.median_max_close_return_as_of),
+                "回放當時可知中位最大不利變動": format_percentage(summary.median_max_adverse_return_as_of),
+                "回放當時可知期末中位變動": format_percentage(summary.median_end_return_as_of),
+                "樣本狀態": sample_status_label(candidate.sample_size_status),
+                "回放日期後的實際歷史結果": get_outcome_status_label(candidate.post_replay_outcome.status.value),
+                "資料是否過期": "是" if candidate.source_price_is_stale else "否",
             }
         )
     return rows
@@ -307,12 +315,12 @@ def replay_candidate_selector_label(candidate) -> str:
 def post_replay_outcome_rows(candidate) -> list[dict[str, str]]:
     outcome = candidate.post_replay_outcome
     return [
-        {"Metric": "Post-Replay Outcome", "Value": outcome.status.value},
-        {"Metric": "First Hit Date", "Value": format_date(outcome.intraday_target_hit_date or outcome.close_target_hit_date)},
-        {"Metric": "Hit Bar", "Value": format_optional_number(outcome.intraday_target_hit_bar_index or outcome.close_target_hit_bar_index)},
-        {"Metric": "MFE", "Value": format_percentage(outcome.max_close_return)},
-        {"Metric": "MAE", "Value": format_percentage(outcome.max_adverse_return)},
-        {"Metric": "End Return", "Value": format_percentage(outcome.end_of_window_return)},
+        {"Metric": "回放日期後的實際歷史結果", "Value": get_outcome_status_label(outcome.status.value)},
+        {"Metric": "首次達標日期", "Value": format_date(outcome.intraday_target_hit_date or outcome.close_target_hit_date)},
+        {"Metric": "第幾個交易日達標", "Value": format_optional_number(outcome.intraday_target_hit_bar_index or outcome.close_target_hit_bar_index)},
+        {"Metric": "最大有利變動", "Value": format_percentage(outcome.max_close_return)},
+        {"Metric": "最大不利變動", "Value": format_percentage(outcome.max_adverse_return)},
+        {"Metric": "觀察期末變動", "Value": format_percentage(outcome.end_of_window_return)},
     ]
 
 
@@ -326,12 +334,12 @@ def candidate_selector_label(candidate: SwingOpportunityCandidate) -> str:
 def build_condition_trace_rows(signal_match: SignalMatch) -> list[dict[str, str]]:
     return [
         {
-            "Metric": condition.metric,
+            "條件": get_technical_metric_label(condition.metric),
             "Actual": format_raw_value(condition.actual_value),
             "Operator": condition.operator.value,
-            "Expected / Secondary": condition.secondary_metric or format_raw_value(condition.expected_value),
+            "Expected / Secondary": get_technical_metric_label(condition.secondary_metric) if condition.secondary_metric else format_raw_value(condition.expected_value),
             "Secondary Actual": format_raw_value(condition.secondary_actual_value),
-            "Status": condition.status.value,
+            "Status": get_signal_status_label(condition.status.value),
         }
         for condition in signal_match.evaluated_conditions
     ]
@@ -350,22 +358,22 @@ def build_technical_snapshot_rows(
     snapshot: TechnicalIndicatorSnapshot,
 ) -> list[dict[str, str]]:
     metrics = (
-        ("SMA20", "sma_20"),
-        ("SMA60", "sma_60"),
-        ("SMA120", "sma_120"),
-        ("SMA200", "sma_200"),
-        ("RSI14", "rsi_14"),
-        ("MACD", "macd"),
-        ("MACD Signal", "macd_signal"),
-        ("ATR14 %", "atr_14_pct"),
-        ("Volume Ratio20", "volume_ratio_20"),
-        ("Return20D", "return_20d"),
-        ("Return60D", "return_60d"),
-        ("Distance to Prior60D High", "distance_to_prior_60d_high"),
+        ("sma_20", "sma_20"),
+        ("sma_60", "sma_60"),
+        ("sma_120", "sma_120"),
+        ("sma_200", "sma_200"),
+        ("rsi_14", "rsi_14"),
+        ("macd", "macd"),
+        ("macd_signal", "macd_signal"),
+        ("atr_14_pct", "atr_14_pct"),
+        ("volume_ratio_20", "volume_ratio_20"),
+        ("return_20d", "return_20d"),
+        ("return_60d", "return_60d"),
+        ("distance_to_prior_60d_high", "distance_to_prior_60d_high"),
     )
     return [
         {
-            "Metric": label,
+            "指標": get_technical_metric_label(label),
             "Value": format_metric_value(attribute, getattr(snapshot, attribute)),
         }
         for label, attribute in metrics
@@ -375,8 +383,8 @@ def build_technical_snapshot_rows(
 def build_no_match_rows(result: SwingScannerResult) -> list[dict[str, str]]:
     return [
         {
-            "Symbol": detail.symbol,
-            "Failed Conditions": ", ".join(detail.failed_conditions) or "N/A",
+            "股票": detail.symbol,
+            "未符合的條件": format_condition_labels(detail.failed_conditions),
         }
         for detail in result.no_match_details
     ]
@@ -385,8 +393,8 @@ def build_no_match_rows(result: SwingScannerResult) -> list[dict[str, str]]:
 def build_not_evaluable_rows(result: SwingScannerResult) -> list[dict[str, str]]:
     return [
         {
-            "Symbol": detail.symbol,
-            "Missing Required Features": ", ".join(detail.missing_required_features) or "N/A",
+            "股票": detail.symbol,
+            "缺少必要指標": format_condition_labels(detail.missing_required_features),
         }
         for detail in result.not_evaluable_symbols
     ]
@@ -395,7 +403,7 @@ def build_not_evaluable_rows(result: SwingScannerResult) -> list[dict[str, str]]
 def build_failure_rows(result: SwingScannerResult) -> list[dict[str, str]]:
     return [
         {
-            "Symbol": failure.symbol,
+            "股票": failure.symbol,
             "Safe Error Type": failure.error_type,
             "Safe Message": failure.message,
         }
@@ -444,9 +452,9 @@ def latest_case_preview_rows(
 
 def build_case_preview_count_rows(case_views: tuple[HistoricalCaseView, ...]) -> list[dict[str, object]]:
     return [
-        {"Metric": "HIT Cases", "Value": count_case_status(case_views, OutcomeEvaluationStatus.HIT)},
-        {"Metric": "MISS Cases", "Value": count_case_status(case_views, OutcomeEvaluationStatus.MISS)},
-        {"Metric": "INCOMPLETE Cases", "Value": count_case_status(case_views, OutcomeEvaluationStatus.INCOMPLETE)},
+        {"Metric": "達成研究目標案例", "Value": count_case_status(case_views, OutcomeEvaluationStatus.HIT)},
+        {"Metric": "未達研究目標案例", "Value": count_case_status(case_views, OutcomeEvaluationStatus.MISS)},
+        {"Metric": "觀察期間尚未完整案例", "Value": count_case_status(case_views, OutcomeEvaluationStatus.INCOMPLETE)},
     ]
 
 
@@ -459,9 +467,9 @@ def count_case_status(
 
 def sample_status_label(status: SampleSizeStatus) -> str:
     labels = {
-        SampleSizeStatus.NO_RESOLVED_SAMPLES: "No Resolved Samples",
-        SampleSizeStatus.BELOW_PREFERRED_MINIMUM: "Below Preferred Minimum",
-        SampleSizeStatus.MEETS_PREFERRED_MINIMUM: "Meets Preferred Minimum",
+        SampleSizeStatus.NO_RESOLVED_SAMPLES: get_sample_status_label("NO_RESOLVED_SAMPLES"),
+        SampleSizeStatus.BELOW_PREFERRED_MINIMUM: get_sample_status_label("BELOW_PREFERRED_MINIMUM"),
+        SampleSizeStatus.MEETS_PREFERRED_MINIMUM: get_sample_status_label("MEETS_PREFERRED_MINIMUM"),
     }
     return labels[status]
 

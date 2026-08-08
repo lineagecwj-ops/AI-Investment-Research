@@ -66,6 +66,8 @@ V1.0 已完成 Daily Swing Research 的正式研究流程基礎：
 - 目前尚未建立 calibrated probability model。
 - Swing scanner 目前尚未合併 fundamental data。
 
+V1.0 的主要 daily-research UI 採用繁體中文術語呈現操作、狀態、表格欄位與 helper text；internal IDs、enum values、service contracts 與 research semantics 仍維持英文原值，方便追溯與測試。
+
 ---
 
 ## MVP 使用方式

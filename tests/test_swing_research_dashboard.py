@@ -604,7 +604,7 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(format_percentage(None), "N/A")
 
     def test_sample_status_labels_are_neutral(self):
-        self.assertEqual(sample_status_label(SampleSizeStatus.BELOW_PREFERRED_MINIMUM), "Below Preferred Minimum")
+        self.assertEqual(sample_status_label(SampleSizeStatus.BELOW_PREFERRED_MINIMUM), "低於偏好最低樣本數")
         self.assertNotIn("confidence", sample_status_label(SampleSizeStatus.BELOW_PREFERRED_MINIMUM).lower())
 
     def test_candidate_table_uses_service_order_and_display_fields(self):
@@ -614,14 +614,14 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         rows = build_candidate_table_rows(ranked)
 
-        self.assertEqual(rows[0]["Symbol"], "LARGE")
-        self.assertEqual(rows[0]["Research Priority"], 1)
-        self.assertEqual(rows[0]["Historical Hit Rate"], "70.00%")
-        self.assertEqual(rows[0]["Resolved n"], 100)
-        self.assertEqual(rows[0]["Median MFE"], "10.00%")
-        self.assertEqual(rows[0]["Median MAE"], "-4.00%")
-        self.assertEqual(rows[0]["Median End Return"], "-2.00%")
-        self.assertEqual(rows[1]["Sample Status"], "Below Preferred Minimum")
+        self.assertEqual(rows[0]["股票"], "LARGE")
+        self.assertEqual(rows[0]["研究優先順序"], 1)
+        self.assertEqual(rows[0]["歷史命中率"], "70.00%")
+        self.assertEqual(rows[0]["已解析歷史樣本數"], 100)
+        self.assertEqual(rows[0]["歷史中位最大有利變動"], "10.00%")
+        self.assertEqual(rows[0]["歷史中位最大不利變動"], "-4.00%")
+        self.assertEqual(rows[0]["歷史期末中位變動"], "-2.00%")
+        self.assertEqual(rows[1]["樣本狀態"], "低於偏好最低樣本數")
 
     def test_replay_summary_rows_match_current_scan_counts(self):
         candidate = self.replay_candidate()
@@ -639,7 +639,7 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         rows = build_replay_summary_rows(result)
 
-        self.assertEqual([row["Metric"] for row in rows], ["Scanned", "MATCH", "NO_MATCH", "NOT_EVALUABLE", "FAILED"])
+        self.assertEqual([row["Metric"] for row in rows], ["已掃描", "符合條件", "不符合條件", "資料不足", "掃描失敗"])
         self.assertEqual([row["Value"] for row in rows], [2, 1, 1, 0, 0])
 
     def test_replay_candidate_table_uses_as_of_labels_and_post_outcome(self):
@@ -647,11 +647,11 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         row = build_replay_candidate_table_rows((candidate,))[0]
 
-        self.assertEqual(row["Requested Replay Date"], "2024-06-30")
-        self.assertEqual(row["Actual Trading Date"], "2024-06-28")
-        self.assertIn("Historical Hit Rate (As Of)", row)
-        self.assertIn("Resolved n (As Of)", row)
-        self.assertEqual(row["Post-Replay Outcome"], "HIT")
+        self.assertEqual(row["指定回放日期"], "2024-06-30")
+        self.assertEqual(row["實際使用交易日"], "2024-06-28")
+        self.assertIn("回放當時可知歷史命中率", row)
+        self.assertIn("回放當時可知已解析樣本數", row)
+        self.assertEqual(row["回放日期後的實際歷史結果"], "達成研究目標（HIT）")
         self.assertNotIn("Replay Probability", row)
 
     def test_replay_candidate_selector_uses_as_of_n_and_actual_date(self):
@@ -667,8 +667,8 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         rows = post_replay_outcome_rows(self.replay_candidate())
         labels = [row["Metric"] for row in rows]
 
-        self.assertIn("Post-Replay Outcome", labels)
-        self.assertIn("First Hit Date", labels)
+        self.assertIn("回放日期後的實際歷史結果", labels)
+        self.assertIn("首次達標日期", labels)
         self.assertNotIn("Prediction Result", labels)
 
     def test_walk_forward_fingerprint_uses_range_frequency_and_historical_start(self):
@@ -717,12 +717,12 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(
             labels,
             [
-                "Total Replay Periods",
-                "Periods With Candidates",
-                "Periods Without Candidates",
-                "Unique Candidate Symbols",
-                "Total Candidate Occurrences",
-                "Candidate Period Share",
+                "回放期數",
+                "有研究候選的期間",
+                "沒有研究候選的期間",
+                "不重複候選股票數",
+                "候選出現次數",
+                "候選出現期間比例",
             ],
         )
         self.assertNotIn("Prediction Accuracy", labels)
@@ -731,45 +731,45 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         rows = build_walk_forward_outcome_count_rows(self.walk_forward_result())
         labels = [row["Metric"] for row in rows]
 
-        self.assertIn("Post-Replay HIT", labels)
-        self.assertIn("Post-Replay MISS", labels)
+        self.assertIn("回放後達成研究目標", labels)
+        self.assertIn("回放後未達研究目標", labels)
         self.assertNotIn("Walk-Forward Hit Rate", labels)
 
     def test_walk_forward_timeline_rows_show_period_counts_and_candidates(self):
         rows = build_walk_forward_timeline_rows(self.walk_forward_result())
 
-        self.assertEqual(rows[0]["Replay Date"], "2024-01-31")
-        self.assertEqual(rows[0]["Candidates"], 1)
-        self.assertEqual(rows[0]["NO_MATCH"], 1)
-        self.assertEqual(rows[0]["Candidate Symbols"], "AAPL")
-        self.assertEqual(rows[1]["Candidate Symbols"], "AAPL, MSFT")
+        self.assertEqual(rows[0]["回放日期"], "2024-01-31")
+        self.assertEqual(rows[0]["候選數"], 1)
+        self.assertEqual(rows[0]["不符合條件"], 1)
+        self.assertEqual(rows[0]["候選股票"], "AAPL")
+        self.assertEqual(rows[1]["候選股票"], "AAPL, MSFT")
 
     def test_walk_forward_period_selector_label_is_concise(self):
         period = self.walk_forward_result().period_results[0]
 
-        self.assertEqual(walk_forward_period_selector_label(period), "2024-01-31 | MATCH 1")
+        self.assertEqual(walk_forward_period_selector_label(period), "2024-01-31 | 符合條件 1")
 
     def test_walk_forward_symbol_summary_rows_show_candidate_frequency(self):
         rows = build_walk_forward_symbol_summary_rows(self.walk_forward_result())
         aapl = rows[0]
 
-        self.assertEqual(aapl["Symbol"], "AAPL")
-        self.assertEqual(aapl["Candidate Occurrences"], 2)
-        self.assertEqual(aapl["Candidate Period Share"], "100.00%")
-        self.assertEqual(aapl["First Appearance"], "2024-01-31")
-        self.assertEqual(aapl["Last Appearance"], "2024-02-29")
-        self.assertEqual(aapl["Longest Consecutive Periods"], 2)
-        self.assertIn("Post-Replay HIT", aapl)
+        self.assertEqual(aapl["股票"], "AAPL")
+        self.assertEqual(aapl["候選出現次數"], 2)
+        self.assertEqual(aapl["候選出現期間比例"], "100.00%")
+        self.assertEqual(aapl["首次出現日期"], "2024-01-31")
+        self.assertEqual(aapl["最後出現日期"], "2024-02-29")
+        self.assertEqual(aapl["最長連續出現期數"], 2)
+        self.assertIn("回放後達成研究目標", aapl)
         self.assertNotIn("Hit Probability", aapl)
 
     def test_walk_forward_candidate_set_stability_rows_are_descriptive(self):
         rows = build_replay_analytics_candidate_set_rows(self.walk_forward_result())
 
-        self.assertEqual(rows[0]["Previous Replay Date"], "2024-01-31")
-        self.assertEqual(rows[0]["Current Replay Date"], "2024-02-29")
-        self.assertEqual(rows[0]["Shared Candidates"], 1)
-        self.assertEqual(rows[0]["Candidate Set Similarity"], "50.00%")
-        self.assertEqual(rows[0]["Candidate Set Turnover"], "50.00%")
+        self.assertEqual(rows[0]["前一回放日期"], "2024-01-31")
+        self.assertEqual(rows[0]["目前回放日期"], "2024-02-29")
+        self.assertEqual(rows[0]["共同候選數"], 1)
+        self.assertEqual(rows[0]["候選名單相似度"], "50.00%")
+        self.assertEqual(rows[0]["候選名單變動率"], "50.00%")
 
     def test_candidate_selector_shows_hit_rate_and_resolved_n(self):
         self.assertEqual(
@@ -781,17 +781,17 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         result = self.result()
         rows = build_scan_summary_rows(result)
 
-        self.assertEqual(rows[1], {"Metric": "MATCH", "Value": 0})
+        self.assertEqual(rows[1], {"Metric": "符合條件", "Value": 0})
         self.assertEqual(build_candidate_table_rows(result.matched_candidates), [])
 
     def test_condition_trace_comes_from_signal_match(self):
         candidate = self.candidate("TEST")
         rows = build_condition_trace_rows(candidate.signal_match)
 
-        self.assertEqual(rows[0]["Metric"], "analysis_close")
+        self.assertEqual(rows[0]["條件"], "分析價格")
         self.assertEqual(rows[0]["Operator"], ">")
-        self.assertEqual(rows[0]["Expected / Secondary"], "sma_20")
-        self.assertEqual(rows[0]["Status"], "MATCH")
+        self.assertEqual(rows[0]["Expected / Secondary"], "20 日均線")
+        self.assertEqual(rows[0]["Status"], "符合")
         self.assertTrue(current_match_trace_is_consistent(candidate.signal_match))
 
     def test_inconsistent_current_match_trace_is_detected(self):
@@ -807,12 +807,12 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
     def test_technical_snapshot_rows_include_required_current_metrics(self):
         rows = build_technical_snapshot_rows(self.snapshot())
-        labels = [row["Metric"] for row in rows]
+        labels = [row["指標"] for row in rows]
 
-        self.assertIn("SMA20", labels)
-        self.assertIn("RSI14", labels)
-        self.assertIn("MACD Signal", labels)
-        self.assertIn("Distance to Prior60D High", labels)
+        self.assertIn("20 日均線", labels)
+        self.assertIn("RSI 14 日相對強弱指標", labels)
+        self.assertIn("MACD 訊號線", labels)
+        self.assertIn("距離前 60 日高點", labels)
         self.assertEqual(rows[-1]["Value"], "-4.00%")
 
     def test_no_match_rows_show_failed_conditions(self):
@@ -828,7 +828,7 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual(build_no_match_rows(result)[0]["Failed Conditions"], "analysis_close")
+        self.assertEqual(build_no_match_rows(result)[0]["未符合的條件"], "分析價格")
 
     def test_not_evaluable_rows_show_missing_features(self):
         from swing_scanner_service import SwingScanCurrentSignalAudit
@@ -843,7 +843,7 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEqual(build_not_evaluable_rows(result)[0]["Missing Required Features"], "sma_200")
+        self.assertEqual(build_not_evaluable_rows(result)[0]["缺少必要指標"], "200 日均線")
 
     def test_failure_rows_use_safe_error_fields(self):
         from swing_scanner_service import SwingScanFailure
@@ -922,8 +922,8 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         )
         views = build_case_preview_views(candidate=candidate, price_series_by_symbol={"TEST": self.price_series("TEST")})
 
-        self.assertEqual(build_case_preview_count_rows(views)[0], {"Metric": "HIT Cases", "Value": 1})
-        self.assertEqual(build_case_preview_count_rows(views)[1], {"Metric": "MISS Cases", "Value": 1})
+        self.assertEqual(build_case_preview_count_rows(views)[0], {"Metric": "達成研究目標案例", "Value": 1})
+        self.assertEqual(build_case_preview_count_rows(views)[1], {"Metric": "未達研究目標案例", "Value": 1})
 
     def test_case_preview_limits_to_latest_five(self):
         views = tuple(
@@ -959,7 +959,7 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
 
         self.assertNotIn("Buy Rank", source)
         self.assertNotIn("Opportunity Score", source)
-        self.assertNotIn("上漲機率", source)
+        self.assertIn("不代表未來上漲機率", source)
         self.assertNotIn("confidence", source)
 
 

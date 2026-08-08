@@ -62,14 +62,14 @@ class UniverseDashboardTestCase(unittest.TestCase):
         self.assertEqual(format_universe_updated_at(self.universe()), "2026-08-08T01:00:00+00:00")
 
     def test_source_display_name_for_manual_watchlist_and_universe(self):
-        self.assertEqual(source_display_name(source_type=MANUAL_SOURCE), "Manual Input")
-        self.assertEqual(source_display_name(source_type=WATCHLIST_SOURCE), "Watchlist")
+        self.assertEqual(source_display_name(source_type=MANUAL_SOURCE), "手動輸入")
+        self.assertEqual(source_display_name(source_type=WATCHLIST_SOURCE), "觀察清單")
         self.assertEqual(
             source_display_name(
                 source_type=SAVED_UNIVERSE_SOURCE,
                 universe_name="AI Server",
             ),
-            "Saved Universe - AI Server",
+            "已儲存股票池 - AI Server",
         )
 
     def test_build_source_context_freezes_symbols(self):

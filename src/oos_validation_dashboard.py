@@ -1,18 +1,20 @@
 from datetime import date
 import hashlib
 
+from ui_terminology import get_outcome_status_label
+
 
 OOS_VALIDATION_MODE = "Out-of-Sample Validation"
 PERIOD_ORDER = ("DEVELOPMENT", "VALIDATION", "HOLDOUT")
 PERIOD_LABELS = {
-    "DEVELOPMENT": "Development",
-    "VALIDATION": "Validation",
-    "HOLDOUT": "Holdout / Out-of-Sample",
+    "DEVELOPMENT": "開發期間",
+    "VALIDATION": "驗證期間",
+    "HOLDOUT": "保留樣本期間（樣本外）",
 }
-HOLDOUT_CAPTION = "此期間未參與 research specification 的建立與調整。"
-HISTORICAL_HIT_RATE_CAPTION = "Out-of-Sample Historical Hit Rate 仍是描述性的歷史事件比例，不是未來上漲機率。"
-OUTCOME_CAPTION = "HIT / MISS 是 OutcomeDefinition 的事件結果，不是實際交易損益。"
-CANDIDATE_SHARE_CAPTION = "Candidate Period Share 描述訊號出現頻率，不直接代表訊號品質。"
+HOLDOUT_CAPTION = "保留樣本期間未參與研究規則建立與調整，用來做樣本外驗證。"
+HISTORICAL_HIT_RATE_CAPTION = "樣本外驗證中的歷史命中率仍然是歷史事件比例，不代表未來上漲機率。"
+OUTCOME_CAPTION = "HIT / MISS 是歷史研究目標的事件結果，不是實際交易損益。"
+CANDIDATE_SHARE_CAPTION = "候選出現期間比例描述訊號出現頻率，不直接代表訊號品質。"
 SMALL_SAMPLE_WARNING = "此期間已解析歷史樣本低於偏好門檻。"
 STORED_RESULT_MISMATCH_MESSAGE = "目前結果來自上一組驗證設定。"
 
@@ -86,20 +88,20 @@ def ordered_period_results(result) -> tuple:
 
 def build_period_summary_rows(period_result) -> list[dict[str, object]]:
     return [
-        {"Metric": "Date Range", "Value": f"{format_date(period_result.start_date)} -> {format_date(period_result.end_date)}"},
-        {"Metric": "Replay Periods", "Value": period_result.requested_replay_period_count},
-        {"Metric": "Completed Replay Periods", "Value": period_result.completed_replay_period_count},
-        {"Metric": "Periods With Candidates", "Value": period_result.periods_with_candidates},
-        {"Metric": "Periods Without Candidates", "Value": period_result.periods_without_candidates},
-        {"Metric": "Candidate Period Share", "Value": format_candidate_period_share(period_result)},
-        {"Metric": "Unique Candidate Symbols", "Value": period_result.unique_candidate_symbols},
-        {"Metric": "Candidate Occurrences", "Value": period_result.total_candidate_occurrences},
-        {"Metric": "Historical Hit Rate", "Value": format_historical_hit_rate_with_n(period_result)},
-        {"Metric": "Resolved n", "Value": period_result.resolved_count},
-        {"Metric": "HIT", "Value": period_result.post_replay_hit_count},
-        {"Metric": "MISS", "Value": period_result.post_replay_miss_count},
-        {"Metric": "INCOMPLETE", "Value": period_result.post_replay_incomplete_count},
-        {"Metric": "NOT_EVALUABLE", "Value": period_result.post_replay_not_evaluable_count},
+        {"Metric": "日期範圍", "Value": f"{format_date(period_result.start_date)} -> {format_date(period_result.end_date)}"},
+        {"Metric": "回放期數", "Value": period_result.requested_replay_period_count},
+        {"Metric": "已完成回放期數", "Value": period_result.completed_replay_period_count},
+        {"Metric": "有研究候選的期間", "Value": period_result.periods_with_candidates},
+        {"Metric": "沒有研究候選的期間", "Value": period_result.periods_without_candidates},
+        {"Metric": "候選出現期間比例", "Value": format_candidate_period_share(period_result)},
+        {"Metric": "不重複候選股票數", "Value": period_result.unique_candidate_symbols},
+        {"Metric": "候選出現次數", "Value": period_result.total_candidate_occurrences},
+        {"Metric": "歷史命中率", "Value": format_historical_hit_rate_with_n(period_result)},
+        {"Metric": "已解析樣本", "Value": period_result.resolved_count},
+        {"Metric": get_outcome_status_label("HIT"), "Value": period_result.post_replay_hit_count},
+        {"Metric": get_outcome_status_label("MISS"), "Value": period_result.post_replay_miss_count},
+        {"Metric": get_outcome_status_label("INCOMPLETE"), "Value": period_result.post_replay_incomplete_count},
+        {"Metric": get_outcome_status_label("NOT_EVALUABLE"), "Value": period_result.post_replay_not_evaluable_count},
     ]
 
 
