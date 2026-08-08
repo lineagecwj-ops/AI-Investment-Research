@@ -8,3 +8,4 @@ data/stocks.db
 data/watchlist.json
 data/taiwan_company_names.json
 data/taiwan_company_summaries.json
+/dist/

@@ -112,6 +112,24 @@ Watchlist 可新增、移除、列出股票，資料儲存在 `data/watchlist.js
 
 Saved Research Universes 可建立多個命名股票池，資料儲存在 SQLite `research_universes` / `research_universe_symbols`。Universe 是研究標的集合，不是推薦清單、Buy list、未來機率或投資建議。
 
+## macOS Quick Launch
+
+可使用本機雙擊啟動器開啟 Dashboard，避免手動開 Terminal 輸入啟動指令。
+
+建置方式：
+
+```bash
+launcher/build_mac_app.sh
+```
+
+產生的 app 位於：
+
+```text
+dist/AI Investment Research.app
+```
+
+雙擊後會檢查 `localhost:8501` 是否已有 Streamlit server。若已啟動，會直接開啟瀏覽器；若尚未啟動，會使用專案內 `.venv/bin/python` 背景啟動 `app.py`，等待 ready 後開啟 `http://localhost:8501`。Generated app bundle 位於 ignored `dist/`，不提交到 Git。詳細說明見 `launcher/README.md`。
+
 ## Dashboard 使用方式
 
 使用 Streamlit 啟動 Dashboard：
