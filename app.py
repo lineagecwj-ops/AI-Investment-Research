@@ -1,5 +1,6 @@
 import sys
 import importlib
+import html
 from datetime import date
 from pathlib import Path
 
@@ -2148,45 +2149,10 @@ def render_swing_technical_condition_detail(result) -> None:
 
     if detail.visual_specs:
         st.markdown("#### 視覺化理解")
-        visual_cols = st.columns(3)
-        for col, spec in zip(visual_cols, detail.visual_specs):
-            with col:
-                st.markdown(f"##### {spec.title}")
-                st.metric("狀態", spec.status_label)
-                st.caption(spec.explanation)
-                st.write(f"目前值：{spec.current_label}")
-                st.write(spec.threshold_label)
-                st.caption(spec.gap_text)
-                marker_df = pd.DataFrame(spec.marker_rows)
-                if not marker_df.empty:
-                    marker_chart = (
-                        alt.Chart(marker_df)
-                        .mark_tick(thickness=3, size=28)
-                        .encode(
-                            x=alt.X(
-                                "數值:Q",
-                                title=None,
-                                scale=alt.Scale(domain=list(spec.x_domain)),
-                            ),
-                            y=alt.value(20),
-                            color=alt.Color("標記:N", title="標記"),
-                            tooltip=["指標", "標記", "說明", "狀態"],
-                        )
-                    )
-                    if spec.range_rows:
-                        range_df = pd.DataFrame(spec.range_rows)
-                        range_chart = (
-                            alt.Chart(range_df)
-                            .mark_rule(size=8)
-                            .encode(
-                                x=alt.X("起點:Q", scale=alt.Scale(domain=list(spec.x_domain))),
-                                x2="終點:Q",
-                                y=alt.value(20),
-                                tooltip=["指標", "標記", "說明", "狀態"],
-                            )
-                        )
-                        marker_chart = range_chart + marker_chart
-                    st.altair_chart(marker_chart, width="stretch")
+        st.markdown(
+            build_technical_condition_visual_panel_html(detail.visual_specs),
+            unsafe_allow_html=True,
+        )
 
     with st.expander("這些指標代表什麼？", expanded=False):
         st.dataframe(
@@ -2218,6 +2184,226 @@ def ensure_current_technical_detail_view(signal_match):
             + ", ".join(missing)
         )
     return detail
+
+
+def build_technical_condition_visual_panel_html(visual_specs) -> str:
+    rows = "\n".join(_technical_condition_visual_row_html(spec) for spec in visual_specs)
+    return f"""
+<style>
+.technical-visual-panel {{
+    background: var(--secondary-background-color, rgba(128, 128, 128, 0.08));
+    color: var(--text-color, inherit);
+    border-radius: 8px;
+    padding: 18px;
+    margin: 8px 0 4px;
+    border: 1px solid rgba(128, 128, 128, 0.28);
+}}
+.technical-visual-row {{
+    display: grid;
+    grid-template-columns: minmax(130px, 180px) minmax(70px, 96px) minmax(220px, 1fr) minmax(92px, 180px) minmax(86px, 118px);
+    gap: 12px;
+    align-items: center;
+    margin: 0 0 18px;
+    padding: 14px;
+    border: 1px solid rgba(128, 128, 128, 0.22);
+    border-radius: 8px;
+    background: rgba(128, 128, 128, 0.04);
+}}
+.technical-visual-row:last-child {{
+    margin-bottom: 0;
+}}
+.technical-visual-title {{
+    font-size: 1.22rem;
+    font-weight: 800;
+    line-height: 1.15;
+}}
+.technical-visual-current,
+.technical-visual-threshold {{
+    font-size: 1.25rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}}
+.technical-visual-current strong,
+.technical-visual-gap strong {{
+    font-weight: 900;
+}}
+.technical-visual-bar {{
+    position: relative;
+    height: 34px;
+    min-width: 200px;
+}}
+.technical-visual-line {{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 16px;
+    border-top: 2px solid currentColor;
+    opacity: 0.75;
+}}
+.technical-visual-range {{
+    position: absolute;
+    top: 12px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--primary-color, #2563eb);
+    opacity: 0.28;
+}}
+.technical-visual-tick {{
+    position: absolute;
+    top: 7px;
+    height: 21px;
+    border-left: 3px solid currentColor;
+}}
+.technical-visual-dot {{
+    position: absolute;
+    top: 7px;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
+    border-radius: 50%;
+    background: var(--background-color, Canvas);
+    border: 3px solid var(--primary-color, currentColor);
+}}
+.technical-visual-status {{
+    font-weight: 900;
+    line-height: 1.15;
+    white-space: nowrap;
+}}
+.technical-visual-status.pass {{
+    color: #22c55e;
+}}
+.technical-visual-status.fail {{
+    color: #ef4444;
+}}
+.technical-visual-gap {{
+    grid-column: 1 / -1;
+    color: var(--text-color, inherit);
+    font-size: 1.18rem;
+    line-height: 1.25;
+    margin-top: -8px;
+}}
+@media (max-width: 900px) {{
+    .technical-visual-row {{
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-bottom: 30px;
+    }}
+    .technical-visual-gap {{
+        grid-column: 1;
+        margin-top: 0;
+    }}
+}}
+</style>
+<div class="technical-visual-panel">
+{rows}
+</div>
+"""
+
+
+def _technical_condition_visual_row_html(spec) -> str:
+    current = _technical_visual_marker_value(spec, "目前值")
+    threshold_markers = [
+        marker
+        for marker in getattr(spec, "marker_rows", [])
+        if marker.get("標記") != "目前值"
+    ]
+    marker_html = ""
+    if current is not None:
+        marker_html = (
+            f'<span class="technical-visual-dot" style="left: {_technical_visual_position(current, spec.x_domain):.2f}%;" '
+            f'title="{_escape_attr(spec.title)}：目前值 {_escape_attr(spec.current_label)}"></span>'
+        )
+    range_html = "\n".join(
+        _technical_visual_range_html(range_row, spec.x_domain)
+        for range_row in getattr(spec, "range_rows", [])
+    )
+    ticks_html = "\n".join(
+        f'<span class="technical-visual-tick" style="left: {_technical_visual_position(marker["數值"], spec.x_domain):.2f}%;" '
+        f'title="{_escape_attr(spec.title)}：{_escape_attr(marker["標記"])} {_escape_attr(marker["說明"])}"></span>'
+        for marker in threshold_markers
+    )
+    threshold_label = _technical_visual_compact_threshold(spec)
+    status_class = "pass" if spec.status_label == "符合" else "fail"
+    status_symbol = "✓" if spec.status_label == "符合" else "✕"
+    status_text = html.escape(spec.status_label)
+    return (
+        f'<div class="technical-visual-row" title="{_escape_attr(spec.explanation)}">'
+        f'<div class="technical-visual-title">{html.escape(spec.title)}</div>'
+        f'<div class="technical-visual-current">{_technical_visual_current_html(spec)}</div>'
+        f'<div class="technical-visual-bar" role="img" aria-label="{_escape_attr(spec.title)} {_escape_attr(spec.status_label)}">'
+        '<span class="technical-visual-line"></span>'
+        f'{range_html}{ticks_html}{marker_html}'
+        '</div>'
+        f'<div class="technical-visual-threshold">{threshold_label}</div>'
+        f'<div class="technical-visual-status {status_class}" aria-label="{_escape_attr(spec.status_label)}">{status_symbol} {status_text}</div>'
+        f'<div class="technical-visual-gap">{_technical_visual_gap_html(spec)}</div>'
+        '</div>'
+    )
+
+
+def _technical_visual_marker_value(spec, marker_label: str) -> float | None:
+    for marker in getattr(spec, "marker_rows", []):
+        if marker.get("標記") == marker_label:
+            try:
+                return float(marker["數值"])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _technical_visual_position(value: float, domain: tuple[float, float]) -> float:
+    start, end = domain
+    if end == start:
+        return 0.0
+    position = ((float(value) - start) / (end - start)) * 100
+    return min(max(position, 0.0), 100.0)
+
+
+def _technical_visual_range_html(range_row: dict[str, object], domain: tuple[float, float]) -> str:
+    start = _technical_visual_position(float(range_row["起點"]), domain)
+    end = _technical_visual_position(float(range_row["終點"]), domain)
+    left = min(start, end)
+    width = abs(end - start)
+    return (
+        f'<span class="technical-visual-range" style="left: {left:.2f}%; width: {width:.2f}%;" '
+        f'title="{_escape_attr(range_row.get("標記", ""))} {_escape_attr(range_row.get("說明", ""))}"></span>'
+    )
+
+
+def _technical_visual_current_html(spec) -> str:
+    return f"<strong>{html.escape(spec.current_label)}</strong>"
+
+
+def _technical_visual_compact_threshold(spec) -> str:
+    if spec.title == "成交量活躍度":
+        return html.escape(spec.threshold_label.replace("V1 門檻 ", "") + " 門檻")
+    if spec.title == "RSI 動能":
+        return "70"
+    if spec.title == "接近前高程度":
+        return "-5% 門檻&nbsp;&nbsp;&nbsp;&nbsp;0%"
+    return html.escape(spec.threshold_label)
+
+
+def _technical_visual_gap_html(spec) -> str:
+    if spec.title == "成交量活躍度":
+        if "尚差 " in spec.gap_text:
+            gap_value = spec.gap_text.split("尚差 ", 1)[1].rstrip("。")
+            return f"尚差 <strong>{html.escape(gap_value)}</strong> 才達到 V1 要求"
+        return html.escape(spec.gap_text)
+    if spec.title == "RSI 動能":
+        return html.escape(spec.gap_text)
+    if spec.title == "接近前高程度":
+        return html.escape(
+            spec.gap_text
+            .replace("目前距離前 60 日高點 ", "目前 ")
+            .replace("，距離 V1 門檻 -5% ", "，")
+            .replace(" 個百分點。", " 個百分點")
+        )
+    return html.escape(spec.gap_text)
+
+
+def _escape_attr(value) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def ensure_swing_technical_detail_contract(*, force_reload: bool = False) -> None:

@@ -1,4 +1,6 @@
 import ast
+import copy
+import inspect
 import importlib
 import subprocess
 import sys
@@ -137,6 +139,220 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
             [spec.title for spec in detail.visual_specs],
             ["成交量活躍度", "RSI 動能", "接近前高程度"],
         )
+
+    def test_visual_panel_html_uses_compact_beginner_bar_layout(self):
+        import app as app_module
+        from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+        from signal_outcome_service import evaluate_signal_conditions
+        from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+        case = SwingResearchDashboardTestCase()
+        signal_match = evaluate_signal_conditions(
+            case.snapshot(
+                symbol="2330.TW",
+                volume_ratio_20=0.64,
+                rsi_14=50.6,
+                distance_to_prior_60d_high=-0.0651,
+            ),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        detail = app_module.ensure_current_technical_detail_view(signal_match)
+
+        html = app_module.build_technical_condition_visual_panel_html(detail.visual_specs)
+
+        self.assertIn("technical-visual-panel", html)
+        self.assertIn("var(--secondary-background-color", html)
+        self.assertNotIn("background: #050505", html)
+        self.assertNotIn("color: #f8fafc", html)
+        self.assertIn("成交量活躍度", html)
+        self.assertIn("<strong>0.64</strong>", html)
+        self.assertIn("1.20 門檻", html)
+        self.assertIn("尚差 <strong>0.56</strong> 才達到 V1 要求", html)
+        self.assertIn("RSI 動能", html)
+        self.assertIn("<strong>50.6</strong>", html)
+        self.assertIn("70", html)
+        self.assertIn("接近前高程度", html)
+        self.assertIn("<strong>-6.51%</strong>", html)
+        self.assertIn("-5% 門檻", html)
+        self.assertIn("✕ 尚未符合", html)
+        self.assertIn("✓ 符合", html)
+
+    def test_visual_marker_position_helper_clamps_display_only(self):
+        import app as app_module
+
+        self.assertEqual(app_module._technical_visual_position(0.0, (0.0, 10.0)), 0.0)
+        self.assertEqual(app_module._technical_visual_position(10.0, (0.0, 10.0)), 100.0)
+        self.assertEqual(app_module._technical_visual_position(5.0, (0.0, 10.0)), 50.0)
+        self.assertEqual(app_module._technical_visual_position(-5.0, (0.0, 10.0)), 0.0)
+        self.assertEqual(app_module._technical_visual_position(15.0, (0.0, 10.0)), 100.0)
+
+    def test_visual_marker_positions_use_dynamic_domains(self):
+        import app as app_module
+        from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+        from signal_outcome_service import evaluate_signal_conditions
+        from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+        case = SwingResearchDashboardTestCase()
+        signal_match = evaluate_signal_conditions(
+            case.snapshot(
+                symbol="DYNAMIC",
+                volume_ratio_20=0.64,
+                rsi_14=50.6,
+                distance_to_prior_60d_high=-0.0651,
+            ),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        detail = app_module.ensure_current_technical_detail_view(signal_match)
+
+        volume, rsi, distance = detail.visual_specs
+
+        self.assertAlmostEqual(
+            app_module._technical_visual_position(0.64, volume.x_domain),
+            42.6667,
+            places=2,
+        )
+        self.assertAlmostEqual(
+            app_module._technical_visual_position(50.6, rsi.x_domain),
+            50.6,
+            places=2,
+        )
+        self.assertAlmostEqual(
+            app_module._technical_visual_position(-6.51, distance.x_domain),
+            34.9,
+            places=2,
+        )
+
+    def test_visual_panel_handles_scale_regression_values(self):
+        import app as app_module
+        from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+        from signal_outcome_service import evaluate_signal_conditions
+        from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+        case = SwingResearchDashboardTestCase()
+        scenarios = [
+            {"volume_ratio_20": value}
+            for value in (0.3, 0.64, 1.2, 1.8, 3.0)
+        ] + [
+            {"rsi_14": value}
+            for value in (20, 50, 50.6, 70, 85)
+        ] + [
+            {"distance_to_prior_60d_high": value}
+            for value in (-0.25, -0.10, -0.0651, -0.05, 0.0, 0.03)
+        ]
+
+        for values in scenarios:
+            with self.subTest(values=values):
+                signal_match = evaluate_signal_conditions(
+                    case.snapshot(symbol="SCALE", **values),
+                    TECHNICAL_EXAMPLE_SIGNAL_V1,
+                )
+                detail = app_module.ensure_current_technical_detail_view(signal_match)
+                html = app_module.build_technical_condition_visual_panel_html(detail.visual_specs)
+
+                self.assertIn("technical-visual-dot", html)
+                self.assertIn("1.20 門檻", html)
+                self.assertIn("-5% 門檻", html)
+                self.assertIn("left:", html)
+
+    def test_visual_panel_escapes_dynamic_html_text(self):
+        import app as app_module
+        from swing_research_dashboard import TechnicalConditionVisualSpec
+
+        spec = TechnicalConditionVisualSpec(
+            title='成交量活躍度<img src=x onerror=alert(1)>',
+            explanation='<script>alert("x")</script>',
+            status_label='尚未符合<script>',
+            status_value="fail",
+            current_label='<b>0.64</b>',
+            threshold_label='<i>V1 門檻 1.20</i>',
+            gap_text='目前 <img src=x onerror=alert(1)> 尚差 0.56。',
+            x_domain=(0.0, 1.5),
+            marker_rows=[
+                {
+                    "指標": "成交量活躍度",
+                    "標記": "目前值",
+                    "數值": 0.64,
+                    "說明": '<b>0.64</b>',
+                    "狀態": "尚未符合",
+                }
+            ],
+            range_rows=[],
+        )
+
+        html = app_module.build_technical_condition_visual_panel_html([spec])
+
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("<img", html)
+        self.assertNotIn("<b>0.64</b>", html)
+        self.assertIn("&lt;b&gt;0.64&lt;/b&gt;", html)
+        self.assertIn("&lt;script&gt;", html)
+
+    def test_visual_panel_handles_missing_current_marker(self):
+        import app as app_module
+        from swing_research_dashboard import TechnicalConditionVisualSpec
+
+        spec = TechnicalConditionVisualSpec(
+            title="成交量活躍度",
+            explanation="缺值測試",
+            status_label="尚未符合",
+            status_value="fail",
+            current_label="N/A",
+            threshold_label="V1 門檻 1.20",
+            gap_text="目前沒有足夠資料顯示此指標。",
+            x_domain=(0.0, 1.5),
+            marker_rows=[
+                {
+                    "指標": "成交量活躍度",
+                    "標記": "V1 門檻",
+                    "數值": 1.2,
+                    "說明": "1.20",
+                    "狀態": "尚未符合",
+                }
+            ],
+            range_rows=[],
+        )
+
+        html = app_module.build_technical_condition_visual_panel_html([spec])
+
+        self.assertIn("<strong>N/A</strong>", html)
+        self.assertNotIn('<span class="technical-visual-dot"', html)
+        self.assertIn("technical-visual-tick", html)
+
+    def test_visual_helper_has_no_hard_coded_sample_symbol_or_values(self):
+        import app as app_module
+
+        helper_source = "\n".join(
+            inspect.getsource(function)
+            for function in (
+                app_module.build_technical_condition_visual_panel_html,
+                app_module._technical_condition_visual_row_html,
+                app_module._technical_visual_current_html,
+                app_module._technical_visual_gap_html,
+            )
+        )
+
+        self.assertNotIn("2330", helper_source)
+        self.assertNotIn("0.64", helper_source)
+        self.assertNotIn("50.6", helper_source)
+        self.assertNotIn("-6.51", helper_source)
+
+    def test_visual_render_does_not_mutate_visual_specs(self):
+        import app as app_module
+        from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
+        from signal_outcome_service import evaluate_signal_conditions
+        from tests.test_swing_research_dashboard import SwingResearchDashboardTestCase
+
+        case = SwingResearchDashboardTestCase()
+        signal_match = evaluate_signal_conditions(
+            case.snapshot(symbol="IMMUTABLE", volume_ratio_20=1.8, rsi_14=70, distance_to_prior_60d_high=0.03),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        detail = app_module.ensure_current_technical_detail_view(signal_match)
+        before = copy.deepcopy(detail.visual_specs)
+
+        app_module.build_technical_condition_visual_panel_html(detail.visual_specs)
+
+        self.assertEqual(detail.visual_specs, before)
 
     def test_stale_detail_view_schema_rebuilds_without_attribute_error(self):
         at = AppTest.from_function(stale_detail_view_schema_app)
