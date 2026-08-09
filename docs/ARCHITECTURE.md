@@ -240,6 +240,17 @@ signal_outcome_service.py
     └── Overlapping signal cooldown as analysis-time filtering only
     └── No hit-rate aggregation, probability, scanner, dashboard, AI, or persistence
 
+signal_condition_diagnostics_service.py
+    └── Deterministic V1 Historical Condition Diagnostics foundation
+    └── HistoricalConditionDiagnosticsConfig with inclusive start/end date and fixed SignalDefinition
+    └── Per-symbol flow: use injected TechnicalIndicatorSeries or load price once and build technical series once
+    └── Per-snapshot flow: reuse evaluate_signal_conditions() and preserve EvaluatedSignalCondition trace
+    └── ConditionDiagnosticObservation preserves symbol, trading date, signal id, status, matched condition count, passed/missing/not-evaluable condition ids, evaluated conditions, and source snapshot
+    └── Aggregates 0/5 through 5/5 match-count distribution, single-condition pass rates, 4/5 missing-condition summaries, and canonical condition combinations
+    └── Separates evaluated observations from NOT_EVALUABLE observations; NOT_EVALUABLE is not counted as 0/5
+    └── Provides aggregate and per-symbol summaries without SQLite persistence
+    └── No outcome calculation, Historical Hit Rate, backtest, replay, scanner ranking, Yahoo fetch when injected data is supplied, dashboard, probability, recommendation, OpenAI, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range

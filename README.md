@@ -148,6 +148,7 @@ Dashboard 目前提供：
 - `AI Research`：單一股票 grounded AI 研究頁；使用 explicit question type、使用者問題、Selected Research Context 與 OpenAI Responses API 產生具 evidence citations 的 structured answer，並支援 session-only grounded follow-up research workflow。
 - `Swing Research`：波段研究整合頁；支援 Manual Input、Watchlist 與 Saved Universe symbol source，按下執行後才掃描 resolved symbols。Current Scan 顯示 summary、MATCH / NO_MATCH 技術條件明細、current MATCH candidates、Historical Hit Rate + Resolved Samples、MFE / MAE / End Return、Research Priority、current signal condition trace、technical snapshot 與少量 Historical Cases Preview。技術條件明細只顯示 scan-time actual values、V1 thresholds、既有 PASS / FAIL 與中性 gap，並用三個獨立 visual scales 呈現成交量活躍度、RSI 動能與接近前高程度；不重新抓 Yahoo、不重新掃描、不重新 backtest，也不是 score、future probability 或 recommendation。Historical Replay 讓使用者指定單一 Replay Date，顯示 Requested Replay Date、各 symbol 的 Actual Trading Date、Historical Hit Rate (As Of) 與獨立的 Post-Replay Outcome 事後驗證。Walk-Forward Replay 會依 Monthly 或 Weekly schedule 重複執行 Single-Date Historical Replay，顯示 period timeline、candidate occurrence counts 與 repeated candidate frequency。Out-of-Sample Validation 會在明確按下 `執行樣本外驗證` 後，比較 Development / Validation / Holdout 三段固定 research specification 的 descriptive validation facts、Research Specification Fingerprint、Historical Hit Rate + Resolved n、Candidate Period Share、outcome counts 與 period-local candidate stability。此頁不是自動獲利股票搜尋器，也不提供投資建議、未來機率、prediction accuracy 或交易指令。
 - `Replay Analytics`：在 Walk-Forward Replay 成功結果下方顯示 Stability Summary、Candidate Occurrence、Period Timeline、Candidate Set Stability 與 Post-Replay Outcome Counts。這是 existing replay result 的描述性 analytics，不重新抓 Yahoo、不重新 replay、不重新 backtest，也不提供 future probability、recommendation、strategy P&L 或 optimization。
+- `V1 歷史條件診斷`：run-local service foundation，統計歷史上每個可評估交易日符合 V1 五項技術條件中的幾項、0/5～5/5 分布、單一條件通過率、4/5 最常缺少條件與常見條件組合。它重用既有 `SignalDefinition` / `evaluate_signal_conditions()`，不計算 Historical Outcome、Historical Hit Rate、future probability、recommendation 或 AI analysis。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
@@ -178,6 +179,7 @@ Dashboard 與 console application 共用既有 service layer：
 - Replay analytics stability review：`src/replay_analytics_service.py`
 - Out-of-sample validation foundation：`src/out_of_sample_validation_service.py`
 - OOS validation dashboard helpers：`src/oos_validation_dashboard.py`
+- V1 historical condition diagnostics foundation：`src/signal_condition_diagnostics_service.py`
 
 Research methodology 詳見 `docs/RESEARCH_FRAMEWORK.md`。
 Historical Trends methodology 詳見 `docs/HISTORICAL_TREND_DASHBOARD.md`。
@@ -199,6 +201,7 @@ Walk-Forward Replay 詳見 `docs/WALK_FORWARD_REPLAY.md`。
 Replay Analytics & Stability Review 詳見 `docs/REPLAY_ANALYTICS_STABILITY.md`。
 Out-of-Sample Validation 詳見 `docs/OUT_OF_SAMPLE_VALIDATION.md`。
 OOS Validation Dashboard 詳見 `docs/OOS_VALIDATION_DASHBOARD.md`。
+V1 Historical Condition Diagnostics 詳見 `docs/V1_HISTORICAL_CONDITION_DIAGNOSTICS.md`。
 
 Dashboard 不直接查詢 Yahoo Finance、不直接讀寫 SQLite，也不直接讀寫 Watchlist JSON。
 
@@ -297,6 +300,14 @@ OOS validation 使用固定的 `SignalDefinition`、`OutcomeDefinition`、replay
 OOS result 保存 candidate period share、unique candidate symbols、candidate occurrences、period-local stability analytics、Post-Replay HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts、Resolved n 與 Historical Hit Rate。Historical Hit Rate denominator 固定為 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 不進 denominator，且 zero resolved samples 顯示為 `None` / `N/A`。
 
 Sprint 08 Batch B 在 Streamlit `Swing Research` tab 新增 Out-of-Sample Validation dashboard。它只呈現 descriptive validation facts，不建立 validation score、prediction accuracy、future probability、parameter optimization、Buy / Sell / Hold recommendation 或 strategy P&L。
+
+## V1 Historical Condition Diagnostics
+
+V1 Historical Condition Diagnostics Batch 1 新增 deterministic service foundation。
+
+Diagnostics 逐一評估歷史 `TechnicalIndicatorSnapshot`，重用既有 `technical_example_v1` 與 `evaluate_signal_conditions()`，保存每筆 observation 的 `符合條件數`、passed / missing condition ids、`NOT_EVALUABLE` trace、match-count distribution、single-condition pass rate、4/5 missing-condition distribution 與 condition-combination summary。
+
+`NOT_EVALUABLE` 不會被當成 `0/5`，且所有 share denominator 只使用可評估歷史樣本。本層不計算 HIT / MISS、Historical Hit Rate、MFE / MAE、future breakout、future probability、ranking、dashboard、AI analysis 或 SQLite persistence。
 
 ## Universe Management
 

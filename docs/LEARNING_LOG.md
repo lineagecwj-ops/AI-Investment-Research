@@ -1,5 +1,24 @@
 # Learning Log
 
+## 2026-08-09 — V1 Historical Condition Diagnostics Batch 1
+
+### Completed Features
+
+- 新增 `src/signal_condition_diagnostics_service.py`，建立 deterministic V1 historical condition diagnostics foundation。
+- 新增 frozen models：`HistoricalConditionDiagnosticsConfig`、`ConditionDiagnosticObservation`、`ConditionPassSummary`、`MatchCountDistributionRow`、`MissingConditionSummary`、`ConditionCombinationSummary`、`SymbolConditionDiagnosticsSummary` 與 `HistoricalConditionDiagnosticsResult`。
+- Diagnostics 逐 historical `TechnicalIndicatorSnapshot` 重用既有 `evaluate_signal_conditions()`，不平行重寫 `technical_example_v1` 五項條件。
+- Result 保存 aggregate 與 per-symbol summaries，包含 0/5～5/5 distribution、single-condition pass rate、4/5 missing condition distribution 與 canonical condition combinations。
+- `NOT_EVALUABLE` observation 保留 traceability，但不當成 `0/5`，也不進 evaluated denominator。
+- 擴充 `src/ui_terminology.py`，集中 `V1 歷史條件診斷`、`歷史條件命中分布`、`符合條件數`、`單一條件通過率`、`未符合條件`、`條件組合` 等繁中 terminology 與 beginner explanations。
+- 新增 `docs/V1_HISTORICAL_CONDITION_DIAGNOSTICS.md`，並更新 README 與 ARCHITECTURE。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、signal / outcome definition、scanner threshold、scanner decision logic、technical formulas、backtest、ranking、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema 或 OpenAI / AI logic。
+- Batch 1 不計算 HIT / MISS、Historical Hit Rate、MFE、MAE、End Return、future breakout 或 future probability。
+- `符合條件數` 只是 factual condition count，不是 score、Buy Score、Opportunity Score、Win Rate、Recommendation、買點、買進建議或預測成功率。
+- Service 使用 injected `TechnicalIndicatorSeries` 時不抓 Yahoo；若由 service 載入 symbol，每個 symbol 只建立一次 technical series 再逐日期評估。
+
 ## 2026-08-08 — V1.0 Post-Release UX Technical Condition Detail
 
 ### Beginner Visual Bars Update
