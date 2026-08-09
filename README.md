@@ -154,6 +154,7 @@ Dashboard 目前提供：
 - `V1 歷史後續結果比較`：run-local Batch 2 service foundation，直接使用 Batch 1 daily diagnostic observations，重用既有 `raw_high_breakout_60d_within_20d_v1` / `evaluate_historical_outcome()` 比較 0/5～5/5 與 4/5 缺少條件的 HIT / MISS / INCOMPLETE / NOT_EVALUABLE、Resolved Samples 與 Historical Hit Rate。它固定 deterministic 60 trading-bar pre-window warm-up 與 20 trading-bar post-window outcome extension，不修改 V1 threshold、不建立 V1.1 / V2、不做 probability、recommendation、ranking、dashboard 或 AI analysis。
 - `V1 單一條件影響分析`：run-local core service foundation，直接使用 Batch 2 outcome-attached daily observations，對每個 canonical V1 condition 建立 leave-one-out comparison：原始 5/5 baseline 加上「只缺該條件」的 4/5 observations，回報新增樣本、HIT / MISS / INCOMPLETE / NOT_EVALUABLE、Resolved Samples、Historical Hit Rate、樣本增加比例與百分點變化。它只做 historical counterfactual grouping，不修改 V1、不建立 V1.1 / V2、不做 threshold sensitivity、dashboard、probability、recommendation、ranking 或 AI analysis。
 - `V1 成交量門檻變化測試`：run-local research service foundation，直接使用 Batch 2 outcome-attached daily observations，固定其他四項 V1 條件，只用 `volume_ratio_20` actual value 對 `0.80 / 1.00 / 1.10 / 1.20 / 1.30 / 1.50` 做 historical sensitivity grouping。`1.20` 仍是 current V1 baseline；本層不修改 production V1、不建立 V1.1、不做 dashboard、threshold optimization、best threshold、probability、recommendation、ranking 或 AI analysis。
+- `V1 成交量門檻穩健性分析`：run-local research service foundation，直接使用 Batch 2 outcome-attached daily observations，只研究 `1.00 / 1.10 / 1.20`，其中 `1.20` 仍是 formal V1 baseline。它建立 aggregate daily、逐股票、逐年度與降低樣本重疊 summaries；overlap-reduced view 使用同一 symbol 的 trading-bar index 至少相隔 20 個交易日，不使用 calendar-day distance。降低樣本重疊不代表完全獨立樣本；本層不修改 production V1、不建立 V1.1、不做 dashboard、threshold optimization、probability、recommendation、ranking、score 或 AI analysis。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。
@@ -321,6 +322,16 @@ V1 Condition Contribution Research Batch 2 新增「成交量門檻變化測試�
 它直接消費 Batch 2 attached historical outcomes，固定其他四項 V1 條件，並只用 `volume_ratio_20 >= threshold` 重新建立 threshold buckets。Primary grid 固定為 `0.80`、`1.00`、`1.10`、`1.20`、`1.30`、`1.50`，所有 deltas 都相對 current V1 `1.20` baseline。
 
 Historical Hit Rate denominator 仍為 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 不進 denominator。Result 保存 aggregate 與 per-symbol summaries、`observation_unit = DAILY` 與 `overlap_possible = True`。本層不重新抓 Yahoo、不重建 technical series、不重新跑 outcome evaluator、不修改 `technical_example_v1`、不建立 V1.1、不做 dashboard、best threshold、recommendation、probability、ranking 或 AI analysis。
+
+## V1 Volume Threshold Robustness
+
+V1 Condition Contribution Research Batch 3 新增「成交量門檻穩健性分析」service foundation。
+
+它直接消費 Batch 2 attached historical outcomes，固定只研究 `1.00`、`1.10`、`1.20`，並保留 `1.20` 作為 formal V1 reference baseline。Batch 3 不重新尋找門檻、不重新測 `0.80 / 1.30 / 1.50`，也不修改 `technical_example_v1`。
+
+Result 保存 aggregate daily、per-symbol、per-year 與 overlap-reduced summaries。Per-year 使用 observation trading date calendar year；future 20-bar outcome 可以延伸到下一年度，但 observation 仍屬於原 observation year。Overlap-reduced view 只降低樣本重疊，使用同一 symbol 的 trading-bar index 至少相隔 20 個交易日；這不代表完全獨立樣本，也不是 entry rule、strategy rule 或 signal suppression rule。
+
+Live read-only validation 使用 `data/stocks.db` SQLite `mode=ro`，重現 Batch 2 required daily baseline：`1.00 n=114 HIT=105 MISS=9 rate=92.11%`、`1.10 n=96 HIT=88 MISS=8 rate=91.67%`、`1.20 n=73 HIT=66 MISS=7 rate=90.41%`。完整說明與 live tables 見 `docs/V1_VOLUME_THRESHOLD_ROBUSTNESS.md`。
 
 ## Universe Management
 

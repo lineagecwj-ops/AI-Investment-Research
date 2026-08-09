@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-09 — V1 Condition Contribution Research Batch 3
+
+### Completed Features
+
+- 新增 `src/volume_threshold_robustness_service.py`，建立 deterministic「成交量門檻穩健性分析」核心服務。
+- Service 直接 consume Batch 2 `HistoricalConditionOutcomeComparisonResult`，重用 Batch 1 daily observation identity 與 Batch 2 attached historical outcome。
+- Candidate thresholds 固定且只允許 `1.00`、`1.10`、`1.20`；`1.20` 是 formal V1 reference baseline。
+- Result 保存 aggregate daily summaries、逐股票 summaries、逐年度 summaries 與降低樣本重疊 summaries。
+- 逐年度 grouping 使用 observation trading date calendar year；future 20-bar outcome 可以延伸到下一年度，但 observation year 不改變。
+- Overlap-reduced view 使用同一 symbol 的 daily observation trading-bar index spacing，已選 observation 之間至少相隔 20 個 trading bars。
+- Selected observation identity 固定為 `symbol + trading_date + signal_definition_id`，同樣 input 與 fixed `generated_at` 會產生相同 result。
+- 新增 frozen models：`VolumeThresholdRobustnessConfig`、`ThresholdDailyRobustnessSummary`、`ThresholdSymbolRobustnessSummary`、`ThresholdYearRobustnessSummary`、`OverlapReducedSelectedObservation`、`OverlapReducedThresholdSummary` 與 `VolumeThresholdRobustnessResult`。
+- 擴充 `src/ui_terminology.py`，集中「成交量門檻穩健性分析」、「逐股票穩健性」、「逐年度穩健性」、「降低樣本重疊」、「原始每日樣本」、「降低重疊後樣本」、「相對正式 V1 差異」、「歷史命中率差異」、「樣本數差異」、「20 個交易日間隔」等 terminology 與 beginner explanations。
+- 新增 `docs/V1_VOLUME_THRESHOLD_ROBUSTNESS.md`，並更新 README 與 ARCHITECTURE。
+
+### Live Read-Only Validation
+
+- 使用 `data/stocks.db` SQLite URI `mode=ro` 直接讀取 `historical_prices`，不初始化、不 migrate、不寫 DB、不 Yahoo refetch、不 network fallback。
+- DB before / after metadata matched：size `7,327,744` bytes、mtime epoch `1786251269`、SHA-256 `dcd65c9f2e579164728eaadbbc7b6926f3d6513bcdcac2cb36154bc8961f9aa5`。
+- `PRAGMA integrity_check` returned `ok`。
+- Live daily baseline reproduced Batch 2 required values：`1.00 n=114 HIT=105 MISS=9 rate=92.11%`、`1.10 n=96 HIT=88 MISS=8 rate=91.67%`、`1.20 n=73 HIT=66 MISS=7 rate=90.41%`。
+- Overlap-reduced live result：`1.00 reduced n=36 HIT=32 MISS=4 rate=88.89%`、`1.10 reduced n=35 HIT=31 MISS=4 rate=88.57%`、`1.20 reduced n=32 HIT=27 MISS=5 rate=84.38%`，selected-ID spacing invariant PASS。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、production `volume_ratio_20 >= 1.20`、signal / outcome definition、scanner threshold、scanner decision logic、technical formulas、backtest、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema 或 OpenAI / AI logic。
+- 成交量門檻穩健性分析本身只做 filter / group / aggregate / deterministic sampling view；不重新抓 Yahoo、不重建 technical series、不重新跑 Batch 1 diagnostics、不重新跑 future outcome evaluator。
+- 降低樣本重疊不代表完全獨立樣本；daily observations 不是 trades。
+- Historical Hit Rate 仍為 `HIT / (HIT + MISS)`；`INCOMPLETE` 與 `NOT_EVALUABLE` 保留 counts 但不進 denominator。
+- Historical Hit Rate delta 使用百分點差，不是百分比相對變化。
+- 本 Batch 不產生 recommendation、ranking、score、probability、threshold optimization、V1.1、V2、RSI sensitivity、distance sensitivity、dashboard integration 或 AI analysis。
+
 ## 2026-08-09 — V1 Condition Contribution Research Batch 2
 
 ### Completed Features

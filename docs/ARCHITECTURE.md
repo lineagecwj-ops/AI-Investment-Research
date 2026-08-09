@@ -303,6 +303,20 @@ volume_threshold_sensitivity_service.py
     └── Records daily-observation unit and overlap_possible warning
     └── No production V1 threshold change, V1.1 / V2, RSI sensitivity, distance sensitivity, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
 
+volume_threshold_robustness_service.py
+    └── Deterministic V1 Volume Threshold Robustness Analysis foundation
+    └── Consumes Batch 2 HistoricalConditionOutcomeComparisonResult with attached ConditionOutcomeObservation records
+    └── Reuses Batch 1 observation identity and Batch 2 outcome attachment; does not re-evaluate V1 conditions or outcomes
+    └── Fixes candidate thresholds exactly as 1.00, 1.10, and 1.20, with 1.20 retained as formal V1 reference baseline
+    └── Keeps the other four V1 conditions fixed and only applies volume_ratio_20 >= threshold to actual diagnostic snapshot values
+    └── Reports aggregate daily, per-symbol, per-year, and overlap-reduced summaries
+    └── Per-year grouping uses observation trading date year; future 20-bar outcomes may extend beyond the observation year
+    └── Overlap-reduced view uses deterministic same-symbol trading-bar index spacing of at least 20 bars
+    └── Lower-overlap view is a research sampling view only; it is not an entry rule, cooldown rule, strategy rule, or statistical-independence claim
+    └── Historical Hit Rate denominator remains HIT + MISS; INCOMPLETE and NOT_EVALUABLE are excluded
+    └── Preserves aggregate raw-count semantics rather than averaging symbol-level or year-level rates
+    └── No production V1 threshold change, V1.1 / V2, new threshold grid, RSI sensitivity, distance sensitivity, recommendation, probability, ranking, score, dashboard, AI, SQLite persistence, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range
