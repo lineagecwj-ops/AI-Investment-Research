@@ -151,6 +151,37 @@ class UiTerminologyTestCase(unittest.TestCase):
             "20 日成交量比率、RSI 14 日相對強弱指標",
         )
 
+    def test_condition_contribution_terminology_is_traditional_chinese_first(self):
+        self.assertEqual(get_diagnostic_label("Single Condition Contribution Analysis"), "單一條件影響分析")
+        self.assertEqual(get_diagnostic_label("Original V1"), "原始 V1")
+        self.assertEqual(get_diagnostic_label("Assume Condition Not Required"), "假設不要求此條件")
+        self.assertEqual(get_diagnostic_label("Added Historical Observations"), "新增歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Added Resolved Historical Observations"), "新增已解析歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Added HIT"), "新增 HIT")
+        self.assertEqual(get_diagnostic_label("Added MISS"), "新增 MISS")
+        self.assertEqual(get_diagnostic_label("Observation Increase Rate"), "樣本增加比例")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate Change"), "歷史命中率變化")
+        self.assertEqual(get_diagnostic_label("Percentage Points"), "百分點")
+        self.assertEqual(get_diagnostic_label("Daily Observations"), "每日觀察樣本")
+        self.assertEqual(get_diagnostic_label("Overlap Possible"), "樣本可能重疊")
+
+        self.assertIn(
+            "取消某一條件要求後",
+            get_diagnostic_beginner_explanation("Single Condition Contribution Analysis"),
+        )
+        self.assertIn(
+            "不是未來發生機率",
+            get_diagnostic_beginner_explanation("Historical Hit Rate Change"),
+        )
+        self.assertIn(
+            "不代表該條件應被移除",
+            get_diagnostic_beginner_explanation("Single Condition Contribution Safety Note"),
+        )
+        self.assertIn(
+            "不能解讀成相同數量的獨立交易",
+            get_diagnostic_beginner_explanation("Daily Observation Overlap Note"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
