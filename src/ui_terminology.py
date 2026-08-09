@@ -141,6 +141,19 @@ DIAGNOSTIC_LABELS = {
     "MISS": "未達成研究目標",
     "INCOMPLETE": "後續資料尚不完整",
     "NOT_EVALUABLE": "無法評估",
+    "Single Condition Contribution Analysis": "單一條件影響分析",
+    "Original V1": "原始 V1",
+    "Assume Condition Not Required": "假設不要求此條件",
+    "Added Historical Observations": "新增歷史樣本數",
+    "Added Resolved Historical Observations": "新增已解析歷史樣本數",
+    "Added HIT": "新增 HIT",
+    "Added MISS": "新增 MISS",
+    "Observation Increase Rate": "樣本增加比例",
+    "Historical Hit Rate Change": "歷史命中率變化",
+    "Percentage Points": "百分點",
+    "Daily Observations": "每日觀察樣本",
+    "Overlap Possible": "樣本可能重疊",
+    "Leave-One-Out": "Leave-One-Out（假設不要求單一條件）",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {
@@ -183,6 +196,20 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "V1 Historical Condition Safety Note": (
         "這是歷史樣本的描述性統計，不是未來上漲機率，也不是買進建議。"
+    ),
+    "Single Condition Contribution Analysis": (
+        "單一條件影響分析是在固定其他 V1 條件下，觀察取消某一條件要求後，"
+        "歷史樣本數與歷史結果如何變化。"
+    ),
+    "Historical Hit Rate Change": (
+        "歷史命中率變化使用百分點差，這是歷史樣本的描述性統計，"
+        "不是未來發生機率，也不是買進建議。"
+    ),
+    "Single Condition Contribution Safety Note": (
+        "較高的歷史命中率不代表該條件應被移除；較低的歷史命中率也不代表該條件一定有效。"
+    ),
+    "Daily Observation Overlap Note": (
+        "目前每日觀察樣本可能具有重疊的未來觀察區間，不能解讀成相同數量的獨立交易。"
     ),
 }
 
