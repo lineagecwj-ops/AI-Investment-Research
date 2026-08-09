@@ -15,6 +15,10 @@ from models import SignalEvaluationStatus
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
 from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 from ui_terminology import format_condition_labels
+from ui_terminology import format_diagnostic_condition_labels
+from ui_terminology import get_diagnostic_beginner_explanation
+from ui_terminology import get_diagnostic_condition_label
+from ui_terminology import get_diagnostic_label
 from ui_terminology import get_outcome_definition_label
 from ui_terminology import get_outcome_status_label
 from ui_terminology import get_overlap_policy_label
@@ -61,6 +65,71 @@ class UiTerminologyTestCase(unittest.TestCase):
         self.assertEqual(get_outcome_status_label(OutcomeEvaluationStatus.HIT.value), "達成研究目標（HIT）")
         self.assertEqual(WalkForwardReplayFrequency.MONTHLY.value, "MONTHLY")
         self.assertEqual(OverlappingSignalPolicy.ALLOW_ALL.value, "ALLOW_ALL")
+
+    def test_diagnostic_labels_are_traditional_chinese(self):
+        self.assertEqual(get_diagnostic_label("Historical Condition Diagnostics"), "V1 歷史條件診斷")
+        self.assertEqual(get_diagnostic_label("Match Count Distribution"), "歷史條件命中分布")
+        self.assertEqual(get_diagnostic_label("Matched Conditions"), "符合條件數")
+        self.assertEqual(get_diagnostic_label("Condition Pass Rate"), "單一條件通過率")
+        self.assertEqual(get_diagnostic_label("Missing Condition"), "未符合條件")
+        self.assertEqual(get_diagnostic_label("Most Common Missing Condition"), "最常缺少的條件")
+        self.assertEqual(get_diagnostic_label("Condition Combination"), "條件組合")
+        self.assertEqual(get_diagnostic_label("Evaluated Observations"), "可評估歷史樣本")
+        self.assertEqual(get_diagnostic_label("Not Evaluable"), "無法評估")
+        self.assertEqual(get_diagnostic_label("Observation Count"), "歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Share"), "占可評估樣本比例")
+
+    def test_diagnostic_condition_primary_labels_hide_raw_metric_ids(self):
+        labels = [
+            get_diagnostic_condition_label("analysis_close_vs_sma_20"),
+            get_diagnostic_condition_label("sma_20_vs_sma_60"),
+            get_diagnostic_condition_label("volume_ratio_20"),
+            get_diagnostic_condition_label("rsi_14"),
+            get_diagnostic_condition_label("distance_to_prior_60d_high"),
+        ]
+
+        self.assertEqual(
+            labels,
+            [
+                "股價高於 20 日均線",
+                "20 日均線高於 60 日均線",
+                "20 日成交量比率",
+                "RSI 14 日相對強弱指標",
+                "距離前 60 日高點",
+            ],
+        )
+        self.assertFalse(any("_" in label for label in labels))
+        self.assertFalse(any("analysis_close" in label for label in labels))
+        self.assertFalse(any("distance_to_prior_60d_high" in label for label in labels))
+
+    def test_diagnostic_matched_count_is_not_score(self):
+        self.assertEqual(get_diagnostic_label("Matched Conditions"), "符合條件數")
+        self.assertNotEqual(get_diagnostic_label("Matched Conditions"), "分數")
+
+    def test_diagnostic_batch_one_labels_do_not_include_historical_hit_rate(self):
+        labels = {
+            get_diagnostic_label("Historical Condition Diagnostics"),
+            get_diagnostic_label("Match Count Distribution"),
+            get_diagnostic_label("Condition Pass Rate"),
+            get_diagnostic_label("Condition Combination"),
+        }
+
+        self.assertFalse(any("Historical Hit Rate" in label for label in labels))
+        self.assertFalse(any("歷史命中率" in label for label in labels))
+
+    def test_diagnostic_beginner_explanations_are_centralized(self):
+        self.assertIn(
+            "統計每個有效交易日符合 V1 五項技術條件中的幾項",
+            get_diagnostic_beginner_explanation("Historical Condition Diagnostics"),
+        )
+        self.assertIn(
+            "找出最常缺少的最後一項條件",
+            get_diagnostic_beginner_explanation("Most Common Missing Condition"),
+        )
+        self.assertEqual(
+            format_diagnostic_condition_labels(("volume_ratio_20", "rsi_14")),
+            "20 日成交量比率、RSI 14 日相對強弱指標",
+        )
 
 
 if __name__ == "__main__":

@@ -116,6 +116,47 @@ TECHNICAL_METRIC_LABELS = {
     "sma60_change_5d": "60 日均線 5 日變化",
 }
 
+DIAGNOSTIC_LABELS = {
+    "Historical Condition Diagnostics": "V1 歷史條件診斷",
+    "Match Count Distribution": "歷史條件命中分布",
+    "Matched Conditions": "符合條件數",
+    "Condition Pass Rate": "單一條件通過率",
+    "Missing Condition": "未符合條件",
+    "Most Common Missing Condition": "最常缺少的條件",
+    "Condition Combination": "條件組合",
+    "Evaluated Observations": "可評估歷史樣本",
+    "Not Evaluable": "無法評估",
+    "Observation Count": "歷史樣本數",
+    "Share": "占可評估樣本比例",
+}
+
+DIAGNOSTIC_CONDITION_LABELS = {
+    "analysis_close_vs_sma_20": "股價高於 20 日均線",
+    "sma_20_vs_sma_60": "20 日均線高於 60 日均線",
+    "volume_ratio_20": "20 日成交量比率",
+    "rsi_14": "RSI 14 日相對強弱指標",
+    "distance_to_prior_60d_high": "距離前 60 日高點",
+}
+
+DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
+    "Historical Condition Diagnostics": (
+        "用歷史資料統計每個有效交易日符合 V1 五項技術條件中的幾項，"
+        "協助了解 V1 為什麼容易或不容易出現完整符合案例。"
+    ),
+    "Match Count Distribution": (
+        "統計歷史上每個可評估樣本，一共符合 V1 五項條件中的幾項。"
+    ),
+    "Condition Pass Rate": (
+        "觀察每一項 V1 條件在歷史資料中有多少比例能夠符合。"
+    ),
+    "Most Common Missing Condition": (
+        "只分析已符合四項條件的歷史樣本，找出最常缺少的最後一項條件。"
+    ),
+    "Condition Combination": (
+        "統計歷史上哪些 V1 條件最常一起成立。"
+    ),
+}
+
 
 def get_scan_mode_label(value: str) -> str:
     return SCAN_MODE_LABELS.get(value, value)
@@ -163,5 +204,21 @@ def get_technical_metric_label(value: str | None) -> str:
     return TECHNICAL_METRIC_LABELS.get(value, value)
 
 
+def get_diagnostic_label(value: str) -> str:
+    return DIAGNOSTIC_LABELS.get(value, value)
+
+
+def get_diagnostic_condition_label(value: str) -> str:
+    return DIAGNOSTIC_CONDITION_LABELS.get(value, value)
+
+
+def get_diagnostic_beginner_explanation(value: str) -> str:
+    return DIAGNOSTIC_BEGINNER_EXPLANATIONS.get(value, value)
+
+
 def format_condition_labels(values: tuple[str, ...] | list[str]) -> str:
     return "、".join(get_technical_metric_label(value) for value in values) or "N/A"
+
+
+def format_diagnostic_condition_labels(values: tuple[str, ...] | list[str]) -> str:
+    return "、".join(get_diagnostic_condition_label(value) for value in values) or "N/A"
