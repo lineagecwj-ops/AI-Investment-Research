@@ -54,6 +54,8 @@ from etf_constituent_universe_service import database_file_audit
 from etf_constituent_universe_service import mark_sources_unavailable
 from etf_constituent_universe_service import normalize_constituent_record
 from etf_constituent_universe_service import parse_capital_portfolio_page
+from etf_constituent_universe_service import parse_capital_buyback_json
+from etf_constituent_universe_service import parse_cathay_stock_list_json
 from etf_constituent_universe_service import parse_fubon_asset_page
 from etf_constituent_universe_service import parse_taishin_holdings_page
 from etf_constituent_universe_service import parse_yuanta_pcf_page
@@ -457,6 +459,46 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(tuple(record.stock_code for record in records), ("2881", "2882"))
         self.assertEqual(records[0].raw_weight, 14.29)
 
+    def test_parse_capital_buyback_json_uses_full_official_stock_list(self):
+        records = parse_capital_buyback_json(
+            {
+                "code": 200,
+                "data": {
+                    "stocks": [
+                        {"stocNo": "2881", "stocName": "富邦金", "weightRound": 14.29},
+                        {"stocNo": "2882", "stocName": "國泰金", "weight": 12.5374},
+                        {"stocNo": "TX", "stocName": "台股期貨", "weightRound": 3.0},
+                    ]
+                },
+            },
+            etf_code="00919",
+            holdings_date=date(2026, 8, 10),
+            source_url="https://www.capitalfund.com.tw/CFWeb/api/etf/buyback",
+        )
+
+        self.assertEqual(tuple(record.stock_code for record in records), ("2881", "2882"))
+        self.assertEqual(records[0].raw_weight, 14.29)
+        self.assertEqual(records[1].raw_weight, 12.5374)
+
+    def test_parse_cathay_stock_list_json_uses_search_date_holdings_rows(self):
+        records = parse_cathay_stock_list_json(
+            {
+                "returnCode": "2000",
+                "result": [
+                    {"stockCode": "2891", "stockName": "中信金", "volumn": "918,044,000", "weights": "9.93"},
+                    {"stockCode": "2382", "stockName": "廣達", "volumn": "176,721,000", "weights": "8.68"},
+                    {"stockCode": "TX", "stockName": "台股期貨", "weights": "3.00"},
+                ],
+            },
+            etf_code="00878",
+            holdings_date=date(2026, 8, 7),
+            source_url="https://cwapi.cathaysite.com.tw/api/ETF/GetETFDetailStockList",
+        )
+
+        self.assertEqual(tuple(record.stock_code for record in records), ("2891", "2382"))
+        self.assertEqual(records[0].raw_weight, 9.93)
+        self.assertEqual(records[0].holdings_date, date(2026, 8, 7))
+
     def test_parse_taishin_holdings_keeps_raw_code_without_exchange_guess(self):
         html = """
         <html><body>
@@ -519,6 +561,35 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(audit.parser_status, PARSER_STATUS_NOT_RUN)
         self.assertEqual(audit.completeness_status, COMPLETENESS_UNKNOWN)
 
+    def test_00878_official_cathay_stock_api_payload_is_complete(self):
+        source = predefined_etf_sources()[5]
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url,
+                "text": (
+                    "<html><title>00878 國泰永續高股息</title>"
+                    "<body>查看基金持股權重 持股權重</body></html>"
+                ),
+                "cathay_stock_list_json": {
+                    "returnCode": "2000",
+                    "result": [
+                        {"stockCode": "2891", "stockName": "中信金", "volumn": "918,044,000", "weights": "9.93"},
+                        {"stockCode": "2382", "stockName": "廣達", "volumn": "176,721,000", "weights": "8.68"},
+                    ],
+                },
+            },
+        )
+
+        self.assertEqual(audit.source_access_status, SOURCE_STATUS_AVAILABLE)
+        self.assertEqual(audit.parser_status, PARSER_STATUS_PARSED)
+        self.assertEqual(audit.raw_constituent_count, 2)
+        self.assertEqual(audit.dedup_constituent_count, 2)
+        self.assertEqual(audit.official_expected_count, 2)
+        self.assertEqual(audit.completeness_status, PARSED_COMPLETE)
+
     def test_00919_visible_ten_rows_are_parser_incomplete_until_expanded_rows_exist(self):
         source = predefined_etf_sources()[6]
         html = """
@@ -554,6 +625,39 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(audit.full_row_count, 10)
         self.assertEqual(audit.dedup_constituent_count, 10)
         self.assertEqual(audit.completeness_status, PARSED_INCOMPLETE)
+
+    def test_00919_official_buyback_api_payload_overrides_visible_preview(self):
+        source = predefined_etf_sources()[6]
+        html = """
+        <html><body>
+          <div id="buyback-stocks-section">
+            <div class="tr"><div>股票代號</div><div>股票名稱</div><div>持股權重(%)</div><div>股數</div></div>
+            <div class="tr"><div>2881</div><div>富邦金</div><div>14.29%</div><div>1</div></div>
+          </div>
+          <button>展開全部</button>
+        </body></html>
+        """
+        stocks = [
+            {"stocNo": f"{code:04d}", "stocName": f"股票{code}", "weightRound": 1.0}
+            for code in range(1101, 1112)
+        ]
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url,
+                "text": html,
+                "capital_buyback_json": {"code": 200, "data": {"stocks": stocks}},
+            },
+        )
+
+        self.assertEqual(audit.parser_status, PARSER_STATUS_PARSED)
+        self.assertEqual(audit.raw_dom_stock_row_count, 1)
+        self.assertEqual(audit.full_row_count, 11)
+        self.assertEqual(audit.dedup_constituent_count, 11)
+        self.assertEqual(audit.official_expected_count, 11)
+        self.assertEqual(audit.completeness_status, PARSED_COMPLETE)
 
     def test_final_frozen_universe_requires_all_eight_sources_complete(self):
         complete_audit = OfficialSourceAccessAudit(

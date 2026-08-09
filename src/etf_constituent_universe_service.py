@@ -710,19 +710,75 @@ def audit_official_source_access(
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
+        elif (
+            source.etf_code == "00878"
+            and (fetcher is None or response.get("cathay_stock_list_json") is not None)
+            and (
+            constituent_table_available or "查看基金持股權重" in html or "持股權重" in html
+            )
+        ):
+            try:
+                stock_payload = response.get("cathay_stock_list_json")
+                stock_holdings_date = holdings_date
+                if stock_payload is None and fetcher is None:
+                    stock_payload, stock_holdings_date = _fetch_cathay_stock_list_json()
+                if stock_payload is None:
+                    raise ETFConstituentUniverseError("Cathay stock holdings endpoint payload is not available.")
+                records = parse_cathay_stock_list_json(
+                    stock_payload,
+                    etf_code=source.etf_code,
+                    holdings_date=stock_holdings_date,
+                    source_url="https://cwapi.cathaysite.com.tw/api/ETF/GetETFDetailStockList",
+                )
+                parser_status = PARSER_STATUS_PARSED
+                raw_count = len(records)
+                raw_dom_count = 10 if "查看全部" in html else raw_count
+                full_row_count = raw_count
+                dedup_count = _dedup_stock_count(records)
+                official_expected_count = raw_count
+                holdings_date = stock_holdings_date
+                source_semantics = (
+                    "Official Cathay ETF detail stock holdings API; SearchDate is taken from "
+                    "the official ETF assets preDate."
+                )
+            except Exception as exc:
+                parser_status = PARSER_STATUS_FAILED
+                parser_error = f"{type(exc).__name__}: {exc}"
         elif source.etf_code == "00919" and constituent_table_available:
             try:
-                records, raw_dom_count = parse_capital_portfolio_page(
-                    html,
-                    etf_code=source.etf_code,
-                    holdings_date=holdings_date,
-                    source_url=response["final_url"],
-                )
+                capital_payload = response.get("capital_buyback_json")
+                try:
+                    _, raw_dom_count = parse_capital_portfolio_page(
+                        html,
+                        etf_code=source.etf_code,
+                        holdings_date=holdings_date,
+                        source_url=response["final_url"],
+                    )
+                except Exception:
+                    raw_dom_count = 0
+                if capital_payload is None and fetcher is None:
+                    capital_payload = _fetch_capital_buyback_json()
+                if capital_payload is None:
+                    records, raw_dom_count = parse_capital_portfolio_page(
+                        html,
+                        etf_code=source.etf_code,
+                        holdings_date=holdings_date,
+                        source_url=response["final_url"],
+                    )
+                    source_semantics = "Official Capital portfolio page visible stock rows."
+                else:
+                    records = parse_capital_buyback_json(
+                        capital_payload,
+                        etf_code=source.etf_code,
+                        holdings_date=holdings_date,
+                        source_url="https://www.capitalfund.com.tw/CFWeb/api/etf/buyback",
+                    )
+                    official_expected_count = len(records)
+                    source_semantics = "Official Capital CFWeb buyback API full stock holdings list."
                 parser_status = PARSER_STATUS_PARSED
                 raw_count = len(records)
                 full_row_count = raw_count
                 dedup_count = _dedup_stock_count(records)
-                source_semantics = "Official Capital portfolio page visible stock rows."
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
@@ -946,6 +1002,81 @@ def parse_capital_portfolio_page(
     if not by_code:
         raise ETFConstituentUniverseError(f"No Capital stock rows found for {etf_code}.")
     return tuple(by_code[code] for code in sorted(by_code)), raw_dom_rows
+
+
+def parse_capital_buyback_json(
+    payload: str | dict[str, object],
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[ETFConstituentRecord, ...]:
+    data = json.loads(payload) if isinstance(payload, str) else payload
+    if data.get("code") != 200:
+        raise ETFConstituentUniverseError(f"Capital buyback API did not return code=200 for {etf_code}.")
+    body = data.get("data")
+    if not isinstance(body, dict):
+        raise ETFConstituentUniverseError(f"Capital buyback API did not return data object for {etf_code}.")
+    stocks = body.get("stocks")
+    if not isinstance(stocks, list):
+        raise ETFConstituentUniverseError(f"Capital buyback API did not return stocks list for {etf_code}.")
+    records = []
+    for row in stocks:
+        if not isinstance(row, dict):
+            continue
+        stock_code = str(row.get("stocNo") or "").strip()
+        if not _is_four_digit_code(stock_code):
+            continue
+        records.append(
+            ETFConstituentRecord(
+                etf_code=etf_code,
+                stock_code=stock_code,
+                stock_name=str(row.get("stocName") or "").strip(),
+                raw_market_info=None,
+                raw_weight=_coerce_float(row.get("weightRound", row.get("weight"))),
+                holdings_date=holdings_date,
+                source_url=source_url,
+            )
+        )
+    if not records:
+        raise ETFConstituentUniverseError(f"No Capital buyback stock rows found for {etf_code}.")
+    return tuple(records)
+
+
+def parse_cathay_stock_list_json(
+    payload: str | dict[str, object],
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[ETFConstituentRecord, ...]:
+    data = json.loads(payload) if isinstance(payload, str) else payload
+    if data.get("returnCode") != "2000":
+        raise ETFConstituentUniverseError(f"Cathay stock list API did not return 2000 for {etf_code}.")
+    rows = data.get("result")
+    if not isinstance(rows, list):
+        raise ETFConstituentUniverseError(f"Cathay stock list API did not return result list for {etf_code}.")
+    records = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        stock_code = str(row.get("stockCode") or "").strip()
+        if not _is_four_digit_code(stock_code):
+            continue
+        records.append(
+            ETFConstituentRecord(
+                etf_code=etf_code,
+                stock_code=stock_code,
+                stock_name=str(row.get("stockName") or "").strip(),
+                raw_market_info=None,
+                raw_weight=_parse_percent(row.get("weights")),
+                holdings_date=holdings_date,
+                source_url=source_url,
+            )
+        )
+    if not records:
+        raise ETFConstituentUniverseError(f"No Cathay stock rows found for {etf_code}.")
+    return tuple(records)
 
 
 def parse_taishin_holdings_page(
@@ -1268,6 +1399,97 @@ def _verified_curl_command(url: str) -> list[str]:
     if any(arg in {"-k", "--insecure"} for arg in command):
         raise ETFConstituentUniverseError("Verified curl transport must not disable TLS verification.")
     return command
+
+
+def _fetch_cathay_stock_list_json() -> tuple[dict[str, object], date | None]:
+    assets_url = "https://cwapi.cathaysite.com.tw/api/ETF/GetETFAssets"
+    stock_url = "https://cwapi.cathaysite.com.tw/api/ETF/GetETFDetailStockList"
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.cathaysite.com.tw/ETF/detail/ECN?tab=etf3",
+        "Accept": "application/json, text/plain, */*",
+    }
+    assets = _get_official_json(
+        assets_url,
+        params={"FundCode": "CN", "status": 1},
+        headers=headers,
+    )
+    pre_date_text = None
+    if isinstance(assets.get("result"), dict):
+        pre_date_text = assets["result"].get("preDate")
+    search_date = _date_from_slash_text(pre_date_text)
+    if search_date is None:
+        raise ETFConstituentUniverseError("Cathay ETF assets API did not return preDate for 00878.")
+    stock_payload = _get_official_json(
+        stock_url,
+        params={"FundCode": "CN", "SearchDate": search_date.isoformat(), "status": 1},
+        headers=headers,
+    )
+    return stock_payload, search_date
+
+
+def _fetch_capital_buyback_json() -> dict[str, object]:
+    return _post_official_json(
+        "https://www.capitalfund.com.tw/CFWeb/api/etf/buyback",
+        payload={"fundId": 195},
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://www.capitalfund.com.tw/etf/product/detail/195/portfolio",
+            "Origin": "https://www.capitalfund.com.tw",
+            "Accept": "application/json, text/plain, */*",
+        },
+    )
+
+
+def _get_official_json(
+    url: str,
+    *,
+    params: dict[str, object],
+    headers: dict[str, str],
+) -> dict[str, object]:
+    import requests
+
+    response = requests.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=20,
+        verify=True,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _post_official_json(
+    url: str,
+    *,
+    payload: dict[str, object],
+    headers: dict[str, str],
+) -> dict[str, object]:
+    import requests
+
+    request_headers = dict(headers)
+    request_headers["Content-Type"] = "application/json;charset=UTF-8"
+    response = requests.post(
+        url,
+        json=payload,
+        headers=request_headers,
+        timeout=20,
+        verify=True,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _date_from_slash_text(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    match = re.search(r"(20\d{2})[/-](\d{1,2})[/-](\d{1,2})", value)
+    if match is None:
+        return None
+    return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
 
 
 def _extract_title(html: str) -> str | None:
