@@ -29,10 +29,10 @@ Canonical official source URLs:
 
 | ETF | Canonical official URL |
 | --- | --- |
-| `0050` | `https://www.yuantaetfs.com/product/detail/0050/ratio` |
-| `0051` | `https://www.yuantaetfs.com/product/detail/0051/ratio` |
+| `0050` | `https://www.yuantaetfs.com/tradeInfo/pcf/0050` |
+| `0051` | `https://www.yuantaetfs.com/tradeInfo/pcf/0051` |
 | `0052` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052` |
-| `0056` | `https://www.yuantaetfs.com/product/detail/0056/ratio` |
+| `0056` | `https://www.yuantaetfs.com/tradeInfo/pcf/0056` |
 | `00733` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=00733` |
 | `00878` | `https://www.cathaysite.com.tw/ETF/purchase?code=CN&name=Cathay+MSCI+Taiwan+ESG+Sustainability+High+Dividend+Yield+ETF` |
 | `00919` | `https://www.capitalfund.com.tw/etf/product/detail/195/portfolio` |
@@ -55,7 +55,41 @@ TLS verification must stay enabled. Do not use `verify=False`, unverified HTTPS 
 
 For Yuanta official pages, Python strict TLS can fail on the local Python/OpenSSL stack while system `curl` validates the same canonical `yuantaetfs.com` pages. The service may use system `curl` as `TRANSPORT_CURL_VERIFIED` only with normal certificate verification enabled. It must not pass `-k`, `--insecure`, or any equivalent TLS bypass.
 
-Each ETF keeps independent source and parser status. Partial parser recovery can be audited, but the formal `2026-08-current-etf-constituent-v1` universe remains `NOT_FINALIZED` until all 8 predefined ETF sources are `PARSED`.
+Each ETF keeps independent source, parser, and completeness status. Partial parser recovery can be audited, but the formal `2026-08-current-etf-constituent-v1` universe remains `NOT_FINALIZED` until all 8 predefined ETF sources are `PARSED_COMPLETE`.
+
+## Phase 3 Completeness Gate
+
+Parser row count is not enough to finalize a universe. A source can be reachable and `PARSED` while still being incomplete because it only exposes a collapsed preview table.
+
+Completeness status values:
+
+- `COMPLETENESS_UNKNOWN`
+- `PARSED_INCOMPLETE`
+- `PARSED_COMPLETE`
+
+Current Phase 3 audit rules:
+
+- Yuanta `0050`, `0051`, and `0056` use official PCF pages, not the ratio page top-5 preview. The PCF Nuxt payload provides full `FundWeights.StockWeights`, cross-checked against `InKind.FundComposition`.
+- Yuanta expected counts are audit metadata: `0050 = 50`, `0051 = 100`, `0056 = 50`. Parsed count must meet the expected count before the source is complete.
+- Fubon `0052` and `00733` use the official asset-page stock holdings table.
+- Taishin `00936` uses the official detail-page stock holdings table.
+- Capital `00919` remains incomplete if only the initial 10 visible portfolio rows are parsed while the page exposes `展開全部`.
+- Cathay `00878` remains `SOURCE_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED` until the official holdings endpoint or downloadable source is resolved.
+
+Observed live audit on 2026-08-09:
+
+| ETF | Holdings date | Visible rows | Full parsed rows | Dedup count | Expected count | Completeness |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `0050` | `2026-08-07` | 5 | 50 | 50 | 50 | `PARSED_COMPLETE` |
+| `0051` | `2026-08-07` | 5 | 100 | 100 | 100 | `PARSED_COMPLETE` |
+| `0052` | `2026-08-07` | 73 | 73 | 72 | N/A | `PARSED_COMPLETE` |
+| `0056` | `2026-08-07` | 5 | 50 | 50 | 50 | `PARSED_COMPLETE` |
+| `00733` | `2026-08-07` | 52 | 52 | 51 | N/A | `PARSED_COMPLETE` |
+| `00878` | `2026-08-10` | 0 | 0 | 0 | N/A | `COMPLETENESS_UNKNOWN` |
+| `00919` | N/A | 10 | 10 | 10 | N/A | `PARSED_INCOMPLETE` |
+| `00936` | `2026-07-31` | 30 | 30 | 30 | N/A | `PARSED_COMPLETE` |
+
+Finalization audit result: `6 / 8` sources are `PARSED_COMPLETE`; `00919` is incomplete and `00878` is unresolved. Therefore the universe remains `NOT_FINALIZED`, and no final frozen constituent universe is created.
 
 ## Source Metadata
 
@@ -72,6 +106,13 @@ Each ETF source stores:
 - `raw_constituent_count`
 - `source_status`
 - `unavailable_reason`
+- `parser_status`
+- `completeness_status`
+- `official_expected_count`
+- `visible_preview_count`
+- `full_row_count`
+- `dedup_constituent_count`
+- `source_semantics`
 
 The final stock list alone is not sufficient research metadata.
 

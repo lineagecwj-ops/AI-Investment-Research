@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sqlite3
 import subprocess
@@ -29,6 +30,10 @@ PARSER_STATUS_FAILED = "PARSER_FAILED"
 TRANSPORT_REQUESTS_VERIFIED = "TRANSPORT_REQUESTS_VERIFIED"
 TRANSPORT_CURL_VERIFIED = "TRANSPORT_CURL_VERIFIED"
 UNIVERSE_STATUS_NOT_FINALIZED = "NOT_FINALIZED"
+UNIVERSE_STATUS_FINALIZED = "FINALIZED"
+COMPLETENESS_UNKNOWN = "COMPLETENESS_UNKNOWN"
+PARSED_INCOMPLETE = "PARSED_INCOMPLETE"
+PARSED_COMPLETE = "PARSED_COMPLETE"
 SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS = "issuer_official_holdings"
 SOURCE_TYPE_ISSUER_OFFICIAL_PCF = "issuer_official_pcf"
 
@@ -87,6 +92,7 @@ _TWSE_CODES = frozenset(
 
 _TPEX_CODES = frozenset({"6488"})
 _NON_STOCK_IDENTIFIERS = frozenset({"CASH", "TX", "NYF", "ETF", "BOND", "FUTURE"})
+_OFFICIAL_EXPECTED_CONSTITUENT_COUNTS = MappingProxyType({"0050": 50, "0051": 100, "0056": 50})
 
 
 class ETFConstituentUniverseError(Exception):
@@ -122,6 +128,18 @@ class ETFUniverseSource:
 
     parser_error: str | None = None
 
+    completeness_status: str = COMPLETENESS_UNKNOWN
+
+    official_expected_count: int | None = None
+
+    visible_preview_count: int = 0
+
+    full_row_count: int = 0
+
+    dedup_constituent_count: int = 0
+
+    source_semantics: str | None = None
+
 
 @dataclass(frozen=True)
 class OfficialSourceAccessAudit:
@@ -151,6 +169,16 @@ class OfficialSourceAccessAudit:
     transport_method: str | None = None
 
     raw_dom_stock_row_count: int = 0
+
+    full_row_count: int = 0
+
+    dedup_constituent_count: int = 0
+
+    official_expected_count: int | None = None
+
+    completeness_status: str = COMPLETENESS_UNKNOWN
+
+    source_semantics: str | None = None
 
     error: str | None = None
 
@@ -260,6 +288,22 @@ class PartialParsedUniverseAudit:
 
 
 @dataclass(frozen=True)
+class ETFUniverseFinalizationAudit:
+
+    universe_version: str
+
+    universe_status: str
+
+    complete_source_count: int
+
+    incomplete_source_count: int
+
+    unresolved_source_count: int
+
+    blocker: str | None
+
+
+@dataclass(frozen=True)
 class SymbolCoverageAudit:
 
     symbol: str
@@ -315,16 +359,16 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="元大台灣50",
         issuer="元大投信",
         category="大型權值",
-        official_source_url="https://www.yuantaetfs.com/product/detail/0050/ratio",
-        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
+        official_source_url="https://www.yuantaetfs.com/tradeInfo/pcf/0050",
+        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_PCF,
     ),
     ETFUniverseSource(
         etf_code="0051",
         etf_name="元大中型100",
         issuer="元大投信",
         category="中型股 breadth",
-        official_source_url="https://www.yuantaetfs.com/product/detail/0051/ratio",
-        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
+        official_source_url="https://www.yuantaetfs.com/tradeInfo/pcf/0051",
+        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_PCF,
     ),
     ETFUniverseSource(
         etf_code="0052",
@@ -339,8 +383,8 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="元大高股息",
         issuer="元大投信",
         category="高股息",
-        official_source_url="https://www.yuantaetfs.com/product/detail/0056/ratio",
-        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
+        official_source_url="https://www.yuantaetfs.com/tradeInfo/pcf/0056",
+        source_type=SOURCE_TYPE_ISSUER_OFFICIAL_PCF,
     ),
     ETFUniverseSource(
         etf_code="00733",
@@ -405,6 +449,7 @@ def mark_sources_unavailable(
             raw_constituent_count=0,
             unavailable_reason=reasons.get(source.etf_code, "Official source was not available in this run."),
             parser_status=PARSER_STATUS_NOT_RUN,
+            completeness_status=COMPLETENESS_UNKNOWN,
         )
         for source in PREDEFINED_ETF_SOURCES
     )
@@ -514,6 +559,36 @@ def build_source_unavailable_universe(
     )
 
 
+def audit_etf_universe_finalization(
+    audits: tuple[OfficialSourceAccessAudit, ...],
+    *,
+    required_source_count: int = 8,
+) -> ETFUniverseFinalizationAudit:
+    complete = sum(1 for audit in audits if audit.completeness_status == PARSED_COMPLETE)
+    incomplete = sum(1 for audit in audits if audit.completeness_status == PARSED_INCOMPLETE)
+    unresolved = sum(
+        1
+        for audit in audits
+        if audit.completeness_status != PARSED_COMPLETE and audit.completeness_status != PARSED_INCOMPLETE
+    )
+    blocker = None
+    status = UNIVERSE_STATUS_FINALIZED
+    if complete != required_source_count or len(audits) != required_source_count:
+        status = UNIVERSE_STATUS_NOT_FINALIZED
+        blocker = (
+            f"Final frozen ETF universe requires {required_source_count}/{required_source_count} "
+            f"PARSED_COMPLETE sources; got {complete}/{required_source_count}."
+        )
+    return ETFUniverseFinalizationAudit(
+        universe_version=UNIVERSE_VERSION,
+        universe_status=status,
+        complete_source_count=complete,
+        incomplete_source_count=incomplete,
+        unresolved_source_count=unresolved,
+        blocker=blocker,
+    )
+
+
 def normalize_constituent_record(
     record: ETFConstituentRecord,
 ) -> ETFConstituentMembership | ETFConstituentExclusion:
@@ -592,9 +667,13 @@ def audit_official_source_access(
         parser_error = None
         raw_count = 0
         raw_dom_count = 0
+        full_row_count = 0
+        dedup_count = 0
+        official_expected_count = _OFFICIAL_EXPECTED_CONSTITUENT_COUNTS.get(source.etf_code)
+        source_semantics = None
         if source.etf_code in {"0050", "0051", "0056"} and constituent_table_available:
             try:
-                records = parse_yuanta_ratio_page(
+                records, pcf_stock_count = parse_yuanta_pcf_page(
                     html,
                     etf_code=source.etf_code,
                     holdings_date=holdings_date,
@@ -602,7 +681,15 @@ def audit_official_source_access(
                 )
                 parser_status = PARSER_STATUS_PARSED
                 raw_count = len(records)
-                raw_dom_count = len(records)
+                raw_dom_count = _count_yuanta_visible_pcf_rows(html)
+                full_row_count = raw_count
+                dedup_count = _dedup_stock_count(records)
+                source_semantics = (
+                    "Official Yuanta PCF payload; FundWeights stock set is cross-checked "
+                    "against InKind FundComposition stock basket."
+                )
+                if pcf_stock_count and pcf_stock_count != raw_count:
+                    official_expected_count = pcf_stock_count
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
@@ -617,6 +704,9 @@ def audit_official_source_access(
                 parser_status = PARSER_STATUS_PARSED
                 raw_count = len(records)
                 raw_dom_count = len(records)
+                full_row_count = raw_count
+                dedup_count = _dedup_stock_count(records)
+                source_semantics = "Official Fubon asset page stock holdings table."
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
@@ -630,6 +720,9 @@ def audit_official_source_access(
                 )
                 parser_status = PARSER_STATUS_PARSED
                 raw_count = len(records)
+                full_row_count = raw_count
+                dedup_count = _dedup_stock_count(records)
+                source_semantics = "Official Capital portfolio page visible stock rows."
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
@@ -644,12 +737,22 @@ def audit_official_source_access(
                 parser_status = PARSER_STATUS_PARSED
                 raw_count = len(records)
                 raw_dom_count = len(records)
+                full_row_count = raw_count
+                dedup_count = _dedup_stock_count(records)
+                source_semantics = "Official Taishin detail page stock holdings table."
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
         source_access_status = SOURCE_STATUS_AVAILABLE
         if source.etf_code == "00878" and parser_status != PARSER_STATUS_PARSED:
             source_access_status = SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED
+        completeness_status = _completeness_status(
+            parser_status=parser_status,
+            parsed_count=dedup_count or raw_count,
+            official_expected_count=official_expected_count,
+            raw_dom_count=raw_dom_count,
+            source=source,
+        )
         return OfficialSourceAccessAudit(
             etf_code=source.etf_code,
             canonical_url=source.official_source_url,
@@ -664,6 +767,11 @@ def audit_official_source_access(
             raw_constituent_count=raw_count,
             transport_method=response.get("transport_method"),
             raw_dom_stock_row_count=raw_dom_count,
+            full_row_count=full_row_count,
+            dedup_constituent_count=dedup_count,
+            official_expected_count=official_expected_count,
+            completeness_status=completeness_status,
+            source_semantics=source_semantics,
             error=parser_error,
         )
     except Exception as exc:
@@ -728,6 +836,39 @@ def parse_yuanta_ratio_page(
     if not records:
         raise ETFConstituentUniverseError(f"No Yuanta stock rows found for {etf_code}.")
     return tuple(records)
+
+
+def parse_yuanta_pcf_page(
+    html: str,
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[tuple[ETFConstituentRecord, ...], int]:
+    stock_weights = _extract_yuanta_nuxt_array(html, ("pcfData", "FundWeights", "StockWeights"))
+    fund_composition = _extract_yuanta_nuxt_array(html, ("pcfData", "InKind", "FundComposition"))
+    if not stock_weights:
+        raise ETFConstituentUniverseError(f"No Yuanta PCF StockWeights payload found for {etf_code}.")
+
+    records = []
+    for row in stock_weights:
+        stock_code = str(row.get("code") or "").strip()
+        if not _is_four_digit_code(stock_code):
+            continue
+        records.append(
+            ETFConstituentRecord(
+                etf_code=etf_code,
+                stock_code=stock_code,
+                stock_name=str(row.get("name") or "").strip(),
+                raw_market_info=None,
+                raw_weight=_coerce_float(row.get("weights")),
+                holdings_date=holdings_date,
+                source_url=source_url,
+            )
+        )
+    if not records:
+        raise ETFConstituentUniverseError(f"No Yuanta PCF stock rows found for {etf_code}.")
+    return tuple(records), len(fund_composition)
 
 
 def parse_fubon_asset_page(
@@ -1164,10 +1305,207 @@ def _extract_holdings_date(html: str) -> date | None:
 def _has_constituent_table(html: str) -> bool:
     return (
         ("股票代碼" in html and "股票名稱" in html and "權重" in html)
+        or ("股票實物申贖" in html and "股票代碼" in html and "股票名稱" in html)
         or ("商品代碼" in html and "商品名稱" in html and "商品權重" in html)
         or ("股票代號" in html and "股票名稱" in html and "持股權重" in html)
         or ("代號" in html and "名稱" in html and "持股權重" in html)
     )
+
+
+def _completeness_status(
+    *,
+    parser_status: str,
+    parsed_count: int,
+    official_expected_count: int | None,
+    raw_dom_count: int,
+    source: ETFUniverseSource,
+) -> str:
+    if parser_status != PARSER_STATUS_PARSED:
+        return COMPLETENESS_UNKNOWN
+    if official_expected_count is not None:
+        return PARSED_COMPLETE if parsed_count >= official_expected_count else PARSED_INCOMPLETE
+    if source.etf_code == "00919" and parsed_count <= 10 and raw_dom_count <= 10:
+        return PARSED_INCOMPLETE
+    if source.etf_code == "00878":
+        return COMPLETENESS_UNKNOWN
+    return PARSED_COMPLETE
+
+
+def _count_yuanta_visible_pcf_rows(html: str) -> int:
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        title = soup.find(lambda tag: tag.name == "h3" and "股票實物申贖" in tag.get_text(" ", strip=True))
+        if title is None:
+            return 0
+        count = 0
+        for row in title.find_all_next("div", class_="tr"):
+            text = row.get_text(" ", strip=True)
+            if "Notice" in text:
+                break
+            cells = row.find_all("div", recursive=False)
+            if cells and _raw_taiwan_code(cells[0].get_text(" ", strip=True)):
+                count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def _dedup_stock_count(records: tuple[ETFConstituentRecord, ...]) -> int:
+    return len({record.stock_code for record in records if _is_four_digit_code(record.stock_code)})
+
+
+def _extract_yuanta_nuxt_array(html: str, path_markers: tuple[str, ...]) -> tuple[dict[str, object], ...]:
+    script_marker = "window.__NUXT__="
+    script_start = html.find(script_marker)
+    if script_start < 0:
+        return tuple()
+    script_end = html.find("</script>", script_start)
+    if script_end < 0:
+        return tuple()
+    script = html[script_start + len(script_marker) : script_end].strip()
+    header_match = re.search(r"^\(function\((?P<params>[^)]*)\)\{", script, re.S)
+    call_index = script.rfind("}(")
+    call_offset = 2
+    if call_index < 0:
+        call_index = script.rfind("})(")
+        call_offset = 3
+    if header_match is None or call_index < 0:
+        return tuple()
+    args_text = script[call_index + call_offset :]
+    if args_text.endswith(");"):
+        args_text = args_text[:-2]
+    if args_text.endswith(")"):
+        args_text = args_text[:-1]
+    variable_map = _yuanta_nuxt_variable_map(
+        header_match.group("params"),
+        args_text,
+    )
+    body = script
+    marker_index = body.find(path_markers[-1] + ":[")
+    if marker_index < 0:
+        return tuple()
+    array_start = body.find("[", marker_index)
+    array_text = _balanced_segment(body, array_start, "[", "]")
+    if not array_text:
+        return tuple()
+    rows = []
+    for item_text in _split_top_level(array_text[1:-1], ","):
+        item_text = item_text.strip()
+        if not item_text.startswith("{"):
+            continue
+        rows.append(_parse_yuanta_object_literal(item_text, variable_map))
+    return tuple(rows)
+
+
+def _yuanta_nuxt_variable_map(params_text: str, args_text: str) -> dict[str, object]:
+    params = [param.strip() for param in params_text.split(",") if param.strip()]
+    args = _split_top_level(args_text, ",")
+    values = {}
+    for param, raw_value in zip(params, args, strict=False):
+        raw_value = raw_value.strip()
+        if raw_value == "null":
+            values[param] = None
+        elif raw_value == "true":
+            values[param] = True
+        elif raw_value == "false":
+            values[param] = False
+        elif re.fullmatch(r"-?(?:\d+(?:\.\d+)?|\.\d+)", raw_value):
+            values[param] = float(raw_value) if "." in raw_value else int(raw_value)
+        elif raw_value.startswith('"') and raw_value.endswith('"'):
+            values[param] = json.loads(raw_value)
+    return values
+
+
+def _parse_yuanta_object_literal(text: str, variable_map: dict[str, object]) -> dict[str, object]:
+    body = text.strip()[1:-1]
+    parsed = {}
+    for item in _split_top_level(body, ","):
+        if ":" not in item:
+            continue
+        key, raw_value = item.split(":", 1)
+        parsed[key.strip()] = _resolve_yuanta_value(raw_value.strip(), variable_map)
+    return parsed
+
+
+def _resolve_yuanta_value(raw_value: str, variable_map: dict[str, object]) -> object:
+    if raw_value in variable_map:
+        return variable_map[raw_value]
+    if raw_value == "null":
+        return None
+    if raw_value == "true":
+        return True
+    if raw_value == "false":
+        return False
+    if re.fullmatch(r"-?(?:\d+(?:\.\d+)?|\.\d+)", raw_value):
+        return float(raw_value) if "." in raw_value else int(raw_value)
+    if raw_value.startswith('"') and raw_value.endswith('"'):
+        return json.loads(raw_value)
+    return raw_value
+
+
+def _balanced_segment(text: str, start: int, opener: str, closer: str) -> str:
+    if start < 0 or start >= len(text) or text[start] != opener:
+        return ""
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return ""
+
+
+def _split_top_level(text: str, separator: str) -> list[str]:
+    parts = []
+    start = 0
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, char in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "[{(":
+            depth += 1
+        elif char in "]})":
+            depth -= 1
+        elif char == separator and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
+
+
+def _coerce_float(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return _parse_percent(str(value))
 
 
 def _parse_percent(value: str) -> float | None:
