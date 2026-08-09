@@ -237,6 +237,18 @@ SWING_TECHNICAL_DETAIL_VIEW_REQUIRED_FIELDS = (
 SWING_SCANNER_RESULT_REQUIRED_FIELDS = (
     "current_signal_details",
 )
+HISTORICAL_CONDITION_DASHBOARD_REQUIRED_ATTRIBUTES = (
+    "HISTORICAL_CONDITION_DASHBOARD_TITLE",
+    "HISTORICAL_CONDITION_DASHBOARD_CAPTION",
+    "HISTORICAL_CONDITION_DASHBOARD_EXPLANATION",
+    "HISTORICAL_CONDITION_DASHBOARD_SAFETY_NOTE",
+    "HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL",
+    "HISTORICAL_CONDITION_DEFAULT_SYMBOLS",
+    "HISTORICAL_CONDITION_STALE_RESULT_MESSAGE",
+    "build_historical_condition_dashboard_fingerprint",
+    "historical_condition_dashboard_result_is_stale",
+    "build_historical_condition_dashboard_view",
+)
 
 
 def historical_case_status_filter_label(option: str) -> str:
@@ -1445,6 +1457,7 @@ def build_historical_condition_dashboard_payload(
     start_date: date,
     end_date: date,
 ) -> dict:
+    ensure_historical_condition_dashboard_contract()
     normalized_symbols = tuple(dict.fromkeys(normalize_stock_symbol(symbol) for symbol in symbols))
     prepared_series_by_symbol = {}
     technical_series_by_symbol = {}
@@ -1614,7 +1627,28 @@ def build_oos_validation_result(
     }
 
 
+def ensure_historical_condition_dashboard_contract() -> None:
+    global swing_dashboard
+    if all(
+        hasattr(swing_dashboard, attribute)
+        for attribute in HISTORICAL_CONDITION_DASHBOARD_REQUIRED_ATTRIBUTES
+    ):
+        return
+    swing_dashboard = importlib.reload(swing_dashboard)
+    missing = [
+        attribute
+        for attribute in HISTORICAL_CONDITION_DASHBOARD_REQUIRED_ATTRIBUTES
+        if not hasattr(swing_dashboard, attribute)
+    ]
+    if missing:
+        raise AttributeError(
+            "swing_research_dashboard missing historical condition dashboard attributes: "
+            + ", ".join(missing)
+        )
+
+
 def render_historical_condition_dashboard() -> None:
+    ensure_historical_condition_dashboard_contract()
     st.markdown(f"### {swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_TITLE}")
     st.caption(swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_CAPTION)
     st.write(swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_EXPLANATION)

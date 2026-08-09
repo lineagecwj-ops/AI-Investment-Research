@@ -6,6 +6,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
@@ -89,6 +90,44 @@ def historical_condition_dashboard_app():
     app_module.render_historical_condition_dashboard()
 
 
+def stale_historical_condition_dashboard_module_app():
+    import importlib
+    import streamlit as st
+    import app as app_module
+    import swing_research_dashboard
+    from tests.test_swing_research_dashboard import HistoricalConditionDashboardPresentationTestCase
+
+    case = HistoricalConditionDashboardPresentationTestCase()
+    diagnostics_result = case.diagnostics_result()
+    comparison_result = case.comparison_result()
+    fingerprint = app_module.swing_dashboard.build_historical_condition_dashboard_fingerprint(
+        symbols=("2330.TW", "0050.TW", "2337.TW", "2404.TW", "2454.TW"),
+        start_date=diagnostics_result.config.start_date,
+        end_date=diagnostics_result.config.end_date,
+        signal_id=diagnostics_result.config.signal_definition.id,
+        outcome_id=comparison_result.config.outcome_definition.id,
+        warmup_trading_bars=comparison_result.config.warmup_trading_bars,
+        outcome_horizon_bars=comparison_result.config.outcome_definition.horizon_bars,
+    )
+    st.session_state["historical_condition_dashboard_payload"] = {
+        "diagnostics_result": diagnostics_result,
+        "outcome_comparison_result": comparison_result,
+        "fingerprint": fingerprint,
+        "symbols": ("2330.TW",),
+        "start_date": diagnostics_result.config.start_date,
+        "end_date": diagnostics_result.config.end_date,
+    }
+    st.session_state["historical_condition_dashboard_fingerprint"] = fingerprint
+    st.session_state["historical_condition_dashboard_last_error"] = None
+    st.session_state["historical_condition_dashboard_error_details"] = None
+    try:
+        delattr(swing_research_dashboard, "HISTORICAL_CONDITION_DASHBOARD_TITLE")
+        app_module.swing_dashboard = swing_research_dashboard
+        app_module.render_historical_condition_dashboard()
+    finally:
+        app_module.swing_dashboard = importlib.reload(swing_research_dashboard)
+
+
 def stale_detail_view_schema_app():
     import app as app_module
     import importlib
@@ -160,6 +199,70 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         self.assertIn("哪些條件最常造成差異", text)
         self.assertIn("哪些 V1 條件本來就比較難符合", text)
         self.assertGreaterEqual(len(at.dataframe), 3)
+
+    def test_historical_condition_dashboard_recovers_stale_module_during_render(self):
+        at = AppTest.from_function(stale_historical_condition_dashboard_module_app)
+
+        at.run(timeout=10)
+
+        text = " ".join(str(item.value) for item in at.markdown)
+        self.assertEqual(len(at.exception), 0)
+        self.assertIn("V1 歷史條件診斷", text)
+
+    def test_historical_condition_dashboard_contract_covers_renderer_references(self):
+        import app as app_module
+
+        source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        module = ast.parse(source)
+        function_names = {
+            "render_historical_condition_dashboard",
+            "build_historical_condition_dashboard_payload",
+        }
+        references = set()
+        for node in module.body:
+            if isinstance(node, ast.FunctionDef) and node.name in function_names:
+                references.update(
+                    child.attr
+                    for child in ast.walk(node)
+                    if isinstance(child, ast.Attribute)
+                    and isinstance(child.value, ast.Name)
+                    and child.value.id == "swing_dashboard"
+                )
+
+        self.assertTrue(
+            references.issubset(
+                set(app_module.HISTORICAL_CONDITION_DASHBOARD_REQUIRED_ATTRIBUTES)
+            )
+        )
+
+    def test_historical_condition_dashboard_contract_recovers_multiple_missing_attributes(self):
+        import app as app_module
+        import swing_research_dashboard
+
+        missing_attributes = (
+            "HISTORICAL_CONDITION_DASHBOARD_TITLE",
+            "build_historical_condition_dashboard_view",
+            "HISTORICAL_CONDITION_STALE_RESULT_MESSAGE",
+        )
+        try:
+            for attribute in missing_attributes:
+                delattr(swing_research_dashboard, attribute)
+            app_module.swing_dashboard = swing_research_dashboard
+
+            app_module.ensure_historical_condition_dashboard_contract()
+
+            for attribute in missing_attributes:
+                self.assertTrue(hasattr(app_module.swing_dashboard, attribute))
+        finally:
+            app_module.swing_dashboard = importlib.reload(swing_research_dashboard)
+
+    def test_historical_condition_dashboard_contract_does_not_reload_complete_module(self):
+        import app as app_module
+
+        with patch("app.importlib.reload") as reload_mock:
+            app_module.ensure_historical_condition_dashboard_contract()
+
+        reload_mock.assert_not_called()
 
     def test_detail_renderer_smoke_has_selector_table_and_chart(self):
         at = AppTest.from_function(app)
