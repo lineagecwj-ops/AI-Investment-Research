@@ -29,7 +29,7 @@
     "excluded_etf_securities": true,
     "excluded_non_stock": true,
     "excluded_unresolved_symbols": true,
-    "used_hhr_threshold_scanner_backtest_return": false
+    "selection_uses_research_outcomes": false
   },
   "price_semantics_contract": {
     "source": "Yahoo Finance via yfinance",

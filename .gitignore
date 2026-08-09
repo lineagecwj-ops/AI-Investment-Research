@@ -5,6 +5,7 @@
 __pycache__/
 *.pyc
 data/stocks.db
+data/backups/
 data/watchlist.json
 data/taiwan_company_names.json
 data/taiwan_company_summaries.json

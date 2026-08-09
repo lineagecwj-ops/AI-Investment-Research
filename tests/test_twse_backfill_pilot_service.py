@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -232,10 +233,44 @@ class TWSEBackfillPilotServiceTestCase(unittest.TestCase):
         self.assertEqual(tuple(row["candidate_index"] for row in manifest["selected"]), APPROVED_INDEXES)
         self.assertTrue(all(row["exchange"] == TWSE for row in manifest["selected"]))
         self.assertTrue(all(row["coverage_status"] == COVERAGE_MISSING_LOCAL for row in manifest["selected"]))
-        self.assertFalse(manifest["candidate_filters"]["used_hhr_threshold_scanner_backtest_return"])
+        self.assertFalse(manifest["candidate_filters"]["selection_uses_research_outcomes"])
         self.assertFalse(manifest["live_backfill_gate"]["db_write_performed"])
         self.assertFalse(manifest["live_backfill_gate"]["price_download_performed"])
         self.assertFalse(manifest["live_backfill_gate"]["threshold_research_performed"])
+
+    def test_manifest_contains_no_forbidden_research_result_wording(self):
+        manifest_text = MANIFEST_PATH.read_text().lower()
+        forbidden = (
+            "hhr",
+            "historical hit rate",
+            "threshold result",
+            "scanner result",
+            "backtest result",
+            "future outcome",
+            "recommendation",
+        )
+
+        self.assertFalse(any(term in manifest_text for term in forbidden))
+
+    def test_runtime_database_and_backup_paths_are_ignored(self):
+        result = subprocess.run(
+            (
+                "git",
+                "check-ignore",
+                "-v",
+                "data/stocks.db",
+                "data/backups/test.db",
+                "data/backups/",
+            ),
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("data/stocks.db", result.stdout)
+        self.assertIn("data/backups/test.db", result.stdout)
+        self.assertIn("data/backups/", result.stdout)
 
     def test_approved_selection_indexes_match_formula_for_candidate_count(self):
         self.assertEqual(equal_spaced_indexes(APPROVED_CANDIDATE_COUNT, PILOT_SYMBOL_COUNT), APPROVED_INDEXES)
