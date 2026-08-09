@@ -68,16 +68,24 @@ class UiTerminologyTestCase(unittest.TestCase):
 
     def test_diagnostic_labels_are_traditional_chinese(self):
         self.assertEqual(get_diagnostic_label("Historical Condition Diagnostics"), "V1 歷史條件診斷")
+        self.assertEqual(get_diagnostic_label("Historical Outcome Comparison"), "歷史後續結果比較")
         self.assertEqual(get_diagnostic_label("Match Count Distribution"), "歷史條件命中分布")
         self.assertEqual(get_diagnostic_label("Matched Conditions"), "符合條件數")
         self.assertEqual(get_diagnostic_label("Condition Pass Rate"), "單一條件通過率")
         self.assertEqual(get_diagnostic_label("Missing Condition"), "未符合條件")
         self.assertEqual(get_diagnostic_label("Most Common Missing Condition"), "最常缺少的條件")
         self.assertEqual(get_diagnostic_label("Condition Combination"), "條件組合")
+        self.assertEqual(get_diagnostic_label("4/5 Missing Condition Outcome"), "4/5 案例：缺少條件與歷史後續結果")
         self.assertEqual(get_diagnostic_label("Evaluated Observations"), "可評估歷史樣本")
         self.assertEqual(get_diagnostic_label("Not Evaluable"), "無法評估")
         self.assertEqual(get_diagnostic_label("Observation Count"), "歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Resolved Samples"), "已解析歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate"), "歷史命中率")
         self.assertEqual(get_diagnostic_label("Share"), "占可評估樣本比例")
+        self.assertEqual(get_diagnostic_label("HIT"), "達成研究目標")
+        self.assertEqual(get_diagnostic_label("MISS"), "未達成研究目標")
+        self.assertEqual(get_diagnostic_label("INCOMPLETE"), "後續資料尚不完整")
+        self.assertEqual(get_diagnostic_label("NOT_EVALUABLE"), "無法評估")
 
     def test_diagnostic_condition_primary_labels_hide_raw_metric_ids(self):
         labels = [
@@ -123,8 +131,20 @@ class UiTerminologyTestCase(unittest.TestCase):
             get_diagnostic_beginner_explanation("Historical Condition Diagnostics"),
         )
         self.assertIn(
+            "既定 20 個交易日研究期間內突破當時的前 60 日高點",
+            get_diagnostic_beginner_explanation("Historical Outcome Comparison"),
+        )
+        self.assertIn(
+            "不代表未來發生機率",
+            get_diagnostic_beginner_explanation("Historical Hit Rate"),
+        )
+        self.assertIn(
             "找出最常缺少的最後一項條件",
             get_diagnostic_beginner_explanation("Most Common Missing Condition"),
+        )
+        self.assertIn(
+            "不同缺失條件與後續歷史結果的差異",
+            get_diagnostic_beginner_explanation("4/5 Missing Condition Outcome"),
         )
         self.assertEqual(
             format_diagnostic_condition_labels(("volume_ratio_20", "rsi_14")),
