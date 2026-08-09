@@ -1,0 +1,94 @@
+{
+  "pilot_version": "2026-08-twse-backfill-pilot-v1",
+  "frozen_universe_version": "2026-08-current-etf-constituent-v1",
+  "created_at": "2026-08-09T12:00:00+00:00",
+  "retrieved_at": "2026-08-09T12:00:00+00:00",
+  "baseline_commit": "c4f64e2ae3fcb494154ec2b0d283929239ac2c19",
+  "candidate_count": 214,
+  "selected_count": 20,
+  "candidate_ordering": "numeric stock_code ascending",
+  "selection_formula": "round(i * (N - 1) / (K - 1)) for i = 0..19, with stable nearest-index dedup if rounding creates duplicates",
+  "candidate_checksum": "ebd2293e75861fd7dfc86e8f54c3efeb5d3b54f7347e42d82b77a8b9468657d0",
+  "universe_counts": {
+    "frozen_total": 224,
+    "twse": 218,
+    "tpex": 6,
+    "unknown_exchange": 0
+  },
+  "coverage_counts": {
+    "available_local": 4,
+    "missing_local": 220
+  },
+  "candidate_filters": {
+    "finalized_etf_frozen_universe": true,
+    "exchange": "TWSE",
+    "symbol_suffix": ".TW",
+    "coverage_status": "MISSING_LOCAL",
+    "excluded_available_local": true,
+    "excluded_tpex": true,
+    "excluded_etf_securities": true,
+    "excluded_non_stock": true,
+    "excluded_unresolved_symbols": true,
+    "used_hhr_threshold_scanner_backtest_return": false
+  },
+  "price_semantics_contract": {
+    "source": "Yahoo Finance via yfinance",
+    "auto_adjust": false,
+    "actions": true,
+    "db_columns": [
+      "symbol",
+      "trading_date",
+      "open",
+      "high",
+      "low",
+      "close",
+      "adjusted_close",
+      "volume",
+      "dividends",
+      "stock_splits",
+      "currency",
+      "fetched_at"
+    ],
+    "technical_analysis_close": "adjusted_close first, fallback raw close",
+    "missing_volume_policy": "do not coerce missing volume to 0"
+  },
+  "source_audit": [
+    {"etf": "0050", "holdings_date": "2026-08-07", "raw_rows": 50, "dedup_count": 50, "visible_rows": 5, "expected_count": 50, "completeness": "PARSED_COMPLETE"},
+    {"etf": "0051", "holdings_date": "2026-08-07", "raw_rows": 100, "dedup_count": 100, "visible_rows": 5, "expected_count": 100, "completeness": "PARSED_COMPLETE"},
+    {"etf": "0052", "holdings_date": "2026-08-07", "raw_rows": 73, "dedup_count": 72, "visible_rows": 73, "expected_count": null, "completeness": "PARSED_COMPLETE"},
+    {"etf": "0056", "holdings_date": "2026-08-07", "raw_rows": 50, "dedup_count": 50, "visible_rows": 5, "expected_count": 50, "completeness": "PARSED_COMPLETE"},
+    {"etf": "00733", "holdings_date": "2026-08-07", "raw_rows": 52, "dedup_count": 51, "visible_rows": 52, "expected_count": null, "completeness": "PARSED_COMPLETE"},
+    {"etf": "00878", "holdings_date": "2026-08-07", "raw_rows": 30, "dedup_count": 30, "visible_rows": 30, "expected_count": 30, "completeness": "PARSED_COMPLETE"},
+    {"etf": "00919", "holdings_date": null, "raw_rows": 40, "dedup_count": 40, "visible_rows": 10, "expected_count": 40, "completeness": "PARSED_COMPLETE"},
+    {"etf": "00936", "holdings_date": "2026-07-31", "raw_rows": 30, "dedup_count": 30, "visible_rows": 30, "expected_count": null, "completeness": "PARSED_COMPLETE"}
+  ],
+  "selected": [
+    {"selection_order": 1, "candidate_index": 0, "stock_code": "1101", "symbol": "1101.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 2, "candidate_index": 11, "stock_code": "1444", "symbol": "1444.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 3, "candidate_index": 22, "stock_code": "1605", "symbol": "1605.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 4, "candidate_index": 34, "stock_code": "2059", "symbol": "2059.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 5, "candidate_index": 45, "stock_code": "2316", "symbol": "2316.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 6, "candidate_index": 56, "stock_code": "2360", "symbol": "2360.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 7, "candidate_index": 67, "stock_code": "2406", "symbol": "2406.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 8, "candidate_index": 78, "stock_code": "2466", "symbol": "2466.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 9, "candidate_index": 90, "stock_code": "2603", "symbol": "2603.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 10, "candidate_index": 101, "stock_code": "2801", "symbol": "2801.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 11, "candidate_index": 112, "stock_code": "2885", "symbol": "2885.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 12, "candidate_index": 123, "stock_code": "3023", "symbol": "3023.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 13, "candidate_index": 135, "stock_code": "3231", "symbol": "3231.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 14, "candidate_index": 146, "stock_code": "3708", "symbol": "3708.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 15, "candidate_index": 157, "stock_code": "5269", "symbol": "5269.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 16, "candidate_index": 168, "stock_code": "6226", "symbol": "6226.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 17, "candidate_index": 179, "stock_code": "6525", "symbol": "6525.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 18, "candidate_index": 191, "stock_code": "6834", "symbol": "6834.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 19, "candidate_index": 202, "stock_code": "8210", "symbol": "8210.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"},
+    {"selection_order": 20, "candidate_index": 213, "stock_code": "9946", "symbol": "9946.TW", "exchange": "TWSE", "coverage_status": "MISSING_LOCAL"}
+  ],
+  "live_backfill_gate": {
+    "db_write_performed": false,
+    "price_download_performed": false,
+    "backup_created": false,
+    "threshold_research_performed": false,
+    "stop_before_live_backfill": true
+  }
+}
