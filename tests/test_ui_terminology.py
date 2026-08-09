@@ -215,6 +215,35 @@ class UiTerminologyTestCase(unittest.TestCase):
             get_diagnostic_beginner_explanation("Volume Threshold Sensitivity Sample Note"),
         )
 
+    def test_volume_threshold_robustness_terminology_is_traditional_chinese_first(self):
+        self.assertEqual(get_diagnostic_label("Volume Threshold Robustness Analysis"), "成交量門檻穩健性分析")
+        self.assertEqual(get_diagnostic_label("Per-Symbol Robustness"), "逐股票穩健性")
+        self.assertEqual(get_diagnostic_label("Per-Year Robustness"), "逐年度穩健性")
+        self.assertEqual(get_diagnostic_label("Overlap-Reduced Samples"), "降低樣本重疊")
+        self.assertEqual(get_diagnostic_label("Original Daily Samples"), "原始每日樣本")
+        self.assertEqual(get_diagnostic_label("Reduced-Overlap Samples"), "降低重疊後樣本")
+        self.assertEqual(get_diagnostic_label("Difference vs Formal V1"), "相對正式 V1 差異")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate Difference"), "歷史命中率差異")
+        self.assertEqual(get_diagnostic_label("Observation Count Difference"), "樣本數差異")
+        self.assertEqual(get_diagnostic_label("20 Trading-Bar Spacing"), "20 個交易日間隔")
+
+        self.assertIn(
+            "不同股票與不同年份",
+            get_diagnostic_beginner_explanation("Volume Threshold Robustness Analysis"),
+        )
+        self.assertIn(
+            "至少相隔 20 個交易日",
+            get_diagnostic_beginner_explanation("Overlap-Reduced Samples"),
+        )
+        self.assertIn(
+            "百分點差異",
+            get_diagnostic_beginner_explanation("Historical Hit Rate Difference"),
+        )
+        self.assertIn(
+            "不代表完全獨立樣本",
+            get_diagnostic_beginner_explanation("Overlap-Reduced Independence Warning"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
