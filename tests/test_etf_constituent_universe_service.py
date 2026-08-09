@@ -29,20 +29,29 @@ from etf_constituent_universe_service import FrozenETFUniverse
 from etf_constituent_universe_service import PARSER_STATUS_FAILED
 from etf_constituent_universe_service import PARSER_STATUS_NOT_RUN
 from etf_constituent_universe_service import PARSER_STATUS_PARSED
+from etf_constituent_universe_service import PartialParsedUniverseAudit
 from etf_constituent_universe_service import SOURCE_STATUS_AVAILABLE
+from etf_constituent_universe_service import SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED
 from etf_constituent_universe_service import SOURCE_STATUS_UNAVAILABLE
 from etf_constituent_universe_service import SymbolCoverageAudit
+from etf_constituent_universe_service import TRANSPORT_CURL_VERIFIED
+from etf_constituent_universe_service import UNIVERSE_STATUS_NOT_FINALIZED
 from etf_constituent_universe_service import UNIVERSE_VERSION
 from etf_constituent_universe_service import audit_universe_local_coverage
 from etf_constituent_universe_service import audit_official_source_access
+from etf_constituent_universe_service import build_partial_parsed_universe_audit
 from etf_constituent_universe_service import build_frozen_etf_universe
 from etf_constituent_universe_service import build_source_unavailable_universe
 from etf_constituent_universe_service import build_universe_with_coverage_audit
 from etf_constituent_universe_service import database_file_audit
 from etf_constituent_universe_service import mark_sources_unavailable
 from etf_constituent_universe_service import normalize_constituent_record
+from etf_constituent_universe_service import parse_capital_portfolio_page
 from etf_constituent_universe_service import parse_fubon_asset_page
+from etf_constituent_universe_service import parse_taishin_holdings_page
+from etf_constituent_universe_service import parse_yuanta_ratio_page
 from etf_constituent_universe_service import predefined_etf_sources
+from etf_constituent_universe_service import _verified_curl_command
 
 
 FETCHED_AT = datetime(2026, 8, 9, 4, 0, tzinfo=UTC).isoformat()
@@ -291,6 +300,47 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(audit.raw_constituent_count, 2)
         self.assertIn("redirected=1", audit.final_url)
 
+    def test_yuanta_parser_and_verified_curl_transport_do_not_disable_tls(self):
+        command = _verified_curl_command("https://www.yuantaetfs.com/product/detail/0050/ratio")
+        html = """
+        <html><body>
+          <h3>基金權重-股票</h3>
+          <div class="each_table">
+            <div class="tr"><div class="td">商品代碼</div><div class="td">商品名稱</div><div class="td">商品數量</div><div class="td">商品權重</div></div>
+            <div class="tr">
+              <div class="td"><span>商品代碼</span><span>2330</span></div>
+              <div class="td"><span>商品名稱</span><span>台積電</span></div>
+              <div class="td"><span>商品數量</span><span>570337837</span></div>
+              <div class="td"><span>商品權重</span><span>58.64</span></div>
+            </div>
+          </div>
+        </body></html>
+        """
+        source = predefined_etf_sources()[0]
+
+        records = parse_yuanta_ratio_page(
+            html,
+            etf_code="0050",
+            holdings_date=date(2026, 8, 7),
+            source_url=source.official_source_url,
+        )
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url,
+                "text": html,
+                "transport_method": TRANSPORT_CURL_VERIFIED,
+            },
+        )
+
+        self.assertNotIn("-k", command)
+        self.assertNotIn("--insecure", command)
+        self.assertEqual(records[0].stock_code, "2330")
+        self.assertEqual(records[0].raw_weight, 58.64)
+        self.assertEqual(audit.parser_status, PARSER_STATUS_PARSED)
+        self.assertEqual(audit.transport_method, TRANSPORT_CURL_VERIFIED)
+
     def test_parser_failure_is_not_source_unavailable(self):
         source = predefined_etf_sources()[2]
         html = """
@@ -346,6 +396,90 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(tuple(record.stock_code for record in records), ("2330", "2454"))
         self.assertEqual(records[0].raw_weight, 65.3782)
         self.assertEqual(records[0].holdings_date, date(2026, 8, 7))
+
+    def test_parse_capital_portfolio_deduplicates_responsive_presentation_rows(self):
+        html = """
+        <html><body>
+          <div id="buyback-stocks-section">
+            <div class="tr"><div>股票代號</div><div>股票名稱</div><div>持股權重(%)</div><div>股數</div></div>
+            <div class="tr show-for-medium"><div>2881</div><div>富邦金</div><div>14.29%</div><div>608,790,000</div></div>
+            <div class="tr hide-for-medium"><div>2881</div><div>富邦金</div><div>14.29%</div><div>608,790,000</div></div>
+            <div class="tr show-for-medium"><div>2882</div><div>國泰金</div><div>13.10%</div><div>500,000,000</div></div>
+          </div>
+        </body></html>
+        """
+
+        records, raw_dom_rows = parse_capital_portfolio_page(
+            html,
+            etf_code="00919",
+            holdings_date=None,
+            source_url="https://www.capitalfund.com.tw/etf/product/detail/195/portfolio",
+        )
+
+        self.assertEqual(raw_dom_rows, 3)
+        self.assertEqual(tuple(record.stock_code for record in records), ("2881", "2882"))
+        self.assertEqual(records[0].raw_weight, 14.29)
+
+    def test_parse_taishin_holdings_keeps_raw_code_without_exchange_guess(self):
+        html = """
+        <html><body>
+          <table>
+            <tr><th>代號</th><th>名稱</th><th>股數</th><th>持股權重</th></tr>
+            <tr><td>8046 TT</td><td>南電</td><td>100,000</td><td>4.1234%</td></tr>
+            <tr><td>5347 TT</td><td>世界</td><td>90,000</td><td>3.0000%</td></tr>
+            <tr><td>股票合計</td><td></td><td></td><td>97.1000%</td></tr>
+          </table>
+        </body></html>
+        """
+
+        records = parse_taishin_holdings_page(
+            html,
+            etf_code="00936",
+            holdings_date=date(2026, 7, 31),
+            source_url="https://www.tsit.com.tw/ETF/Home/ETFSeriesDetail/00936",
+        )
+
+        self.assertEqual(tuple(record.stock_code for record in records), ("8046", "5347"))
+        self.assertTrue(all(record.raw_market_info is None for record in records))
+
+    def test_partial_snapshot_audit_is_not_finalized_and_does_not_touch_db(self):
+        self.insert_symbol("2330.TW")
+        before = database_file_audit(self.db_path)
+        snapshots = (
+            ETFConstituentSnapshot(
+                source=predefined_etf_sources()[0],
+                constituents=(
+                    ETFConstituentRecord("0050", "2330", "台積電", raw_market_info="上市"),
+                    ETFConstituentRecord("0050", "9999", "未知", raw_market_info=None),
+                ),
+            ),
+        )
+
+        audit = build_partial_parsed_universe_audit(snapshots)
+        after = database_file_audit(self.db_path)
+
+        self.assertIsInstance(audit, PartialParsedUniverseAudit)
+        self.assertEqual(audit.universe_status, UNIVERSE_STATUS_NOT_FINALIZED)
+        self.assertEqual(audit.parsed_source_count, 1)
+        self.assertEqual(audit.raw_membership_count, 2)
+        self.assertEqual(audit.normalized_membership_count, 1)
+        self.assertEqual(audit.unique_stock_count, 1)
+        self.assertEqual(before, after)
+
+    def test_00878_unresolved_holdings_endpoint_is_not_parser_success(self):
+        source = predefined_etf_sources()[5]
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url,
+                "text": "<html><title>00878 國泰永續高股息</title><body>查看基金持股權重</body></html>",
+            },
+        )
+
+        self.assertEqual(audit.source_access_status, SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED)
+        self.assertEqual(audit.parser_status, PARSER_STATUS_NOT_RUN)
 
     def test_source_unavailable_handling_keeps_all_sources(self):
         universe = build_source_unavailable_universe(

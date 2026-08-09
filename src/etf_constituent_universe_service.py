@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import sqlite3
+import subprocess
 from dataclasses import dataclass
 from datetime import UTC
 from datetime import date
@@ -20,10 +21,14 @@ from volume_threshold_robustness_service import DEFAULT_WARMUP_TRADING_BARS
 UNIVERSE_VERSION = "2026-08-current-etf-constituent-v1"
 SOURCE_STATUS_AVAILABLE = "AVAILABLE"
 SOURCE_STATUS_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED = "SOURCE_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED"
 SOURCE_STATUS_NOT_RETRIEVED = "NOT_RETRIEVED"
 PARSER_STATUS_NOT_RUN = "PARSER_NOT_RUN"
 PARSER_STATUS_PARSED = "PARSED"
 PARSER_STATUS_FAILED = "PARSER_FAILED"
+TRANSPORT_REQUESTS_VERIFIED = "TRANSPORT_REQUESTS_VERIFIED"
+TRANSPORT_CURL_VERIFIED = "TRANSPORT_CURL_VERIFIED"
+UNIVERSE_STATUS_NOT_FINALIZED = "NOT_FINALIZED"
 SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS = "issuer_official_holdings"
 SOURCE_TYPE_ISSUER_OFFICIAL_PCF = "issuer_official_pcf"
 
@@ -143,6 +148,10 @@ class OfficialSourceAccessAudit:
 
     raw_constituent_count: int
 
+    transport_method: str | None = None
+
+    raw_dom_stock_row_count: int = 0
+
     error: str | None = None
 
 
@@ -228,6 +237,26 @@ class FrozenETFUniverse:
     tpex_count: int
 
     excluded_count: int
+
+
+@dataclass(frozen=True)
+class PartialParsedUniverseAudit:
+
+    universe_version: str
+
+    universe_status: str
+
+    parsed_source_count: int
+
+    raw_membership_count: int
+
+    normalized_membership_count: int
+
+    unique_stock_count: int
+
+    excluded_count: int
+
+    blocker: str | None
 
 
 @dataclass(frozen=True)
@@ -326,7 +355,10 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="國泰永續高股息",
         issuer="國泰投信",
         category="ESG + 高股息",
-        official_source_url="https://www.cathaysite.com.tw/proj/202201dividends/etf/product?etf=00878",
+        official_source_url=(
+            "https://www.cathaysite.com.tw/ETF/purchase?"
+            "code=CN&name=Cathay+MSCI+Taiwan+ESG+Sustainability+High+Dividend+Yield+ETF"
+        ),
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -559,9 +591,38 @@ def audit_official_source_access(
         parser_status = PARSER_STATUS_NOT_RUN
         parser_error = None
         raw_count = 0
-        if source.etf_code in {"0052", "00733"} and constituent_table_available:
+        raw_dom_count = 0
+        if source.etf_code in {"0050", "0051", "0056"} and constituent_table_available:
+            try:
+                records = parse_yuanta_ratio_page(
+                    html,
+                    etf_code=source.etf_code,
+                    holdings_date=holdings_date,
+                    source_url=response["final_url"],
+                )
+                parser_status = PARSER_STATUS_PARSED
+                raw_count = len(records)
+                raw_dom_count = len(records)
+            except Exception as exc:
+                parser_status = PARSER_STATUS_FAILED
+                parser_error = f"{type(exc).__name__}: {exc}"
+        elif source.etf_code in {"0052", "00733"} and constituent_table_available:
             try:
                 records = parse_fubon_asset_page(
+                    html,
+                    etf_code=source.etf_code,
+                    holdings_date=holdings_date,
+                    source_url=response["final_url"],
+                )
+                parser_status = PARSER_STATUS_PARSED
+                raw_count = len(records)
+                raw_dom_count = len(records)
+            except Exception as exc:
+                parser_status = PARSER_STATUS_FAILED
+                parser_error = f"{type(exc).__name__}: {exc}"
+        elif source.etf_code == "00919" and constituent_table_available:
+            try:
+                records, raw_dom_count = parse_capital_portfolio_page(
                     html,
                     etf_code=source.etf_code,
                     holdings_date=holdings_date,
@@ -572,18 +633,37 @@ def audit_official_source_access(
             except Exception as exc:
                 parser_status = PARSER_STATUS_FAILED
                 parser_error = f"{type(exc).__name__}: {exc}"
+        elif source.etf_code == "00936" and constituent_table_available:
+            try:
+                records = parse_taishin_holdings_page(
+                    html,
+                    etf_code=source.etf_code,
+                    holdings_date=holdings_date,
+                    source_url=response["final_url"],
+                )
+                parser_status = PARSER_STATUS_PARSED
+                raw_count = len(records)
+                raw_dom_count = len(records)
+            except Exception as exc:
+                parser_status = PARSER_STATUS_FAILED
+                parser_error = f"{type(exc).__name__}: {exc}"
+        source_access_status = SOURCE_STATUS_AVAILABLE
+        if source.etf_code == "00878" and parser_status != PARSER_STATUS_PARSED:
+            source_access_status = SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED
         return OfficialSourceAccessAudit(
             etf_code=source.etf_code,
             canonical_url=source.official_source_url,
             http_status=response["http_status"],
             final_url=response["final_url"],
             tls_verified=True,
-            source_access_status=SOURCE_STATUS_AVAILABLE,
+            source_access_status=source_access_status,
             page_title=title,
             constituent_table_available=constituent_table_available,
             holdings_date=holdings_date,
             parser_status=parser_status,
             raw_constituent_count=raw_count,
+            transport_method=response.get("transport_method"),
+            raw_dom_stock_row_count=raw_dom_count,
             error=parser_error,
         )
     except Exception as exc:
@@ -599,8 +679,55 @@ def audit_official_source_access(
             holdings_date=None,
             parser_status=PARSER_STATUS_NOT_RUN,
             raw_constituent_count=0,
+            transport_method=response.get("transport_method") if response else None,
+            raw_dom_stock_row_count=0,
             error=f"{type(exc).__name__}: {exc}",
         )
+
+
+def parse_yuanta_ratio_page(
+    html: str,
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[ETFConstituentRecord, ...]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.find(lambda tag: tag.name == "h3" and tag.get_text(strip=True) == "基金權重-股票")
+    if title is None:
+        raise ETFConstituentUniverseError(f"No Yuanta stock weights section found for {etf_code}.")
+    title_parent = title.find_parent("div")
+    section = (
+        title_parent.find_next("div", class_="each_table")
+        if title_parent is not None
+        else title.find_next("div", class_="each_table")
+    )
+    if section is None:
+        raise ETFConstituentUniverseError(f"No Yuanta stock weights table found for {etf_code}.")
+    records = []
+    for row in section.find_all("div", class_="tr"):
+        cells = []
+        for cell in row.find_all("div", class_="td", recursive=False):
+            spans = cell.find_all("span")
+            cells.append(spans[-1].get_text(strip=True) if spans else cell.get_text(strip=True))
+        if len(cells) < 4 or not _is_four_digit_code(cells[0]):
+            continue
+        records.append(
+            ETFConstituentRecord(
+                etf_code=etf_code,
+                stock_code=cells[0],
+                stock_name=cells[1],
+                raw_market_info=None,
+                raw_weight=_parse_percent(cells[3]),
+                holdings_date=holdings_date,
+                source_url=source_url,
+            )
+        )
+    if not records:
+        raise ETFConstituentUniverseError(f"No Yuanta stock rows found for {etf_code}.")
+    return tuple(records)
 
 
 def parse_fubon_asset_page(
@@ -641,6 +768,115 @@ def parse_fubon_asset_page(
             raise ETFConstituentUniverseError(f"No stock rows found in Fubon asset table for {etf_code}.")
         return tuple(records)
     raise ETFConstituentUniverseError(f"No Fubon stock holdings table found for {etf_code}.")
+
+
+def parse_capital_portfolio_page(
+    html: str,
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[tuple[ETFConstituentRecord, ...], int]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    section = soup.find(id="buyback-stocks-section")
+    if section is None:
+        raise ETFConstituentUniverseError(f"No Capital buyback stock section found for {etf_code}.")
+    raw_dom_rows = 0
+    by_code: dict[str, ETFConstituentRecord] = {}
+    for row in section.find_all("div", class_="tr"):
+        cells = tuple(child.get_text(" ", strip=True) for child in row.find_all("div", recursive=False))
+        if len(cells) < 4 or not _is_four_digit_code(cells[0]):
+            continue
+        raw_dom_rows += 1
+        stock_code = cells[0]
+        if stock_code in by_code:
+            continue
+        by_code[stock_code] = ETFConstituentRecord(
+            etf_code=etf_code,
+            stock_code=stock_code,
+            stock_name=cells[1],
+            raw_market_info=None,
+            raw_weight=_parse_percent(cells[2]),
+            holdings_date=holdings_date,
+            source_url=source_url,
+        )
+    if not by_code:
+        raise ETFConstituentUniverseError(f"No Capital stock rows found for {etf_code}.")
+    return tuple(by_code[code] for code in sorted(by_code)), raw_dom_rows
+
+
+def parse_taishin_holdings_page(
+    html: str,
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[ETFConstituentRecord, ...]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        header = tuple(cell.get_text(strip=True) for cell in rows[0].find_all(["td", "th"]))
+        if header[:4] != ("代號", "名稱", "股數", "持股權重"):
+            continue
+        records = []
+        for row in rows[1:]:
+            cells = tuple(cell.get_text(strip=True) for cell in row.find_all(["td", "th"]))
+            if len(cells) < 4:
+                continue
+            stock_code = _raw_taiwan_code(cells[0])
+            if stock_code is None:
+                continue
+            records.append(
+                ETFConstituentRecord(
+                    etf_code=etf_code,
+                    stock_code=stock_code,
+                    stock_name=cells[1],
+                    raw_market_info=None,
+                    raw_weight=_parse_percent(cells[3]),
+                    holdings_date=holdings_date,
+                    source_url=source_url,
+                )
+            )
+        if not records:
+            raise ETFConstituentUniverseError(f"No Taishin stock rows found for {etf_code}.")
+        return tuple(records)
+    raise ETFConstituentUniverseError(f"No Taishin stock holdings table found for {etf_code}.")
+
+
+def build_partial_parsed_universe_audit(
+    snapshots,
+    *,
+    audits: tuple[OfficialSourceAccessAudit, ...] = tuple(),
+) -> PartialParsedUniverseAudit:
+    snapshot_tuple = tuple(snapshots)
+    raw_count = sum(len(snapshot.constituents) for snapshot in snapshot_tuple)
+    normalized = []
+    exclusions = []
+    for snapshot in snapshot_tuple:
+        for record in snapshot.constituents:
+            normalized_record = normalize_constituent_record(record)
+            if isinstance(normalized_record, ETFConstituentExclusion):
+                exclusions.append(normalized_record)
+            else:
+                normalized.append(normalized_record)
+    parsed_source_count = len(snapshot_tuple)
+    blocker = _partial_snapshot_blocker(audits)
+    return PartialParsedUniverseAudit(
+        universe_version=UNIVERSE_VERSION,
+        universe_status=UNIVERSE_STATUS_NOT_FINALIZED,
+        parsed_source_count=parsed_source_count,
+        raw_membership_count=raw_count,
+        normalized_membership_count=len(normalized),
+        unique_stock_count=len({membership.symbol for membership in normalized}),
+        excluded_count=len(exclusions),
+        blocker=blocker,
+    )
 
 
 def audit_universe_local_coverage(
@@ -837,6 +1073,8 @@ def _connect_read_only(db_path: Path | str) -> sqlite3.Connection:
 def _fetch_official_source_strict_tls(url: str) -> dict[str, object]:
     import requests
 
+    if "yuantaetfs.com" in url:
+        return _fetch_official_source_with_verified_curl(url)
     response = requests.get(
         url,
         timeout=20,
@@ -849,7 +1087,46 @@ def _fetch_official_source_strict_tls(url: str) -> dict[str, object]:
         "http_status": response.status_code,
         "final_url": response.url,
         "text": response.text,
+        "transport_method": TRANSPORT_REQUESTS_VERIFIED,
     }
+
+
+def _fetch_official_source_with_verified_curl(url: str) -> dict[str, object]:
+    command = _verified_curl_command(url)
+    result = subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    marker = "\n__ETF_SOURCE_META__"
+    if marker not in result.stdout:
+        raise ETFConstituentUniverseError("Verified curl response did not include response metadata.")
+    html, metadata = result.stdout.rsplit(marker, 1)
+    status_text, final_url = metadata.strip().split(" ", 1)
+    return {
+        "http_status": int(status_text),
+        "final_url": final_url.strip(),
+        "text": html,
+        "transport_method": TRANSPORT_CURL_VERIFIED,
+    }
+
+
+def _verified_curl_command(url: str) -> list[str]:
+    command = [
+        "curl",
+        "-L",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--write-out",
+        "\n__ETF_SOURCE_META__%{http_code} %{url_effective}",
+        url,
+    ]
+    if any(arg in {"-k", "--insecure"} for arg in command):
+        raise ETFConstituentUniverseError("Verified curl transport must not disable TLS verification.")
+    return command
 
 
 def _extract_title(html: str) -> str | None:
@@ -862,7 +1139,23 @@ def _extract_title(html: str) -> str | None:
 
 
 def _extract_holdings_date(html: str) -> date | None:
-    match = re.search(r"資料日期[：: ]*(20\d{2})[/-](\d{1,2})[/-](\d{1,2})", html)
+    searchable = html
+    try:
+        from bs4 import BeautifulSoup
+
+        searchable = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+    except Exception:
+        searchable = html
+    patterns = (
+        r"交易日期[：: \s]*(20\d{2})[/-](\d{1,2})[/-](\d{1,2})",
+        r"資料日期[：: \s]*(20\d{2})[/-](\d{1,2})[/-](\d{1,2})",
+        r"於\s*(20\d{2})[/-](\d{1,2})[/-](\d{1,2})\s*提供",
+    )
+    match = None
+    for pattern in patterns:
+        match = re.search(pattern, searchable)
+        if match is not None:
+            break
     if match is None:
         return None
     return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
@@ -871,6 +1164,8 @@ def _extract_holdings_date(html: str) -> date | None:
 def _has_constituent_table(html: str) -> bool:
     return (
         ("股票代碼" in html and "股票名稱" in html and "權重" in html)
+        or ("商品代碼" in html and "商品名稱" in html and "商品權重" in html)
+        or ("股票代號" in html and "股票名稱" in html and "持股權重" in html)
         or ("代號" in html and "名稱" in html and "持股權重" in html)
     )
 
@@ -880,6 +1175,24 @@ def _parse_percent(value: str) -> float | None:
     if not cleaned:
         return None
     return float(cleaned)
+
+
+def _is_four_digit_code(value: str) -> bool:
+    return bool(re.fullmatch(r"\d{4}", value.strip()))
+
+
+def _raw_taiwan_code(value: str) -> str | None:
+    match = re.search(r"(?<!\d)(\d{4})(?!\d)", value)
+    return match.group(1) if match else None
+
+
+def _partial_snapshot_blocker(audits: tuple[OfficialSourceAccessAudit, ...]) -> str | None:
+    if not audits:
+        return "Not all 8 ETF sources have PARSED status."
+    unresolved = tuple(audit.etf_code for audit in audits if audit.parser_status != PARSER_STATUS_PARSED)
+    if not unresolved:
+        return None
+    return "Not all 8 ETF sources parsed: " + ", ".join(unresolved)
 
 
 def _is_valid_taiwan_symbol(symbol: str) -> bool:

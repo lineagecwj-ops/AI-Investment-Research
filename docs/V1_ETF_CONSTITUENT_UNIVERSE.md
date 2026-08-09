@@ -34,7 +34,7 @@ Canonical official source URLs:
 | `0052` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052` |
 | `0056` | `https://www.yuantaetfs.com/product/detail/0056/ratio` |
 | `00733` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=00733` |
-| `00878` | `https://www.cathaysite.com.tw/proj/202201dividends/etf/product?etf=00878` |
+| `00878` | `https://www.cathaysite.com.tw/ETF/purchase?code=CN&name=Cathay+MSCI+Taiwan+ESG+Sustainability+High+Dividend+Yield+ETF` |
 | `00919` | `https://www.capitalfund.com.tw/etf/product/detail/195/portfolio` |
 | `00936` | `https://www.tsit.com.tw/ETF/Home/ETFSeriesDetail/00936` |
 
@@ -52,6 +52,10 @@ If an official source cannot be retrieved in the execution environment, the sour
 Source access status and parser status are separate. A reachable official page can still be `PARSER_FAILED`, and a parser failure must not be reported as `SOURCE_UNAVAILABLE`.
 
 TLS verification must stay enabled. Do not use `verify=False`, unverified HTTPS contexts, or certificate verification bypasses. If Python cannot validate a site that system tools can validate, record the exact Python TLS / CA bundle error and fix the runtime or CA chain safely before using that source.
+
+For Yuanta official pages, Python strict TLS can fail on the local Python/OpenSSL stack while system `curl` validates the same canonical `yuantaetfs.com` pages. The service may use system `curl` as `TRANSPORT_CURL_VERIFIED` only with normal certificate verification enabled. It must not pass `-k`, `--insecure`, or any equivalent TLS bypass.
+
+Each ETF keeps independent source and parser status. Partial parser recovery can be audited, but the formal `2026-08-current-etf-constituent-v1` universe remains `NOT_FINALIZED` until all 8 predefined ETF sources are `PARSED`.
 
 ## Source Metadata
 
