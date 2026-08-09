@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import unittest
 from datetime import UTC
 from datetime import date
@@ -191,6 +192,31 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn("回放頻率", app_source)
         self.assertIn("手動輸入", (SRC_PATH / "ui_terminology.py").read_text(encoding="utf-8"))
         self.assertIn("已儲存股票池", (SRC_PATH / "ui_terminology.py").read_text(encoding="utf-8"))
+
+    def test_app_import_recovers_stale_ui_terminology_module(self):
+        script = """
+import sys
+from pathlib import Path
+project = Path.cwd()
+sys.path.insert(0, str(project / "src"))
+import ui_terminology
+del ui_terminology.get_diagnostic_condition_label
+import app
+print("app import: PASS")
+print("module:", ui_terminology.__file__)
+print("has get_diagnostic_condition_label:", hasattr(ui_terminology, "get_diagnostic_condition_label"))
+"""
+        result = subprocess.run(
+            [str(PROJECT_ROOT / ".venv" / "bin" / "python"), "-c", script],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("app import: PASS", result.stdout)
+        self.assertIn(str(SRC_PATH / "ui_terminology.py"), result.stdout)
+        self.assertIn("has get_diagnostic_condition_label: True", result.stdout)
 
     def test_universe_management_tab_exists(self):
         app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")

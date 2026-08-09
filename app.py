@@ -14,6 +14,37 @@ SRC_PATH = Path(__file__).resolve().parent / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+
+UI_TERMINOLOGY_IMPORT_REQUIRED_ATTRIBUTES = (
+    "get_diagnostic_condition_label",
+    "get_diagnostic_label",
+    "get_diagnostic_beginner_explanation",
+)
+
+
+def ensure_ui_terminology_import_contract() -> None:
+    import ui_terminology as ui_terminology_module
+
+    if all(
+        hasattr(ui_terminology_module, attribute)
+        for attribute in UI_TERMINOLOGY_IMPORT_REQUIRED_ATTRIBUTES
+    ):
+        return
+    ui_terminology_module = importlib.reload(ui_terminology_module)
+    missing = [
+        attribute
+        for attribute in UI_TERMINOLOGY_IMPORT_REQUIRED_ATTRIBUTES
+        if not hasattr(ui_terminology_module, attribute)
+    ]
+    if missing:
+        raise ImportError(
+            "ui_terminology missing required attributes: "
+            + ", ".join(missing)
+        )
+
+
+ensure_ui_terminology_import_contract()
+
 from dashboard import build_comparison_rows
 from dashboard import build_historical_chart_rows
 from dashboard import build_historical_trend_display
