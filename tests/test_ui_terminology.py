@@ -182,6 +182,39 @@ class UiTerminologyTestCase(unittest.TestCase):
             get_diagnostic_beginner_explanation("Daily Observation Overlap Note"),
         )
 
+    def test_volume_threshold_sensitivity_terminology_is_traditional_chinese_first(self):
+        self.assertEqual(get_diagnostic_label("Volume Threshold Sensitivity Analysis"), "成交量門檻變化測試")
+        self.assertEqual(get_diagnostic_label("Threshold Sensitivity"), "門檻變化測試")
+        self.assertEqual(get_diagnostic_label("Volume Ratio Threshold"), "成交量比率門檻")
+        self.assertEqual(get_diagnostic_label("Current V1 Threshold"), "目前 V1 門檻")
+        self.assertEqual(get_diagnostic_label("Observation Count"), "歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Resolved Samples"), "已解析歷史樣本數")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate"), "歷史命中率")
+        self.assertEqual(get_diagnostic_label("Observation Count Change vs V1"), "相對目前 V1 的樣本變化")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate Change vs V1"), "相對目前 V1 的歷史命中率變化")
+        self.assertEqual(get_diagnostic_label("Percentage Points"), "百分點")
+        self.assertEqual(get_diagnostic_label("Lower Threshold"), "門檻越低")
+        self.assertEqual(get_diagnostic_label("Higher Threshold"), "門檻越高")
+        self.assertEqual(get_diagnostic_label("Daily Observations"), "每日觀察樣本")
+        self.assertEqual(get_diagnostic_label("Overlap Possible"), "樣本可能重疊")
+
+        self.assertIn(
+            "固定其他四項 V1 條件",
+            get_diagnostic_beginner_explanation("Volume Threshold Sensitivity Analysis"),
+        )
+        self.assertIn(
+            "本測試不會修改正式 V1",
+            get_diagnostic_beginner_explanation("Volume Threshold Sensitivity Baseline Note"),
+        )
+        self.assertIn(
+            "不代表該門檻是最佳設定",
+            get_diagnostic_beginner_explanation("Volume Threshold Sensitivity Safety Note"),
+        )
+        self.assertIn(
+            "需要進一步研究",
+            get_diagnostic_beginner_explanation("Volume Threshold Sensitivity Sample Note"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
