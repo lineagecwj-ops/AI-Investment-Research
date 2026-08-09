@@ -162,6 +162,16 @@ DIAGNOSTIC_LABELS = {
     "Historical Hit Rate Change vs V1": "相對目前 V1 的歷史命中率變化",
     "Lower Threshold": "門檻越低",
     "Higher Threshold": "門檻越高",
+    "Volume Threshold Robustness Analysis": "成交量門檻穩健性分析",
+    "Per-Symbol Robustness": "逐股票穩健性",
+    "Per-Year Robustness": "逐年度穩健性",
+    "Overlap-Reduced Samples": "降低樣本重疊",
+    "Original Daily Samples": "原始每日樣本",
+    "Reduced-Overlap Samples": "降低重疊後樣本",
+    "Difference vs Formal V1": "相對正式 V1 差異",
+    "Historical Hit Rate Difference": "歷史命中率差異",
+    "Observation Count Difference": "樣本數差異",
+    "20 Trading-Bar Spacing": "20 個交易日間隔",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {
@@ -231,6 +241,19 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "Volume Threshold Sensitivity Sample Note": (
         "較低門檻通常會增加樣本，但是否保留足夠篩選效果，需要進一步研究。"
+    ),
+    "Volume Threshold Robustness Analysis": (
+        "穩健性不是只看全部股票加總，而是檢查結果在不同股票與不同年份是否仍有類似現象。"
+    ),
+    "Overlap-Reduced Samples": (
+        "因為連續交易日可能共用相似的未來 20 個交易日，"
+        "所以另外用至少相隔 20 個交易日的樣本做比較。"
+    ),
+    "Historical Hit Rate Difference": (
+        "與正式 V1 的 1.20 門檻相比，歷史樣本中的百分點差異。"
+    ),
+    "Overlap-Reduced Independence Warning": (
+        "降低樣本重疊不代表完全獨立樣本；它只降低同一股票連續 observation 的 future-window overlap。"
     ),
 }
 
