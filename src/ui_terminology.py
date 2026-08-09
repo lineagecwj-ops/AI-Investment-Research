@@ -118,16 +118,24 @@ TECHNICAL_METRIC_LABELS = {
 
 DIAGNOSTIC_LABELS = {
     "Historical Condition Diagnostics": "V1 歷史條件診斷",
+    "Historical Outcome Comparison": "歷史後續結果比較",
     "Match Count Distribution": "歷史條件命中分布",
     "Matched Conditions": "符合條件數",
     "Condition Pass Rate": "單一條件通過率",
     "Missing Condition": "未符合條件",
     "Most Common Missing Condition": "最常缺少的條件",
     "Condition Combination": "條件組合",
+    "4/5 Missing Condition Outcome": "4/5 案例：缺少條件與歷史後續結果",
     "Evaluated Observations": "可評估歷史樣本",
     "Not Evaluable": "無法評估",
     "Observation Count": "歷史樣本數",
+    "Resolved Samples": "已解析歷史樣本數",
+    "Historical Hit Rate": "歷史命中率",
     "Share": "占可評估樣本比例",
+    "HIT": "達成研究目標",
+    "MISS": "未達成研究目標",
+    "INCOMPLETE": "後續資料尚不完整",
+    "NOT_EVALUABLE": "無法評估",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {
@@ -154,6 +162,15 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "Condition Combination": (
         "統計歷史上哪些 V1 條件最常一起成立。"
+    ),
+    "Historical Outcome Comparison": (
+        "比較歷史上符合不同數量 V1 條件的樣本，之後是否在既定 20 個交易日研究期間內突破當時的前 60 日高點。"
+    ),
+    "Historical Hit Rate": (
+        "達成研究目標的已解析歷史樣本 ÷ 全部已解析歷史樣本。這是歷史統計，不代表未來發生機率。"
+    ),
+    "4/5 Missing Condition Outcome": (
+        "比較只差一項 V1 條件的歷史樣本，了解不同缺失條件與後續歷史結果的差異。"
     ),
 }
 
