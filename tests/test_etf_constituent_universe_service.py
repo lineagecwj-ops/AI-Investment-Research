@@ -21,6 +21,7 @@ from etf_constituent_universe_service import COVERAGE_MISSING_LOCAL
 from etf_constituent_universe_service import COMPLETENESS_UNKNOWN
 from etf_constituent_universe_service import EXCLUSION_INVALID_SYMBOL
 from etf_constituent_universe_service import EXCLUSION_NON_STOCK
+from etf_constituent_universe_service import EXCLUSION_UNKNOWN_EXCHANGE
 from etf_constituent_universe_service import ETFConstituentRecord
 from etf_constituent_universe_service import ETFConstituentSnapshot
 from etf_constituent_universe_service import ETFConstituentUniverseError
@@ -28,6 +29,8 @@ from etf_constituent_universe_service import ETFUniverseBuildResult
 from etf_constituent_universe_service import ETFUniverseFinalizationAudit
 from etf_constituent_universe_service import ETFUniverseSource
 from etf_constituent_universe_service import FrozenETFUniverse
+from etf_constituent_universe_service import NORMALIZATION_COMPLETE
+from etf_constituent_universe_service import NORMALIZATION_INCOMPLETE
 from etf_constituent_universe_service import PARSED_COMPLETE
 from etf_constituent_universe_service import PARSED_INCOMPLETE
 from etf_constituent_universe_service import PARSER_STATUS_FAILED
@@ -38,6 +41,7 @@ from etf_constituent_universe_service import PartialParsedUniverseAudit
 from etf_constituent_universe_service import SOURCE_STATUS_AVAILABLE
 from etf_constituent_universe_service import SOURCE_STATUS_AVAILABLE_HOLDINGS_ENDPOINT_UNRESOLVED
 from etf_constituent_universe_service import SOURCE_STATUS_UNAVAILABLE
+from etf_constituent_universe_service import SOURCE_COMPLETION_COMPLETE
 from etf_constituent_universe_service import SymbolCoverageAudit
 from etf_constituent_universe_service import TRANSPORT_CURL_VERIFIED
 from etf_constituent_universe_service import UNIVERSE_STATUS_FINALIZED
@@ -62,6 +66,20 @@ from etf_constituent_universe_service import parse_yuanta_pcf_page
 from etf_constituent_universe_service import parse_yuanta_ratio_page
 from etf_constituent_universe_service import predefined_etf_sources
 from etf_constituent_universe_service import _verified_curl_command
+from taiwan_security_master_service import NAME_CONFLICT
+from taiwan_security_master_service import NAME_MATCH
+from taiwan_security_master_service import NAME_VARIANT
+from taiwan_security_master_service import SECURITY_TYPE_COMMON_STOCK
+from taiwan_security_master_service import SECURITY_TYPE_ETF
+from taiwan_security_master_service import SECURITY_TYPE_WARRANT
+from taiwan_security_master_service import TPEX
+from taiwan_security_master_service import TWSE
+from taiwan_security_master_service import TaiwanSecurityMaster
+from taiwan_security_master_service import TaiwanSecurityMasterRecord
+from taiwan_security_master_service import TaiwanSecurityMasterSourceMetadata
+from taiwan_security_master_service import build_official_taiwan_security_master
+from taiwan_security_master_service import name_match_status
+from taiwan_security_master_service import parse_official_security_master_payload
 
 
 FETCHED_AT = datetime(2026, 8, 9, 4, 0, tzinfo=UTC).isoformat()
@@ -136,6 +154,37 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
+
+    def security_master(self):
+        records = (
+            TaiwanSecurityMasterRecord("2330", "台積電", TWSE, SECURITY_TYPE_COMMON_STOCK, "TWSE", "https://twse.test"),
+            TaiwanSecurityMasterRecord("2337", "旺宏", TWSE, SECURITY_TYPE_COMMON_STOCK, "TWSE", "https://twse.test"),
+            TaiwanSecurityMasterRecord("2404", "漢唐", TWSE, SECURITY_TYPE_COMMON_STOCK, "TWSE", "https://twse.test"),
+            TaiwanSecurityMasterRecord("2454", "聯發科", TWSE, SECURITY_TYPE_COMMON_STOCK, "TWSE", "https://twse.test"),
+            TaiwanSecurityMasterRecord("5347", "世界", TPEX, SECURITY_TYPE_COMMON_STOCK, "TPEx", "https://tpex.test"),
+            TaiwanSecurityMasterRecord("6488", "環球晶", TPEX, SECURITY_TYPE_COMMON_STOCK, "TPEx", "https://tpex.test"),
+            TaiwanSecurityMasterRecord("0050", "元大台灣50", TWSE, SECURITY_TYPE_ETF, "TWSE", "https://twse.test/fund"),
+            TaiwanSecurityMasterRecord("1234", "測試權證", TWSE, SECURITY_TYPE_WARRANT, "TWSE", "https://twse.test/warrant"),
+        )
+        metadata = (
+            TaiwanSecurityMasterSourceMetadata(
+                source_authority="TWSE",
+                source_url="https://twse.test",
+                retrieved_at=RETRIEVED_AT,
+                source_date=date(2026, 8, 9),
+                record_count=5,
+                checksum_sha256="0" * 64,
+            ),
+            TaiwanSecurityMasterSourceMetadata(
+                source_authority="TPEx",
+                source_url="https://tpex.test",
+                retrieved_at=RETRIEVED_AT,
+                source_date=date(2026, 8, 9),
+                record_count=2,
+                checksum_sha256="1" * 64,
+            ),
+        )
+        return TaiwanSecurityMaster(records, metadata=metadata)
 
     def snapshots(self):
         snapshots = []
@@ -276,6 +325,213 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(tw.symbol, "2330.TW")
         self.assertEqual(two.symbol, "6488.TWO")
         self.assertEqual(invalid.reason, EXCLUSION_INVALID_SYMBOL)
+
+    def test_security_master_parses_official_twse_and_tpex_payloads_with_metadata(self):
+        twse_records = parse_official_security_master_payload(
+            [
+                {"出表日期": "1150809", "公司代號": "2330", "公司簡稱": "台積電"},
+                {"出表日期": "1150809", "公司代號": "0050", "公司簡稱": "元大台灣50"},
+            ],
+            source_authority="TWSE",
+            source_url="https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
+            exchange=TWSE,
+            security_type=SECURITY_TYPE_COMMON_STOCK,
+        )
+        tpex_records = parse_official_security_master_payload(
+            [
+                {
+                    "Date": "1150809",
+                    "SecuritiesCompanyCode": "6488",
+                    "CompanyAbbreviation": "環球晶",
+                }
+            ],
+            source_authority="TPEx",
+            source_url="https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O",
+            exchange=TPEX,
+            security_type=SECURITY_TYPE_COMMON_STOCK,
+        )
+
+        self.assertEqual(twse_records[0].stock_code, "2330")
+        self.assertEqual(twse_records[0].exchange, TWSE)
+        self.assertEqual(twse_records[0].source_date, date(2026, 8, 9))
+        self.assertEqual(tpex_records[0].stock_code, "6488")
+        self.assertEqual(tpex_records[0].exchange, TPEX)
+
+    def test_security_master_builder_records_source_metadata_and_checksums(self):
+        master = build_official_taiwan_security_master(
+            retrieved_at=RETRIEVED_AT,
+            fetch_json=lambda url: (
+                [{"出表日期": "1150809", "公司代號": "2330", "公司簡稱": "台積電"}]
+                if "twse" in url and "t187ap03_L" in url
+                else [{"Date": "1150809", "SecuritiesCompanyCode": "6488", "CompanyAbbreviation": "環球晶"}]
+                if "mopsfin_t187ap03_O" in url
+                else []
+            ),
+        )
+
+        self.assertEqual(master.resolve("2330", "台積電").record.exchange, TWSE)
+        self.assertEqual(master.resolve("6488", "環球晶").record.exchange, TPEX)
+        self.assertEqual(len(master.metadata), 5)
+        self.assertTrue(all(len(item.checksum_sha256) == 64 for item in master.metadata))
+
+    def test_official_master_precedence_over_existing_mapping_and_name_variant(self):
+        master = TaiwanSecurityMaster(
+            (
+                TaiwanSecurityMasterRecord(
+                    "2337",
+                    "旺宏電子",
+                    TPEX,
+                    SECURITY_TYPE_COMMON_STOCK,
+                    "TPEx",
+                    "https://tpex.test",
+                ),
+            )
+        )
+
+        normalized = normalize_constituent_record(
+            ETFConstituentRecord("00936", "2337", "旺宏", raw_market_info=None),
+            security_master=master,
+        )
+
+        self.assertEqual(normalized.symbol, "2337.TWO")
+        self.assertEqual(normalized.exchange, TPEX)
+        self.assertEqual(normalized.name_match_status, NAME_VARIANT)
+        self.assertEqual(normalized.security_master_source, "TPEx")
+
+    def test_unknown_code_remains_unresolved_and_large_unknown_regression_is_blocked(self):
+        master = self.security_master()
+        records = tuple(
+            ETFConstituentRecord("00936", f"9{code:03d}", f"未知{code}", raw_market_info=None)
+            for code in range(10)
+        )
+        snapshots = tuple(
+            ETFConstituentSnapshot(source=snapshot.source, constituents=records if index == 7 else tuple())
+            for index, snapshot in enumerate(self.snapshots())
+        )
+
+        universe = build_frozen_etf_universe(snapshots, retrieved_at=RETRIEVED_AT, security_master=master)
+
+        self.assertEqual(universe.raw_membership_count, 10)
+        self.assertEqual(universe.normalized_membership_count, 0)
+        self.assertEqual(universe.exchange_unresolved_count, 10)
+        self.assertEqual(universe.normalization_status, NORMALIZATION_INCOMPLETE)
+        self.assertTrue(all(exclusion.reason == EXCLUSION_UNKNOWN_EXCHANGE for exclusion in universe.exclusions))
+
+    def test_non_stock_and_etf_security_are_excluded_from_research_universe(self):
+        master = self.security_master()
+        etf = normalize_constituent_record(
+            ETFConstituentRecord("00936", "0050", "元大台灣50", raw_market_info=None),
+            security_master=master,
+        )
+        warrant = normalize_constituent_record(
+            ETFConstituentRecord("00936", "1234", "測試權證", raw_market_info=None),
+            security_master=master,
+        )
+
+        self.assertEqual(etf.reason, EXCLUSION_NON_STOCK)
+        self.assertIn(SECURITY_TYPE_ETF, etf.detail)
+        self.assertEqual(warrant.reason, EXCLUSION_NON_STOCK)
+        self.assertIn(SECURITY_TYPE_WARRANT, warrant.detail)
+
+    def test_research_etf_source_code_is_excluded_even_without_master_hit(self):
+        excluded = normalize_constituent_record(
+            ETFConstituentRecord("00936", "0050", "元大台灣50", raw_market_info=None)
+        )
+
+        self.assertEqual(excluded.reason, EXCLUSION_NON_STOCK)
+        self.assertIn("ETF research source", excluded.detail)
+
+    def test_existing_mapping_fallback_remains_after_official_master_miss(self):
+        master = TaiwanSecurityMaster(tuple())
+
+        fallback = normalize_constituent_record(
+            ETFConstituentRecord("0052", "6488", "環球晶", raw_market_info=None),
+            security_master=master,
+        )
+
+        self.assertEqual(fallback.symbol, "6488.TWO")
+        self.assertIsNone(fallback.security_master_source)
+
+    def test_name_conflict_does_not_break_identity_resolution(self):
+        master = self.security_master()
+        normalized = normalize_constituent_record(
+            ETFConstituentRecord("0050", "2330", "完全不同名稱", raw_market_info=None),
+            security_master=master,
+        )
+
+        self.assertEqual(normalized.symbol, "2330.TW")
+        self.assertEqual(normalized.name_match_status, NAME_CONFLICT)
+        self.assertEqual(name_match_status("台積電", "台積電"), NAME_MATCH)
+
+    def test_00936_tpex_constituent_normalizes_to_two_with_lineage(self):
+        master = self.security_master()
+        snapshots = tuple(
+            ETFConstituentSnapshot(
+                source=snapshot.source,
+                constituents=(
+                    ETFConstituentRecord("00936", "5347", "世界", raw_market_info=None),
+                    ETFConstituentRecord("00936", "6488", "環球晶", raw_market_info=None),
+                )
+                if snapshot.source.etf_code == "00936"
+                else tuple(),
+            )
+            for snapshot in self.snapshots()
+        )
+
+        universe = build_frozen_etf_universe(snapshots, retrieved_at=RETRIEVED_AT, security_master=master)
+
+        self.assertEqual(universe.tpex_count, 2)
+        self.assertEqual(universe.normalization_status, NORMALIZATION_COMPLETE)
+        self.assertEqual(tuple(membership.symbol for membership in universe.memberships), ("5347.TWO", "6488.TWO"))
+        self.assertEqual(universe.memberships[0].source_etfs, ("00936",))
+
+    def test_source_complete_does_not_finalize_when_normalization_is_incomplete(self):
+        complete_audit = OfficialSourceAccessAudit(
+            etf_code="0050",
+            canonical_url="https://example.test",
+            http_status=200,
+            final_url="https://example.test",
+            tls_verified=True,
+            source_access_status=SOURCE_STATUS_AVAILABLE,
+            page_title=None,
+            constituent_table_available=True,
+            holdings_date=date(2026, 8, 7),
+            parser_status=PARSER_STATUS_PARSED,
+            raw_constituent_count=50,
+            completeness_status=PARSED_COMPLETE,
+        )
+        snapshots = tuple(
+            ETFConstituentSnapshot(
+                source=snapshot.source,
+                constituents=(ETFConstituentRecord("0050", "9999", "未知", raw_market_info=None),)
+                if snapshot.source.etf_code == "0050"
+                else tuple(),
+            )
+            for snapshot in self.snapshots()
+        )
+        universe = build_frozen_etf_universe(
+            snapshots,
+            retrieved_at=RETRIEVED_AT,
+            security_master=TaiwanSecurityMaster(tuple()),
+        )
+
+        audit = audit_etf_universe_finalization((complete_audit,) * 8, universe=universe)
+
+        self.assertEqual(audit.source_completion_status, SOURCE_COMPLETION_COMPLETE)
+        self.assertEqual(audit.normalization_status, NORMALIZATION_INCOMPLETE)
+        self.assertEqual(audit.universe_status, UNIVERSE_STATUS_NOT_FINALIZED)
+        self.assertIn("UNKNOWN_EXCHANGE", audit.blocker)
+
+    def test_frozen_universe_build_is_deterministic_and_keeps_inputs_immutable(self):
+        master = self.security_master()
+        snapshots = self.snapshots()
+        before = snapshots
+
+        first = build_frozen_etf_universe(snapshots, retrieved_at=RETRIEVED_AT, security_master=master)
+        second = build_frozen_etf_universe(snapshots, retrieved_at=RETRIEVED_AT, security_master=master)
+
+        self.assertEqual(first, second)
+        self.assertEqual(snapshots, before)
 
     def test_official_access_audit_records_redirect_tls_and_parser_state_separately(self):
         source = predefined_etf_sources()[2]

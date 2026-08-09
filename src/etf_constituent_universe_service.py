@@ -13,6 +13,10 @@ from pathlib import Path
 from types import MappingProxyType
 
 from database import DEFAULT_DB_PATH
+from taiwan_security_master_service import NAME_NOT_CHECKED
+from taiwan_security_master_service import RESOLUTION_RESOLVED
+from taiwan_security_master_service import SECURITY_TYPE_COMMON_STOCK
+from taiwan_security_master_service import TaiwanSecurityMaster
 from volume_threshold_robustness_service import DEFAULT_OBSERVATION_END
 from volume_threshold_robustness_service import DEFAULT_OBSERVATION_START
 from volume_threshold_robustness_service import DEFAULT_OUTCOME_HORIZON_BARS
@@ -31,6 +35,10 @@ TRANSPORT_REQUESTS_VERIFIED = "TRANSPORT_REQUESTS_VERIFIED"
 TRANSPORT_CURL_VERIFIED = "TRANSPORT_CURL_VERIFIED"
 UNIVERSE_STATUS_NOT_FINALIZED = "NOT_FINALIZED"
 UNIVERSE_STATUS_FINALIZED = "FINALIZED"
+SOURCE_COMPLETION_COMPLETE = "SOURCE_SNAPSHOT_COMPLETE"
+SOURCE_COMPLETION_INCOMPLETE = "SOURCE_SNAPSHOT_INCOMPLETE"
+NORMALIZATION_COMPLETE = "NORMALIZATION_COMPLETE"
+NORMALIZATION_INCOMPLETE = "NORMALIZATION_INCOMPLETE"
 COMPLETENESS_UNKNOWN = "COMPLETENESS_UNKNOWN"
 PARSED_INCOMPLETE = "PARSED_INCOMPLETE"
 PARSED_COMPLETE = "PARSED_COMPLETE"
@@ -92,6 +100,7 @@ _TWSE_CODES = frozenset(
 
 _TPEX_CODES = frozenset({"6488"})
 _NON_STOCK_IDENTIFIERS = frozenset({"CASH", "TX", "NYF", "ETF", "BOND", "FUTURE"})
+_RESEARCH_ETF_SOURCE_CODES = frozenset({"0050", "0051", "0052", "0056", "00733", "00878", "00919", "00936"})
 _OFFICIAL_EXPECTED_CONSTITUENT_COUNTS = MappingProxyType({"0050": 50, "0051": 100, "0056": 50})
 
 
@@ -224,6 +233,10 @@ class ETFConstituentMembership:
 
     etf_membership_count: int
 
+    name_match_status: str = NAME_NOT_CHECKED
+
+    security_master_source: str | None = None
+
 
 @dataclass(frozen=True)
 class ETFConstituentExclusion:
@@ -266,6 +279,14 @@ class FrozenETFUniverse:
 
     excluded_count: int
 
+    normalization_status: str = NORMALIZATION_INCOMPLETE
+
+    exchange_unresolved_count: int = 0
+
+    non_stock_exclusion_count: int = 0
+
+    invalid_exclusion_count: int = 0
+
 
 @dataclass(frozen=True)
 class PartialParsedUniverseAudit:
@@ -301,6 +322,10 @@ class ETFUniverseFinalizationAudit:
     unresolved_source_count: int
 
     blocker: str | None
+
+    source_completion_status: str = SOURCE_COMPLETION_INCOMPLETE
+
+    normalization_status: str = NORMALIZATION_INCOMPLETE
 
 
 @dataclass(frozen=True)
@@ -460,6 +485,7 @@ def build_frozen_etf_universe(
     *,
     universe_version: str = UNIVERSE_VERSION,
     retrieved_at: datetime | None = None,
+    security_master: TaiwanSecurityMaster | None = None,
 ) -> FrozenETFUniverse:
     snapshot_tuple = tuple(snapshots)
     _validate_snapshot_sources(snapshot_tuple)
@@ -474,7 +500,7 @@ def build_frozen_etf_universe(
     for snapshot in snapshot_tuple:
         raw_membership_count += len(snapshot.constituents)
         for record in snapshot.constituents:
-            normalized = normalize_constituent_record(record)
+            normalized = normalize_constituent_record(record, security_master=security_master)
             if isinstance(normalized, ETFConstituentExclusion):
                 exclusions.append(normalized)
                 continue
@@ -491,6 +517,8 @@ def build_frozen_etf_universe(
                     exchange=existing.exchange,
                     source_etfs=existing.source_etfs,
                     etf_membership_count=existing.etf_membership_count,
+                    name_match_status=existing.name_match_status,
+                    security_master_source=existing.security_master_source,
                 )
 
     memberships = []
@@ -515,6 +543,10 @@ def build_frozen_etf_universe(
     retrieval_timestamps = (retrieved_at,)
     twse_count = sum(1 for membership in memberships if membership.exchange == TWSE)
     tpex_count = sum(1 for membership in memberships if membership.exchange == TPEX)
+    exchange_unresolved_count = sum(1 for exclusion in exclusions if exclusion.reason == EXCLUSION_UNKNOWN_EXCHANGE)
+    non_stock_exclusion_count = sum(1 for exclusion in exclusions if exclusion.reason == EXCLUSION_NON_STOCK)
+    invalid_exclusion_count = sum(1 for exclusion in exclusions if exclusion.reason == EXCLUSION_INVALID_SYMBOL)
+    normalization_status = NORMALIZATION_COMPLETE if exchange_unresolved_count == 0 else NORMALIZATION_INCOMPLETE
     return FrozenETFUniverse(
         universe_version=universe_version,
         sources=sources,
@@ -529,6 +561,10 @@ def build_frozen_etf_universe(
         twse_count=twse_count,
         tpex_count=tpex_count,
         excluded_count=len(exclusions),
+        normalization_status=normalization_status,
+        exchange_unresolved_count=exchange_unresolved_count,
+        non_stock_exclusion_count=non_stock_exclusion_count,
+        invalid_exclusion_count=invalid_exclusion_count,
     )
 
 
@@ -563,6 +599,7 @@ def audit_etf_universe_finalization(
     audits: tuple[OfficialSourceAccessAudit, ...],
     *,
     required_source_count: int = 8,
+    universe: FrozenETFUniverse | None = None,
 ) -> ETFUniverseFinalizationAudit:
     complete = sum(1 for audit in audits if audit.completeness_status == PARSED_COMPLETE)
     incomplete = sum(1 for audit in audits if audit.completeness_status == PARSED_INCOMPLETE)
@@ -572,12 +609,23 @@ def audit_etf_universe_finalization(
         if audit.completeness_status != PARSED_COMPLETE and audit.completeness_status != PARSED_INCOMPLETE
     )
     blocker = None
+    source_completion_status = SOURCE_COMPLETION_COMPLETE
+    normalization_status = universe.normalization_status if universe is not None else NORMALIZATION_COMPLETE
     status = UNIVERSE_STATUS_FINALIZED
     if complete != required_source_count or len(audits) != required_source_count:
+        source_completion_status = SOURCE_COMPLETION_INCOMPLETE
         status = UNIVERSE_STATUS_NOT_FINALIZED
         blocker = (
             f"Final frozen ETF universe requires {required_source_count}/{required_source_count} "
             f"PARSED_COMPLETE sources; got {complete}/{required_source_count}."
+        )
+    elif universe is not None and universe.exchange_unresolved_count > 0:
+        normalization_status = NORMALIZATION_INCOMPLETE
+        status = UNIVERSE_STATUS_NOT_FINALIZED
+        blocker = (
+            "Final frozen ETF universe requires all legitimate Taiwan equity constituent codes "
+            f"to resolve exchange or carry a valid exclusion; got {universe.exchange_unresolved_count} "
+            "UNKNOWN_EXCHANGE exclusions."
         )
     return ETFUniverseFinalizationAudit(
         universe_version=UNIVERSE_VERSION,
@@ -586,11 +634,15 @@ def audit_etf_universe_finalization(
         incomplete_source_count=incomplete,
         unresolved_source_count=unresolved,
         blocker=blocker,
+        source_completion_status=source_completion_status,
+        normalization_status=normalization_status,
     )
 
 
 def normalize_constituent_record(
     record: ETFConstituentRecord,
+    *,
+    security_master: TaiwanSecurityMaster | None = None,
 ) -> ETFConstituentMembership | ETFConstituentExclusion:
     raw_code = str(record.stock_code).strip().upper()
     raw_name = record.stock_name.strip()
@@ -608,6 +660,13 @@ def normalize_constituent_record(
             reason=EXCLUSION_NON_STOCK,
             detail=raw_name or record.raw_market_info,
         )
+    if raw_code in _RESEARCH_ETF_SOURCE_CODES:
+        return ETFConstituentExclusion(
+            raw_identifier=raw_code,
+            source_etf=record.etf_code,
+            reason=EXCLUSION_NON_STOCK,
+            detail="Known ETF research source code must not be treated as a stock constituent.",
+        )
     if not (raw_code.isdigit() and len(raw_code) == 4):
         return ETFConstituentExclusion(
             raw_identifier=raw_code,
@@ -616,7 +675,28 @@ def normalize_constituent_record(
             detail="Taiwan common stock code must be four digits.",
         )
 
-    exchange = infer_exchange(raw_code, record.raw_market_info)
+    exchange = None
+    name_match_status_value = NAME_NOT_CHECKED
+    security_master_source = None
+    if security_master is not None:
+        resolution = security_master.resolve(raw_code, raw_name)
+        if resolution.status == RESOLUTION_RESOLVED and resolution.record is not None:
+            master_record = resolution.record
+            if master_record.security_type != SECURITY_TYPE_COMMON_STOCK:
+                return ETFConstituentExclusion(
+                    raw_identifier=raw_code,
+                    source_etf=record.etf_code,
+                    reason=EXCLUSION_NON_STOCK,
+                    detail=(
+                        f"Official security master classifies {raw_code} as "
+                        f"{master_record.security_type} on {master_record.exchange}."
+                    ),
+                )
+            exchange = master_record.exchange
+            name_match_status_value = resolution.name_match_status
+            security_master_source = master_record.source_authority
+    if exchange is None:
+        exchange = infer_exchange(raw_code, record.raw_market_info)
     if exchange is None:
         return ETFConstituentExclusion(
             raw_identifier=raw_code,
@@ -632,6 +712,8 @@ def normalize_constituent_record(
         exchange=exchange,
         source_etfs=(record.etf_code,),
         etf_membership_count=1,
+        name_match_status=name_match_status_value,
+        security_master_source=security_master_source,
     )
 
 
@@ -1202,9 +1284,10 @@ def build_universe_with_coverage_audit(
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
     retrieved_at: datetime | None = None,
+    security_master: TaiwanSecurityMaster | None = None,
 ) -> ETFUniverseBuildResult:
     db_before = database_file_audit(db_path)
-    universe = build_frozen_etf_universe(snapshots, retrieved_at=retrieved_at)
+    universe = build_frozen_etf_universe(snapshots, retrieved_at=retrieved_at, security_master=security_master)
     coverage = audit_universe_local_coverage(universe, db_path=db_path)
     db_after = database_file_audit(db_path)
     return ETFUniverseBuildResult(
