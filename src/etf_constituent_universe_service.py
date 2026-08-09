@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC
@@ -20,6 +21,9 @@ UNIVERSE_VERSION = "2026-08-current-etf-constituent-v1"
 SOURCE_STATUS_AVAILABLE = "AVAILABLE"
 SOURCE_STATUS_UNAVAILABLE = "SOURCE_UNAVAILABLE"
 SOURCE_STATUS_NOT_RETRIEVED = "NOT_RETRIEVED"
+PARSER_STATUS_NOT_RUN = "PARSER_NOT_RUN"
+PARSER_STATUS_PARSED = "PARSED"
+PARSER_STATUS_FAILED = "PARSER_FAILED"
 SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS = "issuer_official_holdings"
 SOURCE_TYPE_ISSUER_OFFICIAL_PCF = "issuer_official_pcf"
 
@@ -108,6 +112,38 @@ class ETFUniverseSource:
     raw_constituent_count: int = 0
 
     unavailable_reason: str | None = None
+
+    parser_status: str = PARSER_STATUS_NOT_RUN
+
+    parser_error: str | None = None
+
+
+@dataclass(frozen=True)
+class OfficialSourceAccessAudit:
+
+    etf_code: str
+
+    canonical_url: str
+
+    http_status: int | None
+
+    final_url: str | None
+
+    tls_verified: bool
+
+    source_access_status: str
+
+    page_title: str | None
+
+    constituent_table_available: bool
+
+    holdings_date: date | None
+
+    parser_status: str
+
+    raw_constituent_count: int
+
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -250,7 +286,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="元大台灣50",
         issuer="元大投信",
         category="大型權值",
-        official_source_url="https://www.yuantaetf.com/product/detail/0050/ratio",
+        official_source_url="https://www.yuantaetfs.com/product/detail/0050/ratio",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -258,7 +294,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="元大中型100",
         issuer="元大投信",
         category="中型股 breadth",
-        official_source_url="https://www.yuantaetf.com/product/detail/0051/ratio",
+        official_source_url="https://www.yuantaetfs.com/product/detail/0051/ratio",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -266,7 +302,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="富邦科技",
         issuer="富邦投信",
         category="科技",
-        official_source_url="https://www.fubon.com/asset-management/ph/0052/index.html",
+        official_source_url="https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -274,7 +310,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="元大高股息",
         issuer="元大投信",
         category="高股息",
-        official_source_url="https://www.yuantaetf.com/product/detail/0056/ratio",
+        official_source_url="https://www.yuantaetfs.com/product/detail/0056/ratio",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -282,7 +318,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="富邦臺灣中小",
         issuer="富邦投信",
         category="中小型 / 動能",
-        official_source_url="https://www.fubon.com/asset-management/ETF/etf-detail/00733",
+        official_source_url="https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=00733",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -290,7 +326,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="國泰永續高股息",
         issuer="國泰投信",
         category="ESG + 高股息",
-        official_source_url="https://www.cathaysite.com.tw/funds/etf/00878",
+        official_source_url="https://www.cathaysite.com.tw/proj/202201dividends/etf/product?etf=00878",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -298,7 +334,7 @@ PREDEFINED_ETF_SOURCES = (
         etf_name="群益台灣精選高息",
         issuer="群益投信",
         category="另一套高股息 selection methodology",
-        official_source_url="https://www.capitalfund.com.tw/ETF/product/detail/00919",
+        official_source_url="https://www.capitalfund.com.tw/etf/product/detail/195/portfolio",
         source_type=SOURCE_TYPE_ISSUER_OFFICIAL_HOLDINGS,
     ),
     ETFUniverseSource(
@@ -336,6 +372,7 @@ def mark_sources_unavailable(
             retrieved_date=stamp,
             raw_constituent_count=0,
             unavailable_reason=reasons.get(source.etf_code, "Official source was not available in this run."),
+            parser_status=PARSER_STATUS_NOT_RUN,
         )
         for source in PREDEFINED_ETF_SOURCES
     )
@@ -502,6 +539,108 @@ def infer_exchange(stock_code: str, raw_market_info: str | None = None) -> str |
     if stock_code in _TPEX_CODES:
         return TPEX
     return None
+
+
+def audit_official_source_access(
+    source: ETFUniverseSource,
+    *,
+    fetcher=None,
+) -> OfficialSourceAccessAudit:
+    response = None
+    try:
+        if fetcher is None:
+            response = _fetch_official_source_strict_tls(source.official_source_url)
+        else:
+            response = fetcher(source.official_source_url)
+        html = response["text"]
+        title = _extract_title(html)
+        holdings_date = _extract_holdings_date(html)
+        constituent_table_available = _has_constituent_table(html)
+        parser_status = PARSER_STATUS_NOT_RUN
+        parser_error = None
+        raw_count = 0
+        if source.etf_code in {"0052", "00733"} and constituent_table_available:
+            try:
+                records = parse_fubon_asset_page(
+                    html,
+                    etf_code=source.etf_code,
+                    holdings_date=holdings_date,
+                    source_url=response["final_url"],
+                )
+                parser_status = PARSER_STATUS_PARSED
+                raw_count = len(records)
+            except Exception as exc:
+                parser_status = PARSER_STATUS_FAILED
+                parser_error = f"{type(exc).__name__}: {exc}"
+        return OfficialSourceAccessAudit(
+            etf_code=source.etf_code,
+            canonical_url=source.official_source_url,
+            http_status=response["http_status"],
+            final_url=response["final_url"],
+            tls_verified=True,
+            source_access_status=SOURCE_STATUS_AVAILABLE,
+            page_title=title,
+            constituent_table_available=constituent_table_available,
+            holdings_date=holdings_date,
+            parser_status=parser_status,
+            raw_constituent_count=raw_count,
+            error=parser_error,
+        )
+    except Exception as exc:
+        return OfficialSourceAccessAudit(
+            etf_code=source.etf_code,
+            canonical_url=source.official_source_url,
+            http_status=response["http_status"] if response else None,
+            final_url=response["final_url"] if response else None,
+            tls_verified=False,
+            source_access_status=SOURCE_STATUS_UNAVAILABLE,
+            page_title=None,
+            constituent_table_available=False,
+            holdings_date=None,
+            parser_status=PARSER_STATUS_NOT_RUN,
+            raw_constituent_count=0,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+
+
+def parse_fubon_asset_page(
+    html: str,
+    *,
+    etf_code: str,
+    holdings_date: date | None,
+    source_url: str,
+) -> tuple[ETFConstituentRecord, ...]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        header = tuple(cell.get_text(strip=True) for cell in rows[0].find_all(["td", "th"]))
+        if header[:5] != ("股票代碼", "股票名稱", "股數", "金額", "權重(%)"):
+            continue
+        records = []
+        for row in rows[1:]:
+            cells = tuple(cell.get_text(strip=True) for cell in row.find_all(["td", "th"]))
+            if len(cells) < 5:
+                continue
+            stock_code, stock_name, _shares, _amount, raw_weight = cells[:5]
+            records.append(
+                ETFConstituentRecord(
+                    etf_code=etf_code,
+                    stock_code=stock_code,
+                    stock_name=stock_name,
+                    raw_market_info=None,
+                    raw_weight=_parse_percent(raw_weight),
+                    holdings_date=holdings_date,
+                    source_url=source_url,
+                )
+            )
+        if not records:
+            raise ETFConstituentUniverseError(f"No stock rows found in Fubon asset table for {etf_code}.")
+        return tuple(records)
+    raise ETFConstituentUniverseError(f"No Fubon stock holdings table found for {etf_code}.")
 
 
 def audit_universe_local_coverage(
@@ -693,6 +832,54 @@ def _connect_read_only(db_path: Path | str) -> sqlite3.Connection:
     connection = sqlite3.connect(uri, uri=True)
     connection.execute("PRAGMA query_only=ON")
     return connection
+
+
+def _fetch_official_source_strict_tls(url: str) -> dict[str, object]:
+    import requests
+
+    response = requests.get(
+        url,
+        timeout=20,
+        headers={"User-Agent": "Mozilla/5.0"},
+        verify=True,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    return {
+        "http_status": response.status_code,
+        "final_url": response.url,
+        "text": response.text,
+    }
+
+
+def _extract_title(html: str) -> str | None:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    if soup.title and soup.title.string:
+        return " ".join(soup.title.string.split())
+    return None
+
+
+def _extract_holdings_date(html: str) -> date | None:
+    match = re.search(r"資料日期[：: ]*(20\d{2})[/-](\d{1,2})[/-](\d{1,2})", html)
+    if match is None:
+        return None
+    return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
+def _has_constituent_table(html: str) -> bool:
+    return (
+        ("股票代碼" in html and "股票名稱" in html and "權重" in html)
+        or ("代號" in html and "名稱" in html and "持股權重" in html)
+    )
+
+
+def _parse_percent(value: str) -> float | None:
+    cleaned = value.replace(",", "").replace("%", "").strip()
+    if not cleaned:
+        return None
+    return float(cleaned)
 
 
 def _is_valid_taiwan_symbol(symbol: str) -> bool:

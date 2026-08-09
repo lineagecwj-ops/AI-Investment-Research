@@ -26,17 +26,22 @@ from etf_constituent_universe_service import ETFConstituentUniverseError
 from etf_constituent_universe_service import ETFUniverseBuildResult
 from etf_constituent_universe_service import ETFUniverseSource
 from etf_constituent_universe_service import FrozenETFUniverse
+from etf_constituent_universe_service import PARSER_STATUS_FAILED
+from etf_constituent_universe_service import PARSER_STATUS_NOT_RUN
+from etf_constituent_universe_service import PARSER_STATUS_PARSED
 from etf_constituent_universe_service import SOURCE_STATUS_AVAILABLE
 from etf_constituent_universe_service import SOURCE_STATUS_UNAVAILABLE
 from etf_constituent_universe_service import SymbolCoverageAudit
 from etf_constituent_universe_service import UNIVERSE_VERSION
 from etf_constituent_universe_service import audit_universe_local_coverage
+from etf_constituent_universe_service import audit_official_source_access
 from etf_constituent_universe_service import build_frozen_etf_universe
 from etf_constituent_universe_service import build_source_unavailable_universe
 from etf_constituent_universe_service import build_universe_with_coverage_audit
 from etf_constituent_universe_service import database_file_audit
 from etf_constituent_universe_service import mark_sources_unavailable
 from etf_constituent_universe_service import normalize_constituent_record
+from etf_constituent_universe_service import parse_fubon_asset_page
 from etf_constituent_universe_service import predefined_etf_sources
 
 
@@ -196,6 +201,17 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
             tuple(source.etf_code for source in sources),
             ("0050", "0051", "0052", "0056", "00733", "00878", "00919", "00936"),
         )
+        self.assertEqual(sources[0].official_source_url, "https://www.yuantaetfs.com/product/detail/0050/ratio")
+        self.assertEqual(sources[1].official_source_url, "https://www.yuantaetfs.com/product/detail/0051/ratio")
+        self.assertEqual(sources[3].official_source_url, "https://www.yuantaetfs.com/product/detail/0056/ratio")
+        self.assertEqual(
+            sources[2].official_source_url,
+            "https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052",
+        )
+        self.assertEqual(
+            sources[4].official_source_url,
+            "https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=00733",
+        )
         self.assertEqual(len(sources), 8)
         self.assertTrue(all(source.issuer for source in sources))
         self.assertTrue(all(source.category for source in sources))
@@ -241,6 +257,95 @@ class ETFConstituentUniverseServiceTestCase(unittest.TestCase):
         self.assertEqual(tw.symbol, "2330.TW")
         self.assertEqual(two.symbol, "6488.TWO")
         self.assertEqual(invalid.reason, EXCLUSION_INVALID_SYMBOL)
+
+    def test_official_access_audit_records_redirect_tls_and_parser_state_separately(self):
+        source = predefined_etf_sources()[2]
+        html = """
+        <html><head><title>富邦投信ETF投資網</title></head>
+        <body>
+          <p>資料日期：2026/08/07</p>
+          <table><tr><td>期貨代碼</td></tr><tr><td>WTEQ6F</td></tr></table>
+          <table>
+            <tr><td>股票代碼</td><td>股票名稱</td><td>股數</td><td>金額</td><td>權重(%)</td></tr>
+            <tr><td>2330</td><td>台積電</td><td>1</td><td>100</td><td>65.37</td></tr>
+            <tr><td>2454</td><td>聯發科</td><td>1</td><td>100</td><td>6.49</td></tr>
+          </table>
+        </body></html>
+        """
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url + "&redirected=1",
+                "text": html,
+            },
+        )
+
+        self.assertEqual(audit.source_access_status, SOURCE_STATUS_AVAILABLE)
+        self.assertEqual(audit.http_status, 200)
+        self.assertTrue(audit.tls_verified)
+        self.assertTrue(audit.constituent_table_available)
+        self.assertEqual(audit.holdings_date, date(2026, 8, 7))
+        self.assertEqual(audit.parser_status, PARSER_STATUS_PARSED)
+        self.assertEqual(audit.raw_constituent_count, 2)
+        self.assertIn("redirected=1", audit.final_url)
+
+    def test_parser_failure_is_not_source_unavailable(self):
+        source = predefined_etf_sources()[2]
+        html = """
+        <html><head><title>富邦投信ETF投資網</title></head>
+        <body>資料日期：2026/08/07 股票代碼 股票名稱 權重</body></html>
+        """
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda url: {
+                "http_status": 200,
+                "final_url": url,
+                "text": html,
+            },
+        )
+
+        self.assertEqual(audit.source_access_status, SOURCE_STATUS_AVAILABLE)
+        self.assertEqual(audit.parser_status, PARSER_STATUS_FAILED)
+        self.assertIn("No Fubon stock holdings table", audit.error)
+
+    def test_tls_failure_is_source_unavailable_and_parser_not_run(self):
+        source = predefined_etf_sources()[0]
+
+        audit = audit_official_source_access(
+            source,
+            fetcher=lambda _url: (_ for _ in ()).throw(RuntimeError("certificate verify failed")),
+        )
+
+        self.assertEqual(audit.source_access_status, SOURCE_STATUS_UNAVAILABLE)
+        self.assertFalse(audit.tls_verified)
+        self.assertEqual(audit.parser_status, PARSER_STATUS_NOT_RUN)
+        self.assertIn("certificate verify failed", audit.error)
+
+    def test_parse_fubon_asset_page_uses_only_stock_holdings_table(self):
+        html = """
+        <html><body>
+          <table><tr><td>期貨代碼</td><td>期貨名稱</td></tr><tr><td>WTEQ6F</td><td>電子期貨</td></tr></table>
+          <table>
+            <tr><td>股票代碼</td><td>股票名稱</td><td>股數</td><td>金額</td><td>權重(%)</td></tr>
+            <tr><td>2330</td><td>台積電</td><td>44,371,027</td><td>105,159,333,990</td><td>65.3782</td></tr>
+            <tr><td>2454</td><td>聯發科</td><td>2,679,703</td><td>10,450,841,700</td><td>6.4973</td></tr>
+          </table>
+        </body></html>
+        """
+
+        records = parse_fubon_asset_page(
+            html,
+            etf_code="0052",
+            holdings_date=date(2026, 8, 7),
+            source_url="https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052",
+        )
+
+        self.assertEqual(tuple(record.stock_code for record in records), ("2330", "2454"))
+        self.assertEqual(records[0].raw_weight, 65.3782)
+        self.assertEqual(records[0].holdings_date, date(2026, 8, 7))
 
     def test_source_unavailable_handling_keeps_all_sources(self):
         universe = build_source_unavailable_universe(

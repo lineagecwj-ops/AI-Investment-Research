@@ -25,6 +25,19 @@ The ETF list is frozen before any coverage or threshold result:
 
 ETF sources must remain exactly this list and this order. The universe builder rejects reordering, missing ETFs, added ETFs, or outcome-selected ETF lists.
 
+Canonical official source URLs:
+
+| ETF | Canonical official URL |
+| --- | --- |
+| `0050` | `https://www.yuantaetfs.com/product/detail/0050/ratio` |
+| `0051` | `https://www.yuantaetfs.com/product/detail/0051/ratio` |
+| `0052` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=0052` |
+| `0056` | `https://www.yuantaetfs.com/product/detail/0056/ratio` |
+| `00733` | `https://websys.fsit.com.tw/FubonETF/Fund/Assets.aspx?stkId=00733` |
+| `00878` | `https://www.cathaysite.com.tw/proj/202201dividends/etf/product?etf=00878` |
+| `00919` | `https://www.capitalfund.com.tw/etf/product/detail/195/portfolio` |
+| `00936` | `https://www.tsit.com.tw/ETF/Home/ETFSeriesDetail/00936` |
+
 ## Official-Source Policy
 
 Source priority:
@@ -35,6 +48,10 @@ Source priority:
 4. Secondary source only if official source is unavailable and explicitly approved later
 
 If an official source cannot be retrieved in the execution environment, the source must be marked `SOURCE_UNAVAILABLE`. The implementation must not silently switch to a secondary source.
+
+Source access status and parser status are separate. A reachable official page can still be `PARSER_FAILED`, and a parser failure must not be reported as `SOURCE_UNAVAILABLE`.
+
+TLS verification must stay enabled. Do not use `verify=False`, unverified HTTPS contexts, or certificate verification bypasses. If Python cannot validate a site that system tools can validate, record the exact Python TLS / CA bundle error and fix the runtime or CA chain safely before using that source.
 
 ## Source Metadata
 
