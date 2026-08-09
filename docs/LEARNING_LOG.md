@@ -1,5 +1,26 @@
 # Learning Log
 
+## 2026-08-09 — V1 Historical Condition Diagnostics Dashboard Batch 3
+
+### Completed Features
+
+- Streamlit `Swing Research` 新增 `V1 歷史條件診斷` beginner dashboard section。
+- Dashboard 使用明確按鈕 `執行 V1 歷史診斷`，執行後把 Batch 1 diagnostics 與 Batch 2 outcome comparison 存在 `historical_condition_dashboard_*` session state。
+- 新增 read-only SQLite historical price cache loader，使用 `mode=ro` 讀取 `data/stocks.db`，不呼叫 Yahoo、不初始化或 migrate database、不寫 cache。
+- 新增 presentation helpers，產生 0/5～5/5 Historical Hit Rate + n rows、4/5 missing-condition rows、single-condition pass-rate rows、advanced status rows、metadata rows、monotonic / neutral summary text 與 stale-session guard。
+- Dashboard 使用 beginner-first 繁中說明、安全 note、三層資訊架構，以及 collapsed advanced metadata。
+- 4/5 missing-condition rows 依 canonical V1 condition order 顯示，不依 Historical Hit Rate 排序。
+- Zero resolved samples 顯示 `N/A`，不是 `0%`。
+- 新增 focused presentation tests 與 Streamlit AppTest smoke coverage。
+- 新增 `docs/V1_HISTORICAL_CONDITION_DASHBOARD.md`，並更新 README 與 Swing Research Dashboard docs。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、V1 thresholds、PASS / FAIL semantics、dynamic scale、scanner logic、signal definition、technical formulas、backtest、Historical Replay、Walk-Forward Replay、OOS、database schema / content 或 OpenAI / AI logic。
+- Historical Hit Rate 仍來自 Batch 2 `summary.historical_hit_rate`，denominator 為 `HIT + MISS`。
+- Dashboard 是 descriptive historical statistics，不是 future probability、strategy win rate、recommendation、ranking、parameter tuning、V1.1 或 V2。
+- Live read-only validation for default five symbols and `2018-01-01`～`2025-12-31` matched expected aggregate baseline: total observations `9716`; counts `1433, 1906, 2368, 3017, 919, 73`; rates `7.89%, 16.47%, 36.87%, 58.67%, 73.23%, 90.41%`。
+
 ## 2026-08-09 — V1 Historical Condition Diagnostics Batch 2
 
 ### Completed Features

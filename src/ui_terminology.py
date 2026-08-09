@@ -126,6 +126,11 @@ DIAGNOSTIC_LABELS = {
     "Most Common Missing Condition": "最常缺少的條件",
     "Condition Combination": "條件組合",
     "4/5 Missing Condition Outcome": "4/5 案例：缺少條件與歷史後續結果",
+    "V1 Historical Condition Dashboard Caption": "查看歷史上符合不同數量 V1 條件時，後續研究結果有何差異。",
+    "V1 Condition Effectiveness Overview": "V1 條件有效性總覽",
+    "Conditions Causing Differences": "哪些條件最常造成差異",
+    "Hard-To-Pass V1 Conditions": "哪些 V1 條件本來就比較難符合？",
+    "Advanced Research Information": "進階研究資訊",
     "Evaluated Observations": "可評估歷史樣本",
     "Not Evaluable": "無法評估",
     "Observation Count": "歷史樣本數",
@@ -171,6 +176,13 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "4/5 Missing Condition Outcome": (
         "比較只差一項 V1 條件的歷史樣本，了解不同缺失條件與後續歷史結果的差異。"
+    ),
+    "V1 Historical Condition Dashboard": (
+        "這裡會比較歷史上符合不同數量 V1 技術條件的樣本，"
+        "觀察之後 20 個交易日內，是否突破當時的前 60 日高點。"
+    ),
+    "V1 Historical Condition Safety Note": (
+        "這是歷史樣本的描述性統計，不是未來上漲機率，也不是買進建議。"
     ),
 }
 

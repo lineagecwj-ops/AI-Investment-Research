@@ -94,6 +94,27 @@ Period Summary + Cross-Period Comparison
 Period-local Candidate Stability
 ```
 
+V1 Historical Condition Diagnostics dashboard flow:
+
+```text
+Swing Research
+    ↓
+V1 歷史條件診斷 section
+    ↓
+Stock scope + observation date range
+    ↓
+Explicit 執行 V1 歷史診斷 submit
+    ↓
+Read data/stocks.db with SQLite mode=ro
+    ↓
+Batch 1 HistoricalConditionDiagnosticsResult
+    ↓
+Batch 2 HistoricalConditionOutcomeComparisonResult
+    ↓
+Beginner-first summary, 0/5～5/5 chart, 4/5 missing-condition table,
+single-condition pass-rate table, collapsed advanced metadata
+```
+
 ## Scan Setup
 
 The page accepts caller-provided symbols from an explicit source selector:
@@ -144,6 +165,18 @@ Out-of-Sample Validation uses:
 
 The default split is editable and is not described as optimized. The user must press `執行樣本外驗證`; changing setup fields, expanders, charts, or tables does not run validation.
 
+The `V1 歷史條件診斷` section uses a separate explicit button, `執行 V1 歷史診斷`. Changing the display scope, expanders, chart/table state, or other selectors only renders the stored `historical_condition_dashboard_*` session-state payload and does not rerun diagnostics, reload Yahoo, rerun scanner, rerun replay, rerun OOS, or write SQLite.
+
+The default diagnostic stock scope is the current research set:
+
+- `2330.TW`
+- `0050.TW`
+- `2337.TW`
+- `2404.TW`
+- `2454.TW`
+
+The default observation window is `2018-01-01` through `2025-12-31`.
+
 ## Source Snapshot and Fingerprint
 
 Swing Research stores scan-time source metadata in session state:
@@ -164,6 +197,62 @@ Out-of-Sample Validation uses a separate UI request fingerprint stored as `oos_v
 Switching Manual Input, Watchlist, or Saved Universe does not automatically scan.
 
 Switching between Current, Historical Replay, Walk-Forward Replay, and Out-of-Sample Validation does not automatically scan. If a stored Swing result came from another mode, the UI displays a mode mismatch warning. If OOS validation inputs changed, the UI displays that the current result came from a previous validation setup.
+
+The V1 historical condition diagnostics dashboard stores:
+
+- `historical_condition_dashboard_payload`
+- `historical_condition_dashboard_fingerprint`
+- `historical_condition_dashboard_last_error`
+- `historical_condition_dashboard_error_details`
+
+The fingerprint includes normalized symbols, observation start/end, signal id, outcome id, warm-up bars, and outcome horizon. If controls change after a run, the UI shows a stale-result warning and waits for another explicit submit.
+
+## V1 Historical Condition Diagnostics Dashboard
+
+The section title shown to users is `V1 歷史條件診斷`.
+
+The primary explanation is beginner-first:
+
+```text
+這裡會比較歷史上符合不同數量 V1 技術條件的樣本，
+觀察之後 20 個交易日內，
+是否突破當時的前 60 日高點。
+```
+
+The neutral safety note is:
+
+```text
+這是歷史樣本的描述性統計，不是未來上漲機率，也不是買進建議。
+```
+
+The dashboard has three visible layers:
+
+- `V1 條件有效性總覽`：0/5～5/5 Historical Hit Rate chart and table, always with resolved `n`.
+- `哪些條件最常造成差異`：4/5 missing-condition outcome comparison, displayed in canonical V1 condition order rather than hit-rate order.
+- `進階研究資訊`：collapsed HIT / MISS / INCOMPLETE / NOT_EVALUABLE counts, observation unit, overlap metadata, warm-up bars, outcome horizon, signal id, and outcome id.
+
+The single-condition pass-rate block is labeled `哪些 V1 條件本來就比較難符合？`. Pass rate means the condition was individually true among evaluable samples. A low pass rate does not mean the condition is bad.
+
+The Dashboard reuses Batch 1 and Batch 2 service contracts:
+
+- condition diagnostics reuse `technical_example_v1` and `evaluate_signal_conditions()`
+- outcome comparison reuses `raw_high_breakout_60d_within_20d_v1` and `evaluate_historical_outcome()`
+- Historical Hit Rate uses `summary.historical_hit_rate`, which is `HIT / (HIT + MISS)`
+- zero resolved samples display `N/A`, not `0%`
+- warm-up is `60` trading bars before observation start
+- outcome horizon is `20` trading bars after each observation
+- observation unit is `DAILY`
+- overlap possible is `True`
+
+The Dashboard uses a read-only SQLite connection (`mode=ro`) to `data/stocks.db`. It does not initialize or migrate the database, fetch Yahoo, write cache rows, add tables, update research semantics, change thresholds, change scanner logic, change signal definitions, change technical formulas, run backtests, run replay, run OOS, or call OpenAI / AI logic.
+
+For the five default symbols and `2018-01-01` to `2025-12-31`, the current run-local expected aggregate is:
+
+```text
+total observations = 9716
+0/5～5/5 observation counts = 1433, 1906, 2368, 3017, 919, 73
+0/5～5/5 Historical Hit Rate = 7.89%, 16.47%, 36.87%, 58.67%, 73.23%, 90.41%
+```
 
 ## Current Signal
 

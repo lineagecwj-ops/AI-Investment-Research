@@ -6,6 +6,7 @@ from datetime import UTC
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,10 @@ from models import TechnicalIndicatorSnapshot
 from models import TechnicalSignalCondition
 from signal_outcome_service import TECHNICAL_EXAMPLE_SIGNAL_V1
 from signal_outcome_service import evaluate_signal_conditions
+from swing_research_dashboard import HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL
+from swing_research_dashboard import HISTORICAL_CONDITION_MONOTONIC_SUMMARY
+from swing_research_dashboard import HISTORICAL_CONDITION_NEUTRAL_SUMMARY
+from swing_research_dashboard import HISTORICAL_CONDITION_SMALL_SAMPLE_NOTE
 from swing_research_dashboard import CASE_PREVIEW_LIMIT
 from swing_research_dashboard import CURRENT_SCAN_MODE
 from swing_research_dashboard import HISTORICAL_REPLAY_MODE
@@ -50,6 +55,8 @@ from swing_research_dashboard import build_replay_summary_rows
 from swing_research_dashboard import build_scan_summary_rows
 from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_beginner_indicator_explanations
+from swing_research_dashboard import build_historical_condition_dashboard_fingerprint
+from swing_research_dashboard import build_historical_condition_dashboard_view
 from swing_research_dashboard import build_technical_condition_detail_rows
 from swing_research_dashboard import build_technical_condition_detail_view
 from swing_research_dashboard import build_technical_condition_visual_specs
@@ -69,6 +76,8 @@ from swing_research_dashboard import current_match_trace_is_consistent
 from swing_research_dashboard import filter_case_preview_views
 from swing_research_dashboard import fingerprint_from_config
 from swing_research_dashboard import format_percentage
+from swing_research_dashboard import historical_condition_dashboard_result_is_stale
+from swing_research_dashboard import historical_condition_match_count_summary
 from swing_research_dashboard import latest_case_preview_rows
 from swing_research_dashboard import post_replay_outcome_rows
 from swing_research_dashboard import parse_swing_symbol_input
@@ -97,6 +106,242 @@ from walk_forward_replay_service import summarize_walk_forward_periods
 
 FETCHED_AT = datetime(2026, 8, 8, 1, 0, tzinfo=UTC)
 GENERATED_AT = datetime(2026, 8, 8, 2, 0, tzinfo=UTC)
+
+
+class HistoricalConditionDashboardPresentationTestCase(unittest.TestCase):
+
+    condition_ids = (
+        "analysis_close_vs_sma_20",
+        "sma_20_vs_sma_60",
+        "volume_ratio_20",
+        "rsi_14",
+        "distance_to_prior_60d_high",
+    )
+
+    def outcome_summary(
+        self,
+        *,
+        observation_count=0,
+        hit_count=0,
+        miss_count=0,
+        incomplete_count=0,
+        not_evaluable_count=0,
+    ):
+        resolved_count = hit_count + miss_count
+        return SimpleNamespace(
+            observation_count=observation_count,
+            hit_count=hit_count,
+            miss_count=miss_count,
+            incomplete_count=incomplete_count,
+            not_evaluable_count=not_evaluable_count,
+            resolved_count=resolved_count,
+            historical_hit_rate=None if resolved_count == 0 else hit_count / resolved_count,
+        )
+
+    def diagnostics_result(self):
+        pass_rows = tuple(
+            SimpleNamespace(
+                condition_id=condition_id,
+                display_name=label,
+                passed_count=passed,
+                failed_count=100 - passed,
+                evaluated_count=100,
+                pass_rate=passed / 100,
+            )
+            for condition_id, label, passed in (
+                ("analysis_close_vs_sma_20", "股價高於 20 日均線", 80),
+                ("sma_20_vs_sma_60", "20 日均線高於 60 日均線", 70),
+                ("volume_ratio_20", "20 日成交量比率", 30),
+                ("rsi_14", "RSI 14 日相對強弱指標", 40),
+                ("distance_to_prior_60d_high", "距離前 60 日高點", 20),
+            )
+        )
+        return SimpleNamespace(
+            config=SimpleNamespace(
+                start_date=date(2018, 1, 1),
+                end_date=date(2025, 12, 31),
+                signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+            ),
+            total_observation_count=100,
+            evaluated_observation_count=100,
+            not_evaluable_observation_count=0,
+            condition_pass_summaries=pass_rows,
+            per_symbol_summaries=(
+                SimpleNamespace(
+                    symbol="2330.TW",
+                    total_observation_count=10,
+                    evaluated_observation_count=10,
+                    not_evaluable_observation_count=0,
+                    condition_pass_summaries=pass_rows,
+                ),
+            ),
+        )
+
+    def comparison_result(self):
+        match_rows = tuple(
+            SimpleNamespace(
+                matched_count=matched_count,
+                total_count=5,
+                outcome_summary=summary,
+            )
+            for matched_count, summary in (
+                (0, self.outcome_summary(observation_count=10, hit_count=1, miss_count=9)),
+                (1, self.outcome_summary(observation_count=10, hit_count=2, miss_count=8)),
+                (2, self.outcome_summary(observation_count=10, hit_count=3, miss_count=7)),
+                (3, self.outcome_summary(observation_count=10, hit_count=4, miss_count=6)),
+                (4, self.outcome_summary(observation_count=10, hit_count=5, miss_count=5)),
+                (5, self.outcome_summary(observation_count=10, hit_count=9, miss_count=1)),
+            )
+        )
+        missing_rows = tuple(
+            SimpleNamespace(
+                condition_id=condition_id,
+                display_name=condition_id,
+                outcome_summary=summary,
+            )
+            for condition_id, summary in (
+                ("distance_to_prior_60d_high", self.outcome_summary(observation_count=8, hit_count=6, miss_count=2)),
+                ("volume_ratio_20", self.outcome_summary(observation_count=5, hit_count=2, miss_count=3)),
+                ("analysis_close_vs_sma_20", self.outcome_summary(observation_count=0)),
+                ("sma_20_vs_sma_60", self.outcome_summary(observation_count=1, hit_count=1)),
+                ("rsi_14", self.outcome_summary(observation_count=2, hit_count=1, miss_count=1)),
+            )
+        )
+        return SimpleNamespace(
+            config=SimpleNamespace(
+                warmup_trading_bars=60,
+                outcome_definition=SimpleNamespace(
+                    id="raw_high_breakout_60d_within_20d_v1",
+                    horizon_bars=20,
+                ),
+            ),
+            observation_unit="DAILY",
+            overlap_possible=True,
+            match_count_outcome_summaries=match_rows,
+            missing_condition_outcome_summaries=missing_rows,
+            per_symbol_summaries=(
+                SimpleNamespace(
+                    symbol="2330.TW",
+                    observation_count=10,
+                    match_count_outcome_summaries=match_rows,
+                    missing_condition_outcome_summaries=missing_rows,
+                ),
+            ),
+        )
+
+    def test_match_count_rows_map_rates_and_sample_counts(self):
+        view = build_historical_condition_dashboard_view(
+            self.diagnostics_result(),
+            self.comparison_result(),
+        )
+
+        self.assertEqual(view.match_count_rows[0]["符合條件數"], "0/5")
+        self.assertEqual(view.match_count_rows[0]["歷史命中率顯示"], "10.00%")
+        self.assertEqual(view.match_count_rows[0]["已解析歷史樣本數"], 10)
+        self.assertEqual(view.match_count_rows[5]["符合條件數"], "5/5")
+        self.assertEqual(view.match_count_rows[5]["歷史命中率顯示"], "90.00%")
+
+    def test_zero_resolved_samples_show_na_not_zero_percent(self):
+        result = self.comparison_result()
+        zero_row = result.missing_condition_outcome_summaries[2]
+
+        view = build_historical_condition_dashboard_view(self.diagnostics_result(), result)
+        zero_display = next(
+            row for row in view.missing_condition_rows
+            if row["未符合條件"] == "股價高於 20 日均線"
+        )
+
+        self.assertIsNone(zero_row.outcome_summary.historical_hit_rate)
+        self.assertEqual(zero_display["歷史命中率顯示"], "N/A")
+        self.assertEqual(zero_display["已解析歷史樣本數"], 0)
+
+    def test_four_of_five_front_high_group_uses_canonical_order_not_rate_sort(self):
+        view = build_historical_condition_dashboard_view(
+            self.diagnostics_result(),
+            self.comparison_result(),
+        )
+
+        self.assertEqual(
+            [row["未符合條件"] for row in view.missing_condition_rows],
+            [
+                "股價高於 20 日均線",
+                "20 日均線高於 60 日均線",
+                "20 日成交量比率",
+                "RSI 14 日相對強弱指標",
+                "距離前 60 日高點",
+            ],
+        )
+        front_high = view.missing_condition_rows[-1]
+        self.assertEqual(front_high["歷史命中率顯示"], "75.00%")
+        self.assertEqual(front_high["已解析歷史樣本數"], 8)
+
+    def test_monotonic_and_neutral_summary_text(self):
+        monotonic_rows = [
+            {"歷史命中率": value}
+            for value in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
+        ]
+        mixed_rows = [
+            {"歷史命中率": value}
+            for value in (0.1, 0.3, 0.2, 0.4, 0.5, 0.6)
+        ]
+
+        self.assertEqual(
+            historical_condition_match_count_summary(monotonic_rows),
+            HISTORICAL_CONDITION_MONOTONIC_SUMMARY,
+        )
+        self.assertEqual(
+            historical_condition_match_count_summary(mixed_rows),
+            HISTORICAL_CONDITION_NEUTRAL_SUMMARY,
+        )
+
+    def test_small_sample_note_does_not_claim_best_strong_or_recommend(self):
+        view = build_historical_condition_dashboard_view(
+            self.diagnostics_result(),
+            self.comparison_result(),
+        )
+
+        self.assertEqual(view.sample_note, HISTORICAL_CONDITION_SMALL_SAMPLE_NOTE)
+        self.assertNotRegex(view.sample_note.lower(), "best|strong|recommend")
+        self.assertNotIn("最強", view.sample_note)
+        self.assertNotIn("建議", view.sample_note)
+
+    def test_advanced_rows_include_status_enums_and_metadata(self):
+        view = build_historical_condition_dashboard_view(
+            self.diagnostics_result(),
+            self.comparison_result(),
+        )
+
+        self.assertEqual(
+            [row["Raw Enum"] for row in view.advanced_status_rows],
+            ["HIT", "MISS", "INCOMPLETE", "NOT_EVALUABLE"],
+        )
+        metadata = {row["項目"]: row["內容"] for row in view.metadata_rows}
+        self.assertEqual(metadata["Observation Unit"], "DAILY")
+        self.assertEqual(metadata["Overlap Possible"], "True")
+        self.assertEqual(metadata["Warm-up Bars"], "60")
+        self.assertEqual(metadata["Outcome Horizon"], "20")
+
+    def test_stale_session_and_fingerprint_helpers(self):
+        fingerprint = build_historical_condition_dashboard_fingerprint(
+            symbols=("2330.TW",),
+            start_date=date(2018, 1, 1),
+            end_date=date(2025, 12, 31),
+            signal_id="technical_example_v1",
+            outcome_id="raw_high_breakout_60d_within_20d_v1",
+            warmup_trading_bars=60,
+            outcome_horizon_bars=20,
+        )
+
+        self.assertFalse(
+            historical_condition_dashboard_result_is_stale(
+                {
+                    "diagnostics_result": self.diagnostics_result(),
+                    "outcome_comparison_result": self.comparison_result(),
+                }
+            )
+        )
+        self.assertTrue(historical_condition_dashboard_result_is_stale({"diagnostics_result": object()}))
+        self.assertEqual(len(fingerprint), 64)
 
 
 class SwingResearchDashboardTestCase(unittest.TestCase):

@@ -58,6 +58,37 @@ def stale_current_result_app():
     render_swing_research_result(case.legacy_result_without_current_signal_details())
 
 
+def historical_condition_dashboard_app():
+    import streamlit as st
+    import app as app_module
+    from tests.test_swing_research_dashboard import HistoricalConditionDashboardPresentationTestCase
+
+    case = HistoricalConditionDashboardPresentationTestCase()
+    diagnostics_result = case.diagnostics_result()
+    comparison_result = case.comparison_result()
+    fingerprint = app_module.swing_dashboard.build_historical_condition_dashboard_fingerprint(
+        symbols=("2330.TW", "0050.TW", "2337.TW", "2404.TW", "2454.TW"),
+        start_date=diagnostics_result.config.start_date,
+        end_date=diagnostics_result.config.end_date,
+        signal_id=diagnostics_result.config.signal_definition.id,
+        outcome_id=comparison_result.config.outcome_definition.id,
+        warmup_trading_bars=comparison_result.config.warmup_trading_bars,
+        outcome_horizon_bars=comparison_result.config.outcome_definition.horizon_bars,
+    )
+    st.session_state["historical_condition_dashboard_payload"] = {
+        "diagnostics_result": diagnostics_result,
+        "outcome_comparison_result": comparison_result,
+        "fingerprint": fingerprint,
+        "symbols": ("2330.TW",),
+        "start_date": diagnostics_result.config.start_date,
+        "end_date": diagnostics_result.config.end_date,
+    }
+    st.session_state["historical_condition_dashboard_fingerprint"] = fingerprint
+    st.session_state["historical_condition_dashboard_last_error"] = None
+    st.session_state["historical_condition_dashboard_error_details"] = None
+    app_module.render_historical_condition_dashboard()
+
+
 def stale_detail_view_schema_app():
     import app as app_module
     import importlib
@@ -110,6 +141,25 @@ def stale_detail_view_schema_app():
 
 
 class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
+
+    def test_historical_condition_dashboard_beginner_ui_smoke(self):
+        at = AppTest.from_function(historical_condition_dashboard_app)
+
+        at.run(timeout=10)
+
+        text = " ".join(
+            str(item.value)
+            for collection in (at.markdown, at.caption, at.info, at.button, at.selectbox)
+            for item in collection
+        )
+        self.assertEqual(len(at.exception), 0)
+        self.assertIn("V1 歷史條件診斷", text)
+        self.assertIn("不是未來上漲機率，也不是買進建議", text)
+        self.assertIn("執行 V1 歷史診斷", [button.label for button in at.button])
+        self.assertIn("V1 條件有效性總覽", text)
+        self.assertIn("哪些條件最常造成差異", text)
+        self.assertIn("哪些 V1 條件本來就比較難符合", text)
+        self.assertGreaterEqual(len(at.dataframe), 3)
 
     def test_detail_renderer_smoke_has_selector_table_and_chart(self):
         at = AppTest.from_function(app)

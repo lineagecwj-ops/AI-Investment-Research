@@ -1,6 +1,7 @@
 import sys
 import importlib
 import html
+import sqlite3
 from datetime import date
 from pathlib import Path
 
@@ -32,6 +33,10 @@ from dashboard import historical_metric_help
 from dashboard import query_stock_batch
 from dashboard import StockQueryFailure
 from dashboard import stock_display_data
+from database import DEFAULT_DB_PATH
+from database import HISTORICAL_PRICE_COLUMNS
+from database import historical_price_bar_from_row
+from database import parse_cache_datetime
 from backtest_service import BacktestConfig
 from backtest_service import BacktestDataError
 from backtest_service import HistoricalBacktestCase
@@ -68,6 +73,13 @@ from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
 from historical_price_service import get_historical_prices
+from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
+from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
+from historical_condition_outcome_service import build_diagnostic_technical_series
+from historical_condition_outcome_service import compare_historical_condition_outcomes
+from historical_condition_outcome_service import prepare_diagnostic_research_series
+from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsConfig
+from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsService
 from historical_interpretation_presentation import ATTENTION_COLOR_EXPLANATION
 from historical_interpretation_presentation import build_historical_highlights
 from historical_interpretation_presentation import build_next_step_display_groups
@@ -111,6 +123,7 @@ from universe_service import UniverseAlreadyExistsError
 from universe_service import UniverseError
 from universe_service import UniverseNotFoundError
 from universe_service import UniverseValidationError
+from models import HistoricalPriceSeries
 from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
@@ -127,6 +140,7 @@ from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
 import swing_scanner_service as swing_scanner_module
 from ui_terminology import format_condition_labels
+from ui_terminology import get_diagnostic_label
 from ui_terminology import get_frequency_label
 from ui_terminology import get_outcome_definition_label
 from ui_terminology import get_outcome_status_label
@@ -236,6 +250,10 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("oos_validation_fingerprint", None)
     st.session_state.setdefault("oos_validation_last_error", None)
     st.session_state.setdefault("oos_validation_source_context", None)
+    st.session_state.setdefault("historical_condition_dashboard_payload", None)
+    st.session_state.setdefault("historical_condition_dashboard_fingerprint", None)
+    st.session_state.setdefault("historical_condition_dashboard_last_error", None)
+    st.session_state.setdefault("historical_condition_dashboard_error_details", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1356,6 +1374,99 @@ def build_swing_research_scan_result(
     }
 
 
+def load_historical_price_series_from_cache_read_only(symbol: str) -> HistoricalPriceSeries:
+    normalized_symbol = normalize_stock_symbol(symbol)
+    db_path = Path(DEFAULT_DB_PATH).resolve()
+    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            f"""
+            SELECT {", ".join(HISTORICAL_PRICE_COLUMNS)}
+            FROM historical_prices
+            WHERE symbol = ?
+            ORDER BY trading_date ASC
+            """,
+            (normalized_symbol,),
+        ).fetchall()
+    finally:
+        connection.close()
+    if not rows:
+        raise ValueError(f"{normalized_symbol} 沒有可用的 historical price cache。")
+    fetched_at_values = [
+        parse_cache_datetime(row["fetched_at"])
+        for row in rows
+        if row["fetched_at"]
+    ]
+    currency = next((row["currency"] for row in rows if row["currency"]), None)
+    return HistoricalPriceSeries(
+        symbol=normalized_symbol,
+        currency=currency,
+        bars=tuple(historical_price_bar_from_row(row) for row in rows),
+        fetched_at=min(fetched_at_values) if fetched_at_values else pd.Timestamp.utcnow().to_pydatetime(),
+        is_stale=False,
+    )
+
+
+def build_historical_condition_dashboard_payload(
+    *,
+    symbols: tuple[str, ...],
+    start_date: date,
+    end_date: date,
+) -> dict:
+    normalized_symbols = tuple(dict.fromkeys(normalize_stock_symbol(symbol) for symbol in symbols))
+    prepared_series_by_symbol = {}
+    technical_series_by_symbol = {}
+    for symbol in normalized_symbols:
+        price_series = load_historical_price_series_from_cache_read_only(symbol)
+        prepared_series = prepare_diagnostic_research_series(
+            price_series,
+            observation_start=start_date,
+            observation_end=end_date,
+            outcome_horizon_bars=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.horizon_bars,
+            warmup_trading_bars=DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS,
+        )
+        prepared_series_by_symbol[prepared_series.symbol] = prepared_series
+        technical_series_by_symbol[prepared_series.symbol] = build_diagnostic_technical_series(prepared_series)
+
+    diagnostics_config = HistoricalConditionDiagnosticsConfig(
+        start_date=start_date,
+        end_date=end_date,
+        signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1,
+    )
+    diagnostics_result = HistoricalConditionDiagnosticsService().run_diagnostics(
+        normalized_symbols,
+        diagnostics_config,
+        technical_series_by_symbol=technical_series_by_symbol,
+    )
+    comparison_config = HistoricalConditionOutcomeComparisonConfig(
+        outcome_definition=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1,
+        warmup_trading_bars=DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS,
+    )
+    outcome_comparison_result = compare_historical_condition_outcomes(
+        diagnostics_result,
+        price_series_by_symbol=prepared_series_by_symbol,
+        config=comparison_config,
+    )
+    fingerprint = swing_dashboard.build_historical_condition_dashboard_fingerprint(
+        symbols=normalized_symbols,
+        start_date=start_date,
+        end_date=end_date,
+        signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
+        outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
+        warmup_trading_bars=DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS,
+        outcome_horizon_bars=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.horizon_bars,
+    )
+    return {
+        "diagnostics_result": diagnostics_result,
+        "outcome_comparison_result": outcome_comparison_result,
+        "fingerprint": fingerprint,
+        "symbols": normalized_symbols,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
 def ensure_swing_scanner_result_contract() -> None:
     global SwingScannerConfig
     global SwingScannerService
@@ -1472,12 +1583,178 @@ def build_oos_validation_result(
     }
 
 
+def render_historical_condition_dashboard() -> None:
+    st.markdown(f"### {swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_TITLE}")
+    st.caption(swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_CAPTION)
+    st.write(swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_EXPLANATION)
+    st.info(swing_dashboard.HISTORICAL_CONDITION_DASHBOARD_SAFETY_NOTE)
+
+    stock_scope_options = (
+        swing_dashboard.HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL,
+        *swing_dashboard.HISTORICAL_CONDITION_DEFAULT_SYMBOLS,
+    )
+    with st.form("historical_condition_dashboard_form"):
+        control_cols = st.columns([1.2, 1, 1])
+        stock_scope = control_cols[0].selectbox(
+            "股票範圍",
+            stock_scope_options,
+            key="historical_condition_dashboard_stock_scope",
+        )
+        start_date = control_cols[1].date_input(
+            "開始日期",
+            value=pd.to_datetime("2018-01-01").date(),
+            key="historical_condition_dashboard_start_date",
+        )
+        end_date = control_cols[2].date_input(
+            "結束日期",
+            value=pd.to_datetime("2025-12-31").date(),
+            key="historical_condition_dashboard_end_date",
+        )
+        submitted = st.form_submit_button("執行 V1 歷史診斷")
+
+    symbols = (
+        swing_dashboard.HISTORICAL_CONDITION_DEFAULT_SYMBOLS
+        if stock_scope == swing_dashboard.HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL
+        else (stock_scope,)
+    )
+    current_fingerprint = swing_dashboard.build_historical_condition_dashboard_fingerprint(
+        symbols=tuple(normalize_stock_symbol(symbol) for symbol in symbols),
+        start_date=start_date,
+        end_date=end_date,
+        signal_id=TECHNICAL_EXAMPLE_SIGNAL_V1.id,
+        outcome_id=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id,
+        warmup_trading_bars=DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS,
+        outcome_horizon_bars=RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.horizon_bars,
+    )
+
+    if submitted:
+        try:
+            with st.spinner("正在分析 V1 歷史條件與後續結果…"):
+                payload = build_historical_condition_dashboard_payload(
+                    symbols=tuple(symbols),
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            st.session_state["historical_condition_dashboard_payload"] = payload
+            st.session_state["historical_condition_dashboard_fingerprint"] = payload["fingerprint"]
+            st.session_state["historical_condition_dashboard_last_error"] = None
+            st.session_state["historical_condition_dashboard_error_details"] = None
+        except Exception as error:
+            st.session_state["historical_condition_dashboard_payload"] = None
+            st.session_state["historical_condition_dashboard_fingerprint"] = None
+            st.session_state["historical_condition_dashboard_last_error"] = "V1 歷史診斷暫時無法完成，請確認本機 historical price cache 是否完整。"
+            st.session_state["historical_condition_dashboard_error_details"] = safe_error_message(error)
+
+    if st.session_state["historical_condition_dashboard_last_error"]:
+        st.error(st.session_state["historical_condition_dashboard_last_error"])
+        with st.expander("錯誤細節", expanded=False):
+            st.write(st.session_state["historical_condition_dashboard_error_details"] or "N/A")
+
+    payload = st.session_state.get("historical_condition_dashboard_payload")
+    if payload is None:
+        st.info("設定股票範圍與日期後，按下「執行 V1 歷史診斷」才會讀取本機 historical price cache 並產生結果。")
+        return
+    if swing_dashboard.historical_condition_dashboard_result_is_stale(payload):
+        st.info(swing_dashboard.HISTORICAL_CONDITION_STALE_RESULT_MESSAGE)
+        return
+    if st.session_state.get("historical_condition_dashboard_fingerprint") != current_fingerprint:
+        st.warning("目前診斷結果來自上一組股票或日期設定；若要更新，請重新按「執行 V1 歷史診斷」。")
+
+    display_options = [swing_dashboard.HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL, *payload["symbols"]]
+    selected_scope = st.selectbox(
+        "顯示範圍",
+        display_options,
+        key="historical_condition_dashboard_display_scope",
+    )
+    view = swing_dashboard.build_historical_condition_dashboard_view(
+        payload["diagnostics_result"],
+        payload["outcome_comparison_result"],
+        selected_scope=selected_scope,
+    )
+
+    st.markdown(f"#### {get_diagnostic_label('V1 Condition Effectiveness Overview')}")
+    st.write(view.summary_text)
+    st.caption("每個百分比都要和已解析歷史樣本數 n 一起閱讀。")
+    metric_cols = st.columns(3)
+    metric_cols[0].metric("觀察樣本數", view.total_observation_count)
+    metric_cols[1].metric("可評估歷史樣本", view.evaluated_observation_count)
+    metric_cols[2].metric("無法評估", view.not_evaluable_observation_count)
+    if view.sample_note:
+        st.caption(view.sample_note)
+
+    match_count_df = pd.DataFrame(view.match_count_rows)
+    if match_count_df.empty or not match_count_df["歷史命中率"].notna().any():
+        st.info("目前沒有已解析歷史樣本可計算歷史命中率。")
+    else:
+        chart = (
+            alt.Chart(match_count_df)
+            .mark_bar()
+            .encode(
+                x=alt.X("符合條件數:N", sort=None, title="符合條件數"),
+                y=alt.Y("歷史命中率:Q", title="歷史命中率", scale=alt.Scale(domain=[0, 1])),
+                tooltip=[
+                    "符合條件數",
+                    alt.Tooltip("歷史命中率:Q", format=".2%"),
+                    alt.Tooltip("已解析歷史樣本數:Q", title="n"),
+                    "歷史樣本數",
+                ],
+            )
+        )
+        labels = (
+            alt.Chart(match_count_df)
+            .mark_text(dy=-8)
+            .encode(
+                x=alt.X("符合條件數:N", sort=None),
+                y=alt.Y("歷史命中率:Q"),
+                text="圖表標籤:N",
+            )
+        )
+        st.altair_chart(chart + labels, width="stretch")
+    st.dataframe(
+        match_count_df[
+            ["符合條件數", "歷史命中率顯示", "已解析歷史樣本數", "歷史樣本數", "HIT", "MISS", "INCOMPLETE"]
+        ].astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.markdown(f"#### {get_diagnostic_label('Conditions Causing Differences')}")
+    st.write("4/5 時，通常差在哪一個條件？")
+    st.caption("以下依 V1 條件順序顯示，不用歷史命中率排序，避免把小樣本百分比誤讀成強弱排名。")
+    missing_df = pd.DataFrame(view.missing_condition_rows)
+    st.dataframe(
+        missing_df[
+            ["未符合條件", "歷史命中率顯示", "已解析歷史樣本數", "歷史樣本數", "HIT", "MISS", "INCOMPLETE"]
+        ].astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.markdown(f"#### {get_diagnostic_label('Hard-To-Pass V1 Conditions')}")
+    st.caption("單一條件通過率表示該條件在可評估樣本中單獨成立的比例；通過率低不代表條件不好。")
+    pass_rate_df = pd.DataFrame(view.condition_pass_rate_rows)
+    st.dataframe(
+        pass_rate_df[
+            ["條件", "單一條件通過率顯示", "可評估歷史樣本數", "通過樣本數", "未通過樣本數"]
+        ].astype(str),
+        width="stretch",
+        hide_index=True,
+    )
+
+    with st.expander(get_diagnostic_label("Advanced Research Information"), expanded=False):
+        st.caption("每日觀察代表每個 symbol 的每個有效交易日各自形成一筆描述性研究樣本，不是交易進出場紀錄。")
+        st.caption("相鄰交易日的後續 20 個交易日觀察窗可能重疊，因此這些樣本不應被解讀為彼此完全獨立。")
+        st.dataframe(pd.DataFrame(view.advanced_status_rows).astype(str), width="stretch", hide_index=True)
+        st.dataframe(pd.DataFrame(view.metadata_rows).astype(str), width="stretch", hide_index=True)
+
+
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
         "整合波段掃描、歷史驗證與歷史案例的日常研究流程。"
         "符合條件的股票只是研究候選，不是交易清單；研究優先順序只是檢視順序。"
     )
+    render_historical_condition_dashboard()
 
     universes = read_universes_for_ui()
     watchlist_symbols = read_watchlist_for_ui(show_error=False)

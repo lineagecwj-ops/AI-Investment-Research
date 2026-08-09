@@ -20,6 +20,9 @@ from swing_scanner_service import SwingOpportunityCandidate
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerResult
 from ui_terminology import format_condition_labels
+from ui_terminology import get_diagnostic_beginner_explanation
+from ui_terminology import get_diagnostic_condition_label
+from ui_terminology import get_diagnostic_label
 from ui_terminology import get_frequency_label
 from ui_terminology import get_outcome_status_label
 from ui_terminology import get_overlap_policy_label
@@ -49,6 +52,25 @@ TECHNICAL_DETAIL_CAPTION = (
 STALE_TECHNICAL_DETAIL_RESULT_MESSAGE = (
     "目前掃描結果來自較舊的工作階段，尚未包含技術條件明細資料。"
     "請重新執行一次波段掃描以產生完整明細。"
+)
+HISTORICAL_CONDITION_DASHBOARD_TITLE = get_diagnostic_label("Historical Condition Diagnostics")
+HISTORICAL_CONDITION_DASHBOARD_CAPTION = get_diagnostic_label("V1 Historical Condition Dashboard Caption")
+HISTORICAL_CONDITION_DASHBOARD_EXPLANATION = get_diagnostic_beginner_explanation("V1 Historical Condition Dashboard")
+HISTORICAL_CONDITION_DASHBOARD_SAFETY_NOTE = get_diagnostic_beginner_explanation("V1 Historical Condition Safety Note")
+HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL = "全部目前研究股票"
+HISTORICAL_CONDITION_DEFAULT_SYMBOLS = ("2330.TW", "0050.TW", "2337.TW", "2404.TW", "2454.TW")
+HISTORICAL_CONDITION_STALE_RESULT_MESSAGE = (
+    "目前診斷結果來自較舊的工作階段，缺少新版 Dashboard 需要的資料。"
+    "請重新執行一次 V1 歷史診斷。"
+)
+HISTORICAL_CONDITION_MONOTONIC_SUMMARY = (
+    "這組歷史資料中，符合的 V1 條件越多，歷史命中率呈現逐步提高。"
+)
+HISTORICAL_CONDITION_NEUTRAL_SUMMARY = (
+    "不同符合條件數的歷史結果存在差異，請搭配樣本數一起閱讀。"
+)
+HISTORICAL_CONDITION_SMALL_SAMPLE_NOTE = (
+    "樣本數很小時，百分比容易跳動；請優先看 n，再看歷史命中率。"
 )
 
 
@@ -92,6 +114,32 @@ class TechnicalConditionVisualSpec:
     marker_rows: list[dict[str, object]]
 
     range_rows: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class HistoricalConditionDashboardView:
+
+    scope_label: str
+
+    match_count_rows: list[dict[str, object]]
+
+    missing_condition_rows: list[dict[str, object]]
+
+    condition_pass_rate_rows: list[dict[str, object]]
+
+    advanced_status_rows: list[dict[str, object]]
+
+    metadata_rows: list[dict[str, str]]
+
+    summary_text: str
+
+    sample_note: str | None
+
+    total_observation_count: int
+
+    evaluated_observation_count: int
+
+    not_evaluable_observation_count: int
 
 
 def parse_swing_symbol_input(user_input: str) -> tuple[str, ...]:
@@ -405,6 +453,230 @@ def technical_detail_result_is_stale(result: SwingScannerResult) -> bool:
 
 def technical_detail_selector_label(signal_match: SignalMatch) -> str:
     return signal_match.symbol
+
+
+def build_historical_condition_dashboard_view(
+    diagnostics_result,
+    outcome_comparison_result,
+    *,
+    selected_scope: str = HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL,
+) -> HistoricalConditionDashboardView:
+    diagnostics_summary = _select_diagnostic_summary(diagnostics_result, selected_scope)
+    outcome_summary = _select_outcome_summary(outcome_comparison_result, selected_scope)
+    condition_order = _historical_condition_order(diagnostics_result)
+    match_count_rows = _historical_condition_match_count_rows(outcome_summary)
+    missing_rows = _historical_condition_missing_condition_rows(
+        outcome_summary,
+        condition_order=condition_order,
+    )
+    pass_rate_rows = _historical_condition_pass_rate_rows(diagnostics_summary)
+    return HistoricalConditionDashboardView(
+        scope_label=selected_scope,
+        match_count_rows=match_count_rows,
+        missing_condition_rows=missing_rows,
+        condition_pass_rate_rows=pass_rate_rows,
+        advanced_status_rows=_historical_condition_status_rows(outcome_summary),
+        metadata_rows=_historical_condition_metadata_rows(diagnostics_result, outcome_comparison_result),
+        summary_text=historical_condition_match_count_summary(match_count_rows),
+        sample_note=_historical_condition_sample_note(match_count_rows + missing_rows),
+        total_observation_count=diagnostics_summary.total_observation_count,
+        evaluated_observation_count=diagnostics_summary.evaluated_observation_count,
+        not_evaluable_observation_count=diagnostics_summary.not_evaluable_observation_count,
+    )
+
+
+def historical_condition_dashboard_result_is_stale(payload) -> bool:
+    if not isinstance(payload, dict):
+        return True
+    diagnostics_result = payload.get("diagnostics_result")
+    outcome_result = payload.get("outcome_comparison_result")
+    return (
+        diagnostics_result is None
+        or outcome_result is None
+        or not hasattr(diagnostics_result, "condition_pass_summaries")
+        or not hasattr(outcome_result, "match_count_outcome_summaries")
+    )
+
+
+def build_historical_condition_dashboard_fingerprint(
+    *,
+    symbols: tuple[str, ...],
+    start_date: date,
+    end_date: date,
+    signal_id: str,
+    outcome_id: str,
+    warmup_trading_bars: int,
+    outcome_horizon_bars: int,
+) -> str:
+    identity = "|".join(
+        (
+            ",".join(symbols),
+            start_date.isoformat(),
+            end_date.isoformat(),
+            signal_id,
+            outcome_id,
+            str(warmup_trading_bars),
+            str(outcome_horizon_bars),
+        )
+    )
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def historical_condition_match_count_summary(rows: list[dict[str, object]]) -> str:
+    rates = [row.get("歷史命中率") for row in rows]
+    if not rates or any(rate is None for rate in rates):
+        return HISTORICAL_CONDITION_NEUTRAL_SUMMARY
+    if all(float(previous) <= float(current) for previous, current in zip(rates, rates[1:])):
+        return HISTORICAL_CONDITION_MONOTONIC_SUMMARY
+    return HISTORICAL_CONDITION_NEUTRAL_SUMMARY
+
+
+def _select_diagnostic_summary(diagnostics_result, selected_scope: str):
+    if selected_scope == HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL:
+        return diagnostics_result
+    for summary in diagnostics_result.per_symbol_summaries:
+        if summary.symbol == selected_scope:
+            return summary
+    return diagnostics_result
+
+
+def _select_outcome_summary(outcome_comparison_result, selected_scope: str):
+    if selected_scope == HISTORICAL_CONDITION_ALL_SYMBOLS_LABEL:
+        return outcome_comparison_result
+    for summary in outcome_comparison_result.per_symbol_summaries:
+        if summary.symbol == selected_scope:
+            return summary
+    return outcome_comparison_result
+
+
+def _historical_condition_order(diagnostics_result) -> tuple[str, ...]:
+    return tuple(summary.condition_id for summary in diagnostics_result.condition_pass_summaries)
+
+
+def _historical_condition_match_count_rows(outcome_summary) -> list[dict[str, object]]:
+    rows = []
+    for summary in outcome_summary.match_count_outcome_summaries:
+        outcome = summary.outcome_summary
+        rows.append(
+            {
+                "符合條件數": f"{summary.matched_count}/{summary.total_count}",
+                "符合條件數值": summary.matched_count,
+                "歷史命中率": outcome.historical_hit_rate,
+                "歷史命中率顯示": format_percentage(outcome.historical_hit_rate),
+                "n": outcome.resolved_count,
+                "已解析歷史樣本數": outcome.resolved_count,
+                "歷史樣本數": outcome.observation_count,
+                "HIT": outcome.hit_count,
+                "MISS": outcome.miss_count,
+                "INCOMPLETE": outcome.incomplete_count,
+                "NOT_EVALUABLE": outcome.not_evaluable_count,
+                "圖表標籤": f"{format_percentage(outcome.historical_hit_rate)}\nn={outcome.resolved_count}",
+            }
+        )
+    return rows
+
+
+def _historical_condition_missing_condition_rows(
+    outcome_summary,
+    *,
+    condition_order: tuple[str, ...],
+) -> list[dict[str, object]]:
+    rows_by_condition = {
+        row.condition_id: row
+        for row in outcome_summary.missing_condition_outcome_summaries
+    }
+    rows = []
+    for condition_id in condition_order:
+        summary = rows_by_condition.get(condition_id)
+        outcome = summary.outcome_summary if summary is not None else None
+        historical_hit_rate = None if outcome is None else outcome.historical_hit_rate
+        resolved_count = 0 if outcome is None else outcome.resolved_count
+        observation_count = 0 if outcome is None else outcome.observation_count
+        rows.append(
+            {
+                "未符合條件": get_diagnostic_condition_label(condition_id),
+                "歷史命中率": historical_hit_rate,
+                "歷史命中率顯示": format_percentage(historical_hit_rate),
+                "n": resolved_count,
+                "已解析歷史樣本數": resolved_count,
+                "歷史樣本數": observation_count,
+                "HIT": 0 if outcome is None else outcome.hit_count,
+                "MISS": 0 if outcome is None else outcome.miss_count,
+                "INCOMPLETE": 0 if outcome is None else outcome.incomplete_count,
+                "NOT_EVALUABLE": 0 if outcome is None else outcome.not_evaluable_count,
+            }
+        )
+    return rows
+
+
+def _historical_condition_pass_rate_rows(diagnostics_summary) -> list[dict[str, object]]:
+    rows = []
+    for summary in diagnostics_summary.condition_pass_summaries:
+        rows.append(
+            {
+                "條件": summary.display_name,
+                "單一條件通過率": summary.pass_rate,
+                "單一條件通過率顯示": format_percentage(summary.pass_rate),
+                "n": summary.evaluated_count,
+                "通過樣本數": summary.passed_count,
+                "未通過樣本數": summary.failed_count,
+                "可評估歷史樣本數": summary.evaluated_count,
+            }
+        )
+    return rows
+
+
+def _historical_condition_status_rows(outcome_summary) -> list[dict[str, object]]:
+    totals = {
+        OutcomeEvaluationStatus.HIT.value: 0,
+        OutcomeEvaluationStatus.MISS.value: 0,
+        OutcomeEvaluationStatus.INCOMPLETE.value: 0,
+        OutcomeEvaluationStatus.NOT_EVALUABLE.value: 0,
+    }
+    for row in outcome_summary.match_count_outcome_summaries:
+        totals[OutcomeEvaluationStatus.HIT.value] += row.outcome_summary.hit_count
+        totals[OutcomeEvaluationStatus.MISS.value] += row.outcome_summary.miss_count
+        totals[OutcomeEvaluationStatus.INCOMPLETE.value] += row.outcome_summary.incomplete_count
+        totals[OutcomeEvaluationStatus.NOT_EVALUABLE.value] += row.outcome_summary.not_evaluable_count
+    return [
+        {
+            "狀態": get_outcome_status_label(status),
+            "Raw Enum": status,
+            "歷史樣本數": count,
+        }
+        for status, count in totals.items()
+    ]
+
+
+def historical_condition_total_resolved_count(rows: list[dict[str, object]]) -> int:
+    return sum(
+        int(row.get("已解析歷史樣本數") or 0)
+        for row in rows
+    )
+
+
+def _historical_condition_metadata_rows(diagnostics_result, outcome_comparison_result) -> list[dict[str, str]]:
+    config = outcome_comparison_result.config
+    diagnostics_config = diagnostics_result.config
+    return [
+        {"項目": "Observation Unit", "內容": outcome_comparison_result.observation_unit},
+        {"項目": "Overlap Possible", "內容": str(outcome_comparison_result.overlap_possible)},
+        {"項目": "Warm-up Bars", "內容": str(config.warmup_trading_bars)},
+        {"項目": "Outcome Horizon", "內容": str(config.outcome_definition.horizon_bars)},
+        {"項目": "Signal Definition ID", "內容": diagnostics_config.signal_definition.id},
+        {"項目": "Outcome Definition ID", "內容": config.outcome_definition.id},
+        {"項目": "Observation Start", "內容": format_date(diagnostics_config.start_date)},
+        {"項目": "Observation End", "內容": format_date(diagnostics_config.end_date)},
+    ]
+
+
+def _historical_condition_sample_note(rows: list[dict[str, object]]) -> str | None:
+    for row in rows:
+        resolved_count = row.get("已解析歷史樣本數")
+        rate = row.get("歷史命中率")
+        if rate is not None and isinstance(resolved_count, int) and 0 < resolved_count < 20:
+            return HISTORICAL_CONDITION_SMALL_SAMPLE_NOTE
+    return None
 
 
 def build_technical_condition_detail_view(signal_match: SignalMatch) -> TechnicalConditionDetailView:

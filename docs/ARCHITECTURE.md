@@ -126,6 +126,21 @@ out_of_sample_validation_service.py
         ↓
         Streamlit Swing Research Out-of-Sample Validation mode
 
+signal_condition_diagnostics_service.py
+    └── TechnicalIndicatorSeries
+        ↓
+        Daily V1 condition observations
+        ↓
+        HistoricalConditionDiagnosticsResult
+        ↓
+        historical_condition_outcome_service.py
+        ↓
+        HistoricalConditionOutcomeComparisonResult
+        ↓
+        swing_research_dashboard.py presentation helpers
+        ↓
+        app.py Swing Research V1 歷史條件診斷 section
+
 backtest_service.py
     ↓
     historical_case_service.py
