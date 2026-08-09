@@ -7,6 +7,7 @@ from historical_condition_outcome_service import ConditionOutcomeObservation
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonResult
 from historical_condition_outcome_service import OutcomeStatusSummary
 from models import OutcomeEvaluationStatus
+from models import HistoricalPriceSeries
 from volume_threshold_sensitivity_service import DEFAULT_BASELINE_THRESHOLD
 from volume_threshold_sensitivity_service import VOLUME_CONDITION_ID
 from volume_threshold_sensitivity_service import _other_v1_conditions_pass
@@ -166,6 +167,8 @@ class OverlapReducedSelectedObservation:
 
     trading_bar_index: int
 
+    outcome_status: OutcomeEvaluationStatus
+
 
 @dataclass(frozen=True)
 class OverlapReducedThresholdSummary:
@@ -245,6 +248,8 @@ def analyze_volume_threshold_robustness(
     comparison_result: HistoricalConditionOutcomeComparisonResult,
     *,
     config: VolumeThresholdRobustnessConfig | None = None,
+    price_series_by_symbol: dict[str, HistoricalPriceSeries] | None = None,
+    trading_bar_index_by_identity: dict[tuple[str, object, str], int] | None = None,
     generated_at: datetime | None = None,
 ) -> VolumeThresholdRobustnessResult:
     config = config or VolumeThresholdRobustnessConfig(
@@ -274,7 +279,14 @@ def analyze_volume_threshold_robustness(
         for threshold in config.candidate_thresholds
     )
 
-    bar_index_by_identity = _trading_bar_index_by_identity(observations)
+    bar_index_by_identity = trading_bar_index_by_identity
+    if bar_index_by_identity is None and price_series_by_symbol is not None:
+        bar_index_by_identity = _prepared_trading_bar_index_by_identity(
+            observations,
+            price_series_by_symbol,
+        )
+    if bar_index_by_identity is None:
+        bar_index_by_identity = _trading_bar_index_by_identity(observations)
     overlap_baseline = _overlap_reduced_observations(
         qualified_by_threshold[config.baseline_threshold],
         bar_index_by_identity,
@@ -460,6 +472,7 @@ def _overlap_summary(
             trading_date=observation.trading_date,
             signal_definition_id=observation.signal_definition_id,
             trading_bar_index=bar_index_by_identity[_observation_identity(observation)],
+            outcome_status=observation.status,
         )
         for observation in overlap_reduced_observations
     )
@@ -514,6 +527,33 @@ def _trading_bar_index_by_identity(
     for symbol_observations in by_symbol.values():
         for index, observation in enumerate(sorted(symbol_observations, key=lambda item: item.trading_date)):
             result[_observation_identity(observation)] = index
+    return result
+
+
+def _prepared_trading_bar_index_by_identity(
+    observations: tuple[ConditionOutcomeObservation, ...],
+    price_series_by_symbol: dict[str, HistoricalPriceSeries],
+) -> dict[tuple[str, object, str], int]:
+    wanted = {_observation_identity(observation): observation for observation in observations}
+    result = {}
+    for symbol, price_series in price_series_by_symbol.items():
+        index_by_date = {
+            bar.trading_date: index
+            for index, bar in enumerate(sorted(price_series.bars, key=lambda item: item.trading_date))
+        }
+        for identity, observation in wanted.items():
+            if observation.symbol != symbol:
+                continue
+            if observation.trading_date not in index_by_date:
+                raise VolumeThresholdRobustnessAnalysisError(
+                    "Prepared trading-bar index is missing an outcome observation date."
+                )
+            result[identity] = index_by_date[observation.trading_date]
+    missing = set(wanted) - set(result)
+    if missing:
+        raise VolumeThresholdRobustnessAnalysisError(
+            "Prepared trading-bar index is missing one or more observation symbols."
+        )
     return result
 
 

@@ -333,6 +333,14 @@ Result 保存 aggregate daily、per-symbol、per-year 與 overlap-reduced summar
 
 Live read-only validation 使用 `data/stocks.db` SQLite `mode=ro`，重現 Batch 2 required daily baseline：`1.00 n=114 HIT=105 MISS=9 rate=92.11%`、`1.10 n=96 HIT=88 MISS=8 rate=91.67%`、`1.20 n=73 HIT=66 MISS=7 rate=90.41%`。完整說明與 live tables 見 `docs/V1_VOLUME_THRESHOLD_ROBUSTNESS.md`。
 
+## V1 Expanded Symbol Universe Validation
+
+V1 Condition Contribution Research Batch 4 新增「擴大股票樣本驗證」service foundation。
+
+它先用 `data/stocks.db` SQLite `mode=ro` 做 deterministic universe coverage audit，凍結 local Taiwan universe 後才計算 threshold results。Selection rule 只使用本地資料覆蓋與 `.TW` / `.TWO` symbol filter，不使用 Historical Hit Rate、threshold result、scanner result、backtest result、profitability、ranking 或 score。
+
+Live local DB 只有 `8` 個 historical price symbols，其中 `6` 個是 Taiwan symbols，因此本 Batch 只從原五檔擴大到 `0050.TW`、`2330.TW`、`2337.TW`、`2404.TW`、`2454.TW`、`6488.TWO`，未達目標 `15` 到 `30` symbols，且沒有 network backfill。Expanded aggregate：`1.00 n=124 rate=91.94%`、`1.10 n=104 rate=91.35%`、`1.20 n=80 rate=90.00%`。完整 universe audit、per-symbol、per-year、overlap-reduced、concentration 與 old-five comparison 見 `docs/V1_EXPANDED_SYMBOL_UNIVERSE_VALIDATION.md`。
+
 ## Universe Management
 
 Sprint 07 Batch B 新增 Saved Research Universes。

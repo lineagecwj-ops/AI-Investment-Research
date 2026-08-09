@@ -172,6 +172,18 @@ DIAGNOSTIC_LABELS = {
     "Historical Hit Rate Difference": "歷史命中率差異",
     "Observation Count Difference": "樣本數差異",
     "20 Trading-Bar Spacing": "20 個交易日間隔",
+    "Expanded Symbol Universe Validation": "擴大股票樣本驗證",
+    "Symbol Universe": "股票樣本範圍",
+    "Coverage Audit": "資料覆蓋檢查",
+    "Included in Research": "納入研究",
+    "Excluded from Research": "未納入研究",
+    "Insufficient Data": "資料不足",
+    "Per-Symbol Result": "逐股票結果",
+    "Cross-Symbol Consistency": "跨股票一致性",
+    "Effective Year Count": "有效年度數",
+    "Sample Concentration": "樣本集中程度",
+    "Original Five Benchmark": "原始五檔基準",
+    "Expanded Sample Result": "擴大樣本結果",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {
@@ -254,6 +266,9 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "Overlap-Reduced Independence Warning": (
         "降低樣本重疊不代表完全獨立樣本；它只降低同一股票連續 observation 的 future-window overlap。"
+    ),
+    "Expanded Symbol Universe Validation": (
+        "這一階段不是調整 V1，而是增加更多股票，檢查前面看到的成交量門檻現象是否只出現在少數股票。"
     ),
 }
 

@@ -1,5 +1,37 @@
 # Learning Log
 
+## 2026-08-09 — V1 Condition Contribution Research Batch 4
+
+### Completed Features
+
+- 新增 `src/expanded_volume_threshold_validation_service.py`，建立 deterministic「擴大股票樣本驗證」核心服務。
+- Service 使用 `data/stocks.db` SQLite `mode=ro` 先做 universe coverage audit，凍結 local Taiwan universe 後才執行 threshold result calculation。
+- Universe selection rule 固定為本地 `historical_prices` 中 `.TW` / `.TWO` symbols，且必須符合 `2018-01-01` 到 `2025-12-31` 研究 window、`60` pre-window trading bars、`20` post-window trading bars、無 duplicate dates、無 unusable OHLCV rows。
+- Selection 不使用 Historical Hit Rate、threshold result、scanner result、backtest result、profitability、ranking、score、recommendation 或 probability。
+- 新增 frozen models：`ExpandedSymbolUniverseConfig`、`SymbolCoverageAudit`、`ExpandedThresholdSymbolSummary`、`ExpandedThresholdYearSummary`、`ExpandedThresholdOverlapSummary`、`SymbolBreadthSummary`、`ThresholdConcentrationMetric`、`OldFiveBenchmarkComparison`、`CandidateRobustnessClassification` 與 `ExpandedVolumeThresholdValidationResult`。
+- Expanded service 重用 `prepare_diagnostic_research_series()`、Batch 1 diagnostics、Batch 2 outcome attachment 與 Batch 3 robustness semantics；每 symbol price series、technical series、diagnostics、outcome attachment 各準備一次。
+- 強化 `src/volume_threshold_robustness_service.py` overlap-reduced spacing，可使用 explicit prepared trading-bar index，而不是依賴 outcome observation ordinal。
+- 擴充 `src/ui_terminology.py`，集中「擴大股票樣本驗證」、「股票樣本範圍」、「資料覆蓋檢查」、「納入研究」、「未納入研究」、「資料不足」、「逐股票結果」、「跨股票一致性」、「有效年度數」、「樣本集中程度」、「原始五檔基準」、「擴大樣本結果」等 terminology 與 beginner explanation。
+- 新增 `docs/V1_EXPANDED_SYMBOL_UNIVERSE_VALIDATION.md`，並更新 README 與 ARCHITECTURE。
+
+### Live Read-Only Validation
+
+- `historical_prices` distinct symbols：`8`。
+- Included symbols：`0050.TW`、`2330.TW`、`2337.TW`、`2404.TW`、`2454.TW`、`6488.TWO`。
+- Excluded symbols：`AAPL`、`NVDA`，reason `EXCLUDED_NOT_TAIWAN_UNIVERSE`。
+- Original five all retained；`2404.TW` zero sample retained。
+- Local DB only provided `6` Taiwan symbols, below target `15` to `30`; no Yahoo/network backfill was used.
+- Expanded aggregate：`1.00 n=124 HIT=114 MISS=10 rate=91.94%`、`1.10 n=104 HIT=95 MISS=9 rate=91.35%`、`1.20 n=80 HIT=72 MISS=8 rate=90.00%`。
+- Effective years remained `3 / 8` for all three thresholds; resolved samples were only in `2023` to `2025`.
+- Overlap-reduced result：`1.00 reduced n=39 HIT=35 MISS=4 rate=89.74%`、`1.10 reduced n=38 HIT=34 MISS=4 rate=89.47%`、`1.20 reduced n=35 HIT=30 MISS=5 rate=85.71%`。
+- DB before / after metadata matched：size `7,327,744` bytes、SHA-256 `dcd65c9f2e579164728eaadbbc7b6926f3d6513bcdcac2cb36154bc8961f9aa5`。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、formal `volume_ratio_20 >= 1.20`、scanner、technical formulas、outcome semantics、backtest、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema/content 或 OpenAI / AI logic。
+- 本 Batch 不啟動 V1.1、Dashboard integration、RSI sensitivity、Distance sensitivity、V2 或 AI analysis。
+- Candidate classification 只使用 `SUPPORTED`、`MIXED`、`WEAK`、`UNAVAILABLE` descriptive labels；沒有 numeric score、winner、best threshold 或 recommendation。
+
 ## 2026-08-09 — V1 Condition Contribution Research Batch 3
 
 ### Completed Features

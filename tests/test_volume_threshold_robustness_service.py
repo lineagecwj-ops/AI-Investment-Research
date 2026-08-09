@@ -311,6 +311,46 @@ class VolumeThresholdRobustnessServiceTestCase(unittest.TestCase):
 
         self.assertEqual(selected_aaa_dates, [date(2025, 1, 1), date(2025, 1, 25)])
 
+    def test_overlap_reduced_accepts_explicit_prepared_trading_bar_index(self):
+        comparison = self.comparison_result()
+        reduced_observations = tuple(
+            observation for observation in comparison.outcome_observations
+            if observation.symbol == "AAA"
+            and observation.trading_date in (date(2025, 1, 1), date(2025, 1, 25))
+        )
+        comparison = replace(
+            comparison,
+            outcome_observations=reduced_observations,
+        )
+        price_series = HistoricalPriceSeries(
+            symbol="AAA",
+            currency="USD",
+            bars=tuple(
+                self.price_bar("AAA", date(2025, 1, day))
+                for day in range(1, 26)
+            ),
+            fetched_at=FETCHED_AT,
+            is_stale=False,
+        )
+
+        rows = {
+            row.threshold: row
+            for row in analyze_volume_threshold_robustness(
+                comparison,
+                price_series_by_symbol={"AAA": price_series},
+            ).overlap_reduced_summaries
+        }
+
+        self.assertEqual(
+            tuple(item.trading_date for item in rows[1.20].selected_observations),
+            (date(2025, 1, 1), date(2025, 1, 25)),
+        )
+        self.assertEqual(
+            tuple(item.trading_bar_index for item in rows[1.20].selected_observations),
+            (0, 24),
+        )
+        self.assertTrue(rows[1.20].selected_spacing_invariant_passed)
+
     def test_incomplete_and_not_evaluable_semantics_are_preserved(self):
         rows = {
             row.threshold: row

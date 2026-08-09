@@ -244,6 +244,25 @@ class UiTerminologyTestCase(unittest.TestCase):
             get_diagnostic_beginner_explanation("Overlap-Reduced Independence Warning"),
         )
 
+    def test_expanded_symbol_universe_validation_terminology_is_traditional_chinese_first(self):
+        self.assertEqual(get_diagnostic_label("Expanded Symbol Universe Validation"), "擴大股票樣本驗證")
+        self.assertEqual(get_diagnostic_label("Symbol Universe"), "股票樣本範圍")
+        self.assertEqual(get_diagnostic_label("Coverage Audit"), "資料覆蓋檢查")
+        self.assertEqual(get_diagnostic_label("Included in Research"), "納入研究")
+        self.assertEqual(get_diagnostic_label("Excluded from Research"), "未納入研究")
+        self.assertEqual(get_diagnostic_label("Insufficient Data"), "資料不足")
+        self.assertEqual(get_diagnostic_label("Per-Symbol Result"), "逐股票結果")
+        self.assertEqual(get_diagnostic_label("Cross-Symbol Consistency"), "跨股票一致性")
+        self.assertEqual(get_diagnostic_label("Effective Year Count"), "有效年度數")
+        self.assertEqual(get_diagnostic_label("Sample Concentration"), "樣本集中程度")
+        self.assertEqual(get_diagnostic_label("Original Five Benchmark"), "原始五檔基準")
+        self.assertEqual(get_diagnostic_label("Expanded Sample Result"), "擴大樣本結果")
+
+        explanation = get_diagnostic_beginner_explanation("Expanded Symbol Universe Validation")
+        self.assertIn("不是調整 V1", explanation)
+        self.assertIn("增加更多股票", explanation)
+        self.assertIn("是否只出現在少數股票", explanation)
+
 
 if __name__ == "__main__":
     unittest.main()

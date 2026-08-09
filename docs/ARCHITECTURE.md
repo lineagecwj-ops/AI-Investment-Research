@@ -317,6 +317,18 @@ volume_threshold_robustness_service.py
     └── Preserves aggregate raw-count semantics rather than averaging symbol-level or year-level rates
     └── No production V1 threshold change, V1.1 / V2, new threshold grid, RSI sensitivity, distance sensitivity, recommendation, probability, ranking, score, dashboard, AI, SQLite persistence, or database schema change
 
+expanded_volume_threshold_validation_service.py
+    └── Deterministic V1 Expanded Symbol Universe Validation foundation
+    └── Uses data/stocks.db SQLite mode=ro for universe audit and read-only historical price loading
+    └── Freezes a local Taiwan universe before threshold result calculation, using only .TW / .TWO symbols and coverage quality
+    └── Preserves original five symbols when coverage is valid, including zero-sample symbols such as 2404.TW
+    └── Excludes symbols with explicit reasons such as EXCLUDED_NOT_TAIWAN_UNIVERSE or EXCLUDED_DATA_COVERAGE
+    └── Reuses prepare_diagnostic_research_series, HistoricalConditionDiagnosticsService, HistoricalConditionOutcomeComparison, and VolumeThresholdRobustness semantics
+    └── Prepares price series, technical series, diagnostics, and outcome attachment at most once per symbol before threshold aggregation
+    └── Reports aggregate, per-symbol, per-year, symbol-breadth, overlap-reduced, concentration, old-five comparison, and descriptive classification outputs
+    └── Selection never uses Historical Hit Rate, threshold result, scanner result, backtest result, profitability, recommendation, ranking, score, or probability
+    └── No production V1 threshold change, V1.1 / V2, dashboard integration, RSI sensitivity, distance sensitivity, scanner, backtest, AI, SQLite persistence, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range
