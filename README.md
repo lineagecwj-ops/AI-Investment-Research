@@ -57,6 +57,7 @@ V1.0 已完成 Daily Swing Research 的正式研究流程基礎：
 - Out-of-Sample Validation
 - OOS Validation Dashboard
 - V1 Historical Condition Diagnostics Dashboard
+- V1 Condition Contribution Analysis
 
 重要限制：
 
@@ -151,6 +152,7 @@ Dashboard 目前提供：
 - `Replay Analytics`：在 Walk-Forward Replay 成功結果下方顯示 Stability Summary、Candidate Occurrence、Period Timeline、Candidate Set Stability 與 Post-Replay Outcome Counts。這是 existing replay result 的描述性 analytics，不重新抓 Yahoo、不重新 replay、不重新 backtest，也不提供 future probability、recommendation、strategy P&L 或 optimization。
 - `V1 歷史條件診斷`：run-local service foundation，統計歷史上每個可評估交易日符合 V1 五項技術條件中的幾項、0/5～5/5 分布、單一條件通過率、4/5 最常缺少條件與常見條件組合。它重用既有 `SignalDefinition` / `evaluate_signal_conditions()`，不計算 Historical Outcome、Historical Hit Rate、future probability、recommendation 或 AI analysis。
 - `V1 歷史後續結果比較`：run-local Batch 2 service foundation，直接使用 Batch 1 daily diagnostic observations，重用既有 `raw_high_breakout_60d_within_20d_v1` / `evaluate_historical_outcome()` 比較 0/5～5/5 與 4/5 缺少條件的 HIT / MISS / INCOMPLETE / NOT_EVALUABLE、Resolved Samples 與 Historical Hit Rate。它固定 deterministic 60 trading-bar pre-window warm-up 與 20 trading-bar post-window outcome extension，不修改 V1 threshold、不建立 V1.1 / V2、不做 probability、recommendation、ranking、dashboard 或 AI analysis。
+- `V1 單一條件影響分析`：run-local core service foundation，直接使用 Batch 2 outcome-attached daily observations，對每個 canonical V1 condition 建立 leave-one-out comparison：原始 5/5 baseline 加上「只缺該條件」的 4/5 observations，回報新增樣本、HIT / MISS / INCOMPLETE / NOT_EVALUABLE、Resolved Samples、Historical Hit Rate、樣本增加比例與百分點變化。它只做 historical counterfactual grouping，不修改 V1、不建立 V1.1 / V2、不做 threshold sensitivity、dashboard、probability、recommendation、ranking 或 AI analysis。
 - `Universes`：自訂研究股票池管理頁；可建立、編輯名稱 / description / symbols、刪除 Universe，CRUD 全程只使用 local SQLite，不呼叫 Yahoo 或 OpenAI。
 - `Historical Cases`：單一股票 historical case explorer；按下建立後才執行 price / technical / backtest / case-view workflow，顯示 HIT / MISS / INCOMPLETE / NOT_EVALUABLE 歷史案例、analysis-close chart、raw-high reference / hit marker、signal condition trace 與 signal-date technical snapshot。
 - `Watchlist`：顯示、新增、移除與查詢 Watchlist 股票。

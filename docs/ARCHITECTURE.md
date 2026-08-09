@@ -278,6 +278,18 @@ historical_condition_outcome_service.py
     └── Records daily-observation unit and overlap_possible warning
     └── No V1 threshold change, parameter tuning, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
 
+condition_contribution_service.py
+    └── Deterministic V1 Single Condition Contribution Analysis foundation
+    └── Consumes Batch 2 HistoricalConditionOutcomeComparisonResult with attached ConditionOutcomeObservation records
+    └── Reuses Batch 1 observation identity and Batch 2 outcome attachment; does not re-evaluate V1 conditions or outcomes
+    └── For each canonical V1 condition, compares original 5/5 baseline against baseline plus 4/5 observations where only that target condition is missing
+    └── Enforces no duplicate daily observation by symbol, trading date, and signal definition id
+    └── Reports baseline, leave-one-out, added observation, added resolved, added HIT / MISS, observation increase rate, and Historical Hit Rate delta in percentage points
+    └── Historical Hit Rate denominator remains HIT + MISS; INCOMPLETE and NOT_EVALUABLE are excluded
+    └── Preserves aggregate and per-symbol summaries; aggregate sums raw counts rather than averaging symbol-level rates
+    └── Records daily-observation unit and overlap_possible warning
+    └── No V1 threshold change, V1.1 / V2, threshold sensitivity, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range

@@ -1,5 +1,28 @@
 # Learning Log
 
+## 2026-08-09 — V1 Condition Contribution Research Batch 1
+
+### Completed Features
+
+- 新增 `src/condition_contribution_service.py`，建立 deterministic「單一條件影響分析」核心服務。
+- Service 直接 consume Batch 2 `HistoricalConditionOutcomeComparisonResult`，重用 Batch 1 daily observation identity 與 Batch 2 attached historical outcome。
+- 對每個 canonical V1 condition 建立 leave-one-out comparison：原始 5/5 baseline 加上「只缺該條件」的 4/5 observations。
+- 新增 frozen models：`ConditionContributionConfig`、`ConditionContributionComparison`、`ConditionContributionSymbolSummary` 與 `ConditionContributionResult`。
+- Comparison 保存 baseline、leave-one-out、added observation / resolved / HIT / MISS、observation increase rate 與 Historical Hit Rate delta percentage points。
+- 實作 duplicate invariant：同一個 `symbol + trading_date + signal_definition_id` 在 contribution input 與 leave-one-out group 內不得重複。
+- Result 保存 aggregate 與 per-symbol summaries；aggregate 以 raw counts 加總，不 average symbol-level Historical Hit Rate。
+- Result metadata 保留 `observation_unit = DAILY` 與 `overlap_possible = True`。
+- 擴充 `src/ui_terminology.py`，集中「單一條件影響分析」、「原始 V1」、「假設不要求此條件」、「新增歷史樣本數」、「歷史命中率變化」、「百分點」、「每日觀察樣本」、「樣本可能重疊」等繁中 terminology 與 beginner explanations。
+- 新增 `docs/V1_CONDITION_CONTRIBUTION_ANALYSIS.md`，並更新 README 與 ARCHITECTURE。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、V1 thresholds、`evaluate_signal_conditions()`、technical formulas、scanner logic、outcome definition、`evaluate_historical_outcome()`、reference-high definition、20-day horizon、backtest、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema / content 或 OpenAI / AI logic。
+- 單一條件影響分析本身只做 filter / group / aggregate；不重新抓 Yahoo、不重建 technical series、不重新跑 Batch 1 diagnostics、不重新跑 future outcome evaluator。
+- Historical Hit Rate 仍為 `HIT / (HIT + MISS)`；`INCOMPLETE` 與 `NOT_EVALUABLE` 保留 counts 但不進 denominator。
+- Historical Hit Rate delta 使用百分點差，不是百分比相對變化。
+- 本 Batch 不產生 recommendation、ranking、score、best condition、optimal threshold、V1.1、V2、threshold sensitivity、dashboard integration 或 AI analysis。
+
 ## 2026-08-09 — V1 Historical Condition Diagnostics Dashboard Batch 3
 
 ### Completed Features
