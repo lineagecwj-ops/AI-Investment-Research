@@ -1,5 +1,30 @@
 # Learning Log
 
+## 2026-08-09 — V1 Condition Contribution Research Batch 2
+
+### Completed Features
+
+- 新增 `src/volume_threshold_sensitivity_service.py`，建立 deterministic「成交量門檻變化測試」核心服務。
+- Service 直接 consume Batch 2 `HistoricalConditionOutcomeComparisonResult`，重用 Batch 1 daily observation identity 與 Batch 2 attached historical outcome。
+- Primary threshold grid 固定為 `0.80`、`1.00`、`1.10`、`1.20`、`1.30`、`1.50`，且 output 依 threshold ascending。
+- `1.20` 是 current V1 baseline；所有 observation / resolved / HIT / MISS / Historical Hit Rate deltas 都相對 `1.20`。
+- Qualification 固定其他四項 V1 conditions 必須 PASS，只用 `volume_ratio_20` actual value 重新套用 `>= threshold`。
+- 新增 frozen models：`VolumeThresholdSensitivityConfig`、`VolumeThresholdSensitivityPoint`、`VolumeThresholdSensitivitySymbolSummary` 與 `VolumeThresholdSensitivityResult`。
+- Result 保存 aggregate 與 per-symbol summaries；aggregate 以 raw counts 加總，不 average symbol-level Historical Hit Rate。
+- 實作 duplicate observation identity、sample-count monotonic 與 qualified-ID subset invariants。
+- Result metadata 保留 `observation_unit = DAILY` 與 `overlap_possible = True`。
+- 擴充 `src/ui_terminology.py`，集中「成交量門檻變化測試」、「成交量比率門檻」、「目前 V1 門檻」、「相對目前 V1 的樣本變化」、「相對目前 V1 的歷史命中率變化」、「門檻越低」、「門檻越高」等繁中 terminology 與 beginner explanations。
+- 新增 `docs/V1_VOLUME_THRESHOLD_SENSITIVITY.md`，並更新 README 與 ARCHITECTURE。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、production `volume_ratio_20 >= 1.20`、signal / outcome definition、scanner threshold、scanner decision logic、technical formulas、backtest、ranking、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema 或 OpenAI / AI logic。
+- 成交量門檻變化測試本身只做 filter / group / aggregate；不重新抓 Yahoo、不重建 technical series、不重新跑 Batch 1 diagnostics、不重新跑 future outcome evaluator。
+- Historical Hit Rate 仍為 `HIT / (HIT + MISS)`；`INCOMPLETE` 與 `NOT_EVALUABLE` 保留 counts 但不進 denominator。
+- Historical Hit Rate delta 使用百分點差，不是百分比相對變化。
+- Missing、`None` 或 non-finite `volume_ratio_20` 不會硬算成 `0`，也不會 qualify into threshold buckets。
+- 本 Batch 不產生 recommendation、ranking、score、best threshold、optimal threshold、V1.1、V2、RSI sensitivity、distance sensitivity、dashboard integration 或 AI analysis。
+
 ## 2026-08-09 — V1 Condition Contribution Research Batch 1
 
 ### Completed Features

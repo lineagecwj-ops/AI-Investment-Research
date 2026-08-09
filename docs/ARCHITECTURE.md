@@ -290,6 +290,19 @@ condition_contribution_service.py
     └── Records daily-observation unit and overlap_possible warning
     └── No V1 threshold change, V1.1 / V2, threshold sensitivity, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
 
+volume_threshold_sensitivity_service.py
+    └── Deterministic V1 Volume Threshold Sensitivity Analysis foundation
+    └── Consumes Batch 2 HistoricalConditionOutcomeComparisonResult with attached ConditionOutcomeObservation records
+    └── Reuses Batch 1 observation identity and Batch 2 outcome attachment; does not re-evaluate V1 conditions or outcomes
+    └── Keeps the other four V1 conditions fixed and only applies volume_ratio_20 >= threshold to actual diagnostic snapshot values
+    └── Validates finite positive unique thresholds, deterministic ascending output, and required 1.20 current V1 baseline
+    └── Reports threshold points for observation count, HIT / MISS / INCOMPLETE / NOT_EVALUABLE, resolved count, Historical Hit Rate, and deltas vs 1.20
+    └── Enforces duplicate observation identity, sample-count monotonicity, and qualified-ID subset invariants
+    └── Historical Hit Rate denominator remains HIT + MISS; INCOMPLETE and NOT_EVALUABLE are excluded
+    └── Preserves aggregate and per-symbol summaries; aggregate sums raw counts rather than averaging symbol-level rates
+    └── Records daily-observation unit and overlap_possible warning
+    └── No production V1 threshold change, V1.1 / V2, RSI sensitivity, distance sensitivity, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range
