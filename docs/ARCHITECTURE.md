@@ -251,6 +251,18 @@ signal_condition_diagnostics_service.py
     └── Provides aggregate and per-symbol summaries without SQLite persistence
     └── No outcome calculation, Historical Hit Rate, backtest, replay, scanner ranking, Yahoo fetch when injected data is supplied, dashboard, probability, recommendation, OpenAI, or database schema change
 
+historical_condition_outcome_service.py
+    └── Deterministic V1 Historical Condition Outcome Comparison foundation
+    └── Consumes Batch 1 ConditionDiagnosticObservation as the condition-side truth source
+    └── Does not re-evaluate V1 conditions or create independent signal events / trades
+    └── Prepares deterministic research series with 60 pre-window warm-up trading bars, observation-window bars, and outcome-horizon post-window bars
+    └── Reuses raw_high_breakout_60d_within_20d_v1 and evaluate_historical_outcome()
+    └── Groups daily observations by 0/5 through 5/5, 4/5 missing condition, and canonical passed-condition combination
+    └── Historical Hit Rate denominator fixed as HIT + MISS; INCOMPLETE and NOT_EVALUABLE are excluded
+    └── Preserves aggregate and per-symbol summaries; aggregate sums observations rather than averaging symbol rates
+    └── Records daily-observation unit and overlap_possible warning
+    └── No V1 threshold change, parameter tuning, recommendation, probability, ranking, dashboard, AI, SQLite persistence, or database schema change
+
 backtest_service.py
     └── Deterministic historical backtest aggregation from existing price, technical, signal, and outcome layers
     └── BacktestConfig with SignalDefinition, OutcomeDefinition, overlap policy, cooldown, and inclusive signal-date range

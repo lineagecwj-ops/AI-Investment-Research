@@ -1,5 +1,29 @@
 # Learning Log
 
+## 2026-08-09 — V1 Historical Condition Diagnostics Batch 2
+
+### Completed Features
+
+- 新增 `src/historical_condition_outcome_service.py`，建立 deterministic V1 historical condition outcome comparison foundation。
+- Batch 2 直接 consume Batch 1 `ConditionDiagnosticObservation` 作為 condition-side truth source，不重新 evaluate V1 conditions。
+- 新增 frozen models：`HistoricalConditionOutcomeComparisonConfig`、`ConditionOutcomeObservation`、`OutcomeStatusSummary`、`MatchCountOutcomeSummary`、`MissingConditionOutcomeSummary`、`ConditionCombinationOutcomeSummary`、`SymbolConditionOutcomeComparisonSummary` 與 `HistoricalConditionOutcomeComparisonResult`。
+- 固定 deterministic research window helper：每個 symbol 保留 observation start 前 60 根 trading bars 作為 warm-up、observation window bars、以及 observation end 後 `outcome_definition.horizon_bars` 根 post-window bars。
+- Warm-up bars 只用於 technical feature，不建立 Batch 1 observation、不進 denominator、不進 Batch 2 outcome group；post-window bars 只用於 outcome labeling。
+- Batch 2 重用既有 `raw_high_breakout_60d_within_20d_v1` / `evaluate_historical_outcome()`，並保留 frozen observation-date `prior_high_60d` reference-high semantics。
+- Match-count outcome summaries 覆蓋 0/5～5/5，4/5 missing-condition summaries 覆蓋五個 V1 condition ids，並支援 canonical combination outcome foundation。
+- Historical Hit Rate denominator 固定為 `HIT + MISS`；`INCOMPLETE` 與 `NOT_EVALUABLE` 保留 counts 但不進 denominator；zero resolved samples 回傳 `None`。
+- Result 支援 aggregate 與 per-symbol summaries；aggregate 以 observation counts 加總，不 average symbol-level percentages。
+- 擴充 `src/ui_terminology.py`，集中 `歷史後續結果比較`、`已解析歷史樣本數`、`歷史命中率`、`4/5 案例：缺少條件與歷史後續結果` 等 terminology 與 beginner explanations。
+- 新增 `docs/V1_HISTORICAL_CONDITION_OUTCOME_COMPARISON.md`，並更新 README 與 ARCHITECTURE。
+
+### Safety Notes
+
+- 本 Batch 不修改 `technical_example_v1`、V1 五項 threshold、signal / outcome definition、scanner threshold、scanner decision logic、technical formulas、backtest、ranking、Historical Replay、Walk-Forward Replay、Replay Analytics、OOS、database schema 或 OpenAI / AI logic。
+- Batch 2 的 primary unit 是 daily diagnostic observation，不是 independent signal event、trade、entry、position 或 strategy backtest case。
+- Consecutive daily observations may have overlapping future 20-trading-bar windows, so result metadata keeps `observation_unit = DAILY` and `overlap_possible = True`。
+- `歷史命中率` 是 descriptive historical statistic，必須與 resolved sample count 一起解讀；不是 future probability、success probability、prediction accuracy、confidence、likelihood、expected return、Win Rate 或 investment recommendation。
+- 即使某個 4/5 missing-condition group outcome 較高，本 Batch 仍只產生 evidence，不修改 `-5%` threshold、不產生 V1.1 / V2、不做 recommendation、ranking 或 parameter tuning。
+
 ## 2026-08-09 — V1 Historical Condition Diagnostics Batch 1
 
 ### Completed Features
