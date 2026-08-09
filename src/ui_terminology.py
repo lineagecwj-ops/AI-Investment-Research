@@ -154,6 +154,14 @@ DIAGNOSTIC_LABELS = {
     "Daily Observations": "每日觀察樣本",
     "Overlap Possible": "樣本可能重疊",
     "Leave-One-Out": "Leave-One-Out（假設不要求單一條件）",
+    "Volume Threshold Sensitivity Analysis": "成交量門檻變化測試",
+    "Threshold Sensitivity": "門檻變化測試",
+    "Volume Ratio Threshold": "成交量比率門檻",
+    "Current V1 Threshold": "目前 V1 門檻",
+    "Observation Count Change vs V1": "相對目前 V1 的樣本變化",
+    "Historical Hit Rate Change vs V1": "相對目前 V1 的歷史命中率變化",
+    "Lower Threshold": "門檻越低",
+    "Higher Threshold": "門檻越高",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {
@@ -210,6 +218,19 @@ DIAGNOSTIC_BEGINNER_EXPLANATIONS = {
     ),
     "Daily Observation Overlap Note": (
         "目前每日觀察樣本可能具有重疊的未來觀察區間，不能解讀成相同數量的獨立交易。"
+    ),
+    "Volume Threshold Sensitivity Analysis": (
+        "成交量門檻變化測試會固定其他四項 V1 條件，只改變成交量比率門檻，"
+        "比較不同門檻下的歷史樣本數與歷史後續結果。"
+    ),
+    "Volume Threshold Sensitivity Baseline Note": (
+        "1.20 是目前 V1 正式門檻。本測試不會修改正式 V1。"
+    ),
+    "Volume Threshold Sensitivity Safety Note": (
+        "歷史命中率變高或變低，不代表該門檻是最佳設定。"
+    ),
+    "Volume Threshold Sensitivity Sample Note": (
+        "較低門檻通常會增加樣本，但是否保留足夠篩選效果，需要進一步研究。"
     ),
 }
 
