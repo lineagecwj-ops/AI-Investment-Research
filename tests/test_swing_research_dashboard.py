@@ -53,6 +53,7 @@ from swing_research_dashboard import build_not_evaluable_rows
 from swing_research_dashboard import build_replay_candidate_table_rows
 from swing_research_dashboard import build_replay_summary_rows
 from swing_research_dashboard import build_scan_summary_rows
+from swing_research_dashboard import build_scanner_condition_coverage_view
 from swing_research_dashboard import build_swing_research_fingerprint
 from swing_research_dashboard import build_beginner_indicator_explanations
 from swing_research_dashboard import build_historical_condition_dashboard_fingerprint
@@ -897,6 +898,55 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
                 preferred_sample_minimum=config.preferred_resolved_samples,
             ),
         )
+
+    def test_scanner_condition_coverage_view_projects_formal_near_and_exploratory_rows(self):
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        formal = evaluate_signal_conditions(
+            self.snapshot(symbol="2330.TW", volume_ratio_20=1.20),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        near = evaluate_signal_conditions(
+            self.snapshot(symbol="2368.TW", volume_ratio_20=1.10),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        exploratory = evaluate_signal_conditions(
+            self.snapshot(symbol="2002.TW", volume_ratio_20=1.10, rsi_14=72.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(formal, near, exploratory),
+            matched_candidates=(SimpleNamespace(symbol="2330.TW"),),
+        )
+
+        view = build_scanner_condition_coverage_view(result)
+
+        self.assertEqual(view.summary_rows[0]["數量"], 3)
+        self.assertEqual(view.summary_rows[1]["數量"], 1)
+        self.assertEqual(view.summary_rows[2]["數量"], 1)
+        self.assertEqual(view.summary_rows[3]["數量"], 1)
+        self.assertEqual(view.formal_v1_rows[0]["股票"], "2330.TW")
+        self.assertEqual(view.formal_v1_rows[0]["條件覆蓋"], "5/5")
+        self.assertEqual(view.formal_v1_rows[0]["V1 狀態"], "正式命中")
+        self.assertEqual(view.near_match_rows[0]["股票"], "2368.TW")
+        self.assertEqual(view.near_match_rows[0]["條件覆蓋"], "4/5")
+        self.assertIn("成交量", view.near_match_rows[0]["未符合項目"])
+        self.assertEqual(view.near_match_rows[0]["V1.1 實驗版"], "V1.1 實驗版符合")
+        self.assertEqual(view.exploratory_rows[0]["股票"], "2002.TW")
+        self.assertEqual(view.exploratory_rows[0]["條件覆蓋"], "3/5")
+        self.assertIn("RSI", view.exploratory_rows[0]["未符合項目"])
+        forbidden_columns = {
+            "score",
+            "rank",
+            "winner",
+            "probability",
+            "confidence",
+            "recommendation",
+            "推薦",
+            "強弱排名",
+        }
+        for row in view.formal_v1_rows + view.near_match_rows + view.exploratory_rows:
+            self.assertTrue(forbidden_columns.isdisjoint(set(row)))
 
     def test_percentage_formatter(self):
         self.assertEqual(format_percentage(0.72), "72.00%")
