@@ -916,4 +916,3 @@ def _file_sha256(path: Path) -> str:
 
 def _unexpected_mutating_or_network_load():
     raise ConditionCoverageOutcomeStudyError("Research study must use frozen local inputs only.")
-
