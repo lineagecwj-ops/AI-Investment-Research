@@ -15,6 +15,9 @@ from models import SignalEvaluationStatus
 from models import SignalMatch
 from models import TechnicalIndicatorSnapshot
 from replay_analytics_service import build_replay_analytics
+from scanner_condition_coverage_service import ConditionCoverageClassification
+from scanner_condition_coverage_service import ScannerConditionCoverageSummary
+from scanner_condition_coverage_service import build_scanner_condition_coverage_summary
 from swing_scanner_service import SampleSizeStatus
 from swing_scanner_service import SwingOpportunityCandidate
 from swing_scanner_service import SwingScannerConfig
@@ -140,6 +143,28 @@ class HistoricalConditionDashboardView:
     evaluated_observation_count: int
 
     not_evaluable_observation_count: int
+
+
+@dataclass(frozen=True)
+class ScannerConditionCoverageView:
+
+    summary_rows: list[dict[str, object]]
+
+    formal_v1_rows: list[dict[str, object]]
+
+    near_match_rows: list[dict[str, object]]
+
+    exploratory_rows: list[dict[str, object]]
+
+    hidden_rows: list[dict[str, object]]
+
+    near_match_missing_breakdown_rows: list[dict[str, object]]
+
+    exploratory_missing_breakdown_rows: list[dict[str, object]]
+
+    evaluated_symbol_count: int
+
+    below_display_threshold_count: int
 
 
 def parse_swing_symbol_input(user_input: str) -> tuple[str, ...]:
@@ -285,6 +310,105 @@ def build_walk_forward_outcome_count_rows(result) -> list[dict[str, object]]:
         {"Metric": "回放後未達研究目標", "Value": distribution.post_replay_miss_count},
         {"Metric": "回放後觀察期間尚未完整", "Value": distribution.post_replay_incomplete_count},
         {"Metric": "回放後無法判定", "Value": distribution.post_replay_not_evaluable_count},
+    ]
+
+
+def build_scanner_condition_coverage_view(
+    result: SwingScannerResult,
+) -> ScannerConditionCoverageView:
+    summary = build_scanner_condition_coverage_summary(
+        result,
+        production_signal_definition=result.config.signal_definition,
+    )
+    return ScannerConditionCoverageView(
+        summary_rows=_scanner_condition_coverage_summary_rows(summary),
+        formal_v1_rows=_scanner_condition_coverage_rows(
+            summary,
+            classification=ConditionCoverageClassification.FORMAL_V1_MATCH,
+        ),
+        near_match_rows=_scanner_condition_coverage_rows(
+            summary,
+            classification=ConditionCoverageClassification.NEAR_MATCH,
+        ),
+        exploratory_rows=_scanner_condition_coverage_rows(
+            summary,
+            classification=ConditionCoverageClassification.EXPLORATORY,
+        ),
+        hidden_rows=_scanner_condition_coverage_rows(
+            summary,
+            classification=ConditionCoverageClassification.BELOW_DISPLAY_THRESHOLD,
+        ),
+        near_match_missing_breakdown_rows=_missing_breakdown_rows(summary.near_match_missing_condition_breakdown),
+        exploratory_missing_breakdown_rows=_missing_breakdown_rows(summary.exploratory_missing_condition_breakdown),
+        evaluated_symbol_count=summary.evaluated_symbol_count,
+        below_display_threshold_count=summary.below_display_threshold_count,
+    )
+
+
+def _scanner_condition_coverage_summary_rows(
+    summary: ScannerConditionCoverageSummary,
+) -> list[dict[str, object]]:
+    return [
+        {"分類": "掃描股票數", "數量": summary.evaluated_symbol_count},
+        {"分類": "正式 V1 命中 5/5", "數量": summary.formal_v1_match_count},
+        {"分類": "接近條件 4/5", "數量": summary.near_match_count},
+        {"分類": "觀察 3/5", "數量": summary.exploratory_count},
+        {"分類": "預設隱藏 0-2/5", "數量": summary.below_display_threshold_count},
+    ]
+
+
+def _scanner_condition_coverage_rows(
+    summary: ScannerConditionCoverageSummary,
+    *,
+    classification: ConditionCoverageClassification,
+) -> list[dict[str, object]]:
+    rows = []
+    for item in summary.results:
+        if item.classification is not classification:
+            continue
+        rows.append(
+            {
+                "股票": item.symbol,
+                "最新交易日": format_date(item.as_of_date),
+                "條件覆蓋": item.coverage_label,
+                "符合項目": format_condition_labels(item.matched_condition_ids),
+                "未符合項目": format_condition_labels(item.missing_condition_ids),
+                "Missing Signature": item.missing_condition_signature,
+                "volume_ratio_20": format_metric_value("volume_ratio_20", item.volume_ratio_20),
+                "V1 狀態": "正式命中" if item.formal_v1_qualified else "不符合",
+                "V1.1 實驗版": "V1.1 實驗版符合" if item.v1_1_experimental_match else "N/A",
+                **_condition_status_columns(item.condition_details),
+            }
+        )
+    return rows
+
+
+def _condition_status_columns(
+    conditions: tuple[EvaluatedSignalCondition, ...],
+) -> dict[str, str]:
+    return {
+        get_diagnostic_condition_label(condition_diagnostic_key(condition)): (
+            "符合" if condition.matched is True else "未符合"
+        )
+        for condition in conditions
+    }
+
+
+def condition_diagnostic_key(condition: EvaluatedSignalCondition) -> str:
+    if condition.secondary_metric is not None:
+        return f"{condition.metric}_vs_{condition.secondary_metric}"
+    return condition.metric
+
+
+def _missing_breakdown_rows(rows) -> list[dict[str, object]]:
+    return [
+        {
+            "未符合項目": format_condition_labels(row.missing_condition_ids),
+            "Missing Signature": row.missing_condition_signature,
+            "數量": row.symbol_count,
+            "股票": ", ".join(row.symbols),
+        }
+        for row in rows
     ]
 
 

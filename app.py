@@ -2488,6 +2488,7 @@ def render_swing_research_result(result, source_context=None) -> None:
     for col, row in zip(summary_cols, swing_dashboard.build_scan_summary_rows(result)):
         col.metric(row["Metric"], row["Value"])
 
+    render_scanner_condition_coverage(result)
     render_swing_technical_condition_detail(result)
 
     if result.failed_symbols:
@@ -2527,6 +2528,52 @@ def render_swing_research_result(result, source_context=None) -> None:
     selected_label = st.selectbox("選擇研究候選", candidate_labels)
     selected_candidate = result.matched_candidates[candidate_labels.index(selected_label)]
     render_swing_candidate_detail(selected_candidate)
+
+
+def render_scanner_condition_coverage(result) -> None:
+    st.markdown("### 今日股票掃描")
+    st.caption("條件覆蓋只顯示本次 Scanner 已計算的 V1 五項條件，不是分數、勝率、推薦或強弱排名。")
+    view = swing_dashboard.build_scanner_condition_coverage_view(result)
+    summary_cols = st.columns(5)
+    for col, row in zip(summary_cols, view.summary_rows):
+        col.metric(row["分類"], row["數量"])
+
+    st.markdown("#### 正式 V1 命中")
+    if view.formal_v1_rows:
+        st.dataframe(pd.DataFrame(view.formal_v1_rows).astype(str), width="stretch", hide_index=True)
+    else:
+        st.info("本次掃描沒有 5/5 正式 V1 命中。")
+
+    st.markdown("#### 接近條件")
+    if view.near_match_rows:
+        st.dataframe(pd.DataFrame(view.near_match_rows).astype(str), width="stretch", hide_index=True)
+    else:
+        st.info("本次掃描沒有 4/5 接近條件。")
+
+    st.markdown("#### 觀察")
+    if view.exploratory_rows:
+        st.dataframe(pd.DataFrame(view.exploratory_rows).astype(str), width="stretch", hide_index=True)
+    else:
+        st.info("本次掃描沒有 3/5 觀察股票。")
+
+    with st.expander("未展開股票與未符合項目統計", expanded=False):
+        st.write(f"0-2/5 預設隱藏數量：{view.below_display_threshold_count}")
+        if view.hidden_rows:
+            st.dataframe(pd.DataFrame(view.hidden_rows).astype(str), width="stretch", hide_index=True)
+        if view.near_match_missing_breakdown_rows:
+            st.markdown("##### 4/5 未符合項目統計")
+            st.dataframe(
+                pd.DataFrame(view.near_match_missing_breakdown_rows).astype(str),
+                width="stretch",
+                hide_index=True,
+            )
+        if view.exploratory_missing_breakdown_rows:
+            st.markdown("##### 3/5 未符合組合統計")
+            st.dataframe(
+                pd.DataFrame(view.exploratory_missing_breakdown_rows).astype(str),
+                width="stretch",
+                hide_index=True,
+            )
 
 
 def render_swing_technical_condition_detail(result) -> None:
