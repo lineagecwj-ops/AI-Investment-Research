@@ -1,0 +1,1101 @@
+{
+  "source_authority": "Taiwan Stock Exchange OpenAPI listed company basic data",
+  "source_url": "https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
+  "source_report_date": "2026-08-09",
+  "source_report_date_raw": "1150809",
+  "retrieved_at": "2026-08-10T05:53:18Z",
+  "source_checksum": "496cfa5a392102d23d5900ef1a382b0cbbb4bfb503ecd454428f48dd818d719f",
+  "records": [
+    {
+      "stock_code": "1101",
+      "stock_name": "臺灣水泥股份有限公司",
+      "listing_date": "1962-02-09"
+    },
+    {
+      "stock_code": "1102",
+      "stock_name": "亞洲水泥股份有限公司",
+      "listing_date": "1962-06-08"
+    },
+    {
+      "stock_code": "1210",
+      "stock_name": "大成長城企業股份有限公司",
+      "listing_date": "1978-05-20"
+    },
+    {
+      "stock_code": "1216",
+      "stock_name": "統一企業股份有限公司",
+      "listing_date": "1987-12-28"
+    },
+    {
+      "stock_code": "1229",
+      "stock_name": "聯華實業控股股份有限公司",
+      "listing_date": "1976-07-19"
+    },
+    {
+      "stock_code": "1301",
+      "stock_name": "台灣塑膠工業股份有限公司",
+      "listing_date": "1964-07-27"
+    },
+    {
+      "stock_code": "1303",
+      "stock_name": "南亞塑膠工業股份有限公司",
+      "listing_date": "1967-11-15"
+    },
+    {
+      "stock_code": "1319",
+      "stock_name": "東陽實業廠股份有限公司",
+      "listing_date": "1994-12-12"
+    },
+    {
+      "stock_code": "1326",
+      "stock_name": "台灣化學纖維股份有限公司",
+      "listing_date": "1984-12-20"
+    },
+    {
+      "stock_code": "1342",
+      "stock_name": "八貫企業股份有限公司",
+      "listing_date": "2020-11-24"
+    },
+    {
+      "stock_code": "1402",
+      "stock_name": "遠東新世紀股份有限公司",
+      "listing_date": "1967-04-14"
+    },
+    {
+      "stock_code": "1444",
+      "stock_name": "力麗企業股份有限公司",
+      "listing_date": "1990-08-08"
+    },
+    {
+      "stock_code": "1447",
+      "stock_name": "力鵬企業股份有限公司",
+      "listing_date": "1992-01-28"
+    },
+    {
+      "stock_code": "1476",
+      "stock_name": "儒鴻企業股份有限公司",
+      "listing_date": "2001-04-18"
+    },
+    {
+      "stock_code": "1477",
+      "stock_name": "聚陽實業股份有限公司",
+      "listing_date": "2003-01-21"
+    },
+    {
+      "stock_code": "1503",
+      "stock_name": "士林電機廠股份有限公司",
+      "listing_date": "1969-12-15"
+    },
+    {
+      "stock_code": "1504",
+      "stock_name": "東元電機股份有限公司",
+      "listing_date": "1973-11-05"
+    },
+    {
+      "stock_code": "1513",
+      "stock_name": "中興電工機械股份有限公司",
+      "listing_date": "1994-03-08"
+    },
+    {
+      "stock_code": "1515",
+      "stock_name": "力山工業股份有限公司",
+      "listing_date": "1995-02-04"
+    },
+    {
+      "stock_code": "1519",
+      "stock_name": "華城電機股份有限公司",
+      "listing_date": "1997-04-16"
+    },
+    {
+      "stock_code": "1560",
+      "stock_name": "中國砂輪企業股份有限公司",
+      "listing_date": "2005-01-31"
+    },
+    {
+      "stock_code": "1590",
+      "stock_name": "亞德客國際集團",
+      "listing_date": "2010-12-13"
+    },
+    {
+      "stock_code": "1605",
+      "stock_name": "華新麗華股份有限公司",
+      "listing_date": "1972-11-03"
+    },
+    {
+      "stock_code": "1608",
+      "stock_name": "華榮電線電纜股份有限公司",
+      "listing_date": "1988-07-11"
+    },
+    {
+      "stock_code": "1708",
+      "stock_name": "東南實業股份有限公司",
+      "listing_date": "1986-06-16"
+    },
+    {
+      "stock_code": "1714",
+      "stock_name": "和桐化學股份有限公司",
+      "listing_date": "1991-08-30"
+    },
+    {
+      "stock_code": "1717",
+      "stock_name": "長興材料工業股份有限公司",
+      "listing_date": "1994-03-31"
+    },
+    {
+      "stock_code": "1718",
+      "stock_name": "中國人造纖維股份有限公司",
+      "listing_date": "1963-12-02"
+    },
+    {
+      "stock_code": "1802",
+      "stock_name": "台灣玻璃工業股份有限公司",
+      "listing_date": "1973-07-20"
+    },
+    {
+      "stock_code": "2002",
+      "stock_name": "中國鋼鐵股份有限公司",
+      "listing_date": "1974-12-26"
+    },
+    {
+      "stock_code": "2006",
+      "stock_name": "東和鋼鐵企業股份有限公司",
+      "listing_date": "1988-07-13"
+    },
+    {
+      "stock_code": "2027",
+      "stock_name": "大成不銹鋼工業股份有限公司",
+      "listing_date": "1996-10-24"
+    },
+    {
+      "stock_code": "2031",
+      "stock_name": "新光鋼鐵股份有限公司",
+      "listing_date": "2000-09-11"
+    },
+    {
+      "stock_code": "2049",
+      "stock_name": "上銀科技股份有限公司",
+      "listing_date": "2009-06-26"
+    },
+    {
+      "stock_code": "2059",
+      "stock_name": "川湖科技股份有限公司",
+      "listing_date": "2008-06-25"
+    },
+    {
+      "stock_code": "2105",
+      "stock_name": "正新橡膠工業股份有限公司",
+      "listing_date": "1987-12-07"
+    },
+    {
+      "stock_code": "2207",
+      "stock_name": "和泰汽車股份有限公司",
+      "listing_date": "1997-02-25"
+    },
+    {
+      "stock_code": "2211",
+      "stock_name": "長榮鋼鐵股份有限公司",
+      "listing_date": "2021-04-12"
+    },
+    {
+      "stock_code": "2243",
+      "stock_name": "宏旭控股股份有限公司",
+      "listing_date": "2017-09-27"
+    },
+    {
+      "stock_code": "2301",
+      "stock_name": "光寶科技股份有限公司",
+      "listing_date": "1995-11-17"
+    },
+    {
+      "stock_code": "2302",
+      "stock_name": "麗正國際科技股份有限公司",
+      "listing_date": "1985-01-15"
+    },
+    {
+      "stock_code": "2303",
+      "stock_name": "聯華電子股份有限公司",
+      "listing_date": "1985-07-16"
+    },
+    {
+      "stock_code": "2305",
+      "stock_name": "全友電腦股份有限公司",
+      "listing_date": "1988-10-21"
+    },
+    {
+      "stock_code": "2308",
+      "stock_name": "台達電子工業股份有限公司",
+      "listing_date": "1988-12-19"
+    },
+    {
+      "stock_code": "2313",
+      "stock_name": "華通電腦股份有限公司",
+      "listing_date": "1990-07-24"
+    },
+    {
+      "stock_code": "2316",
+      "stock_name": "楠梓電子股份有限公司",
+      "listing_date": "1991-02-05"
+    },
+    {
+      "stock_code": "2317",
+      "stock_name": "鴻海精密工業股份有限公司",
+      "listing_date": "1991-06-18"
+    },
+    {
+      "stock_code": "2324",
+      "stock_name": "仁寶電腦工業股份有限公司",
+      "listing_date": "1992-02-18"
+    },
+    {
+      "stock_code": "2327",
+      "stock_name": "國巨股份有限公司",
+      "listing_date": "1993-10-22"
+    },
+    {
+      "stock_code": "2330",
+      "stock_name": "台灣積體電路製造股份有限公司",
+      "listing_date": "1994-09-05"
+    },
+    {
+      "stock_code": "2337",
+      "stock_name": "旺宏電子股份有限公司",
+      "listing_date": "1995-03-15"
+    },
+    {
+      "stock_code": "2344",
+      "stock_name": "華邦電子股份有限公司",
+      "listing_date": "1995-10-18"
+    },
+    {
+      "stock_code": "2345",
+      "stock_name": "智邦科技股份有限公司",
+      "listing_date": "1995-11-15"
+    },
+    {
+      "stock_code": "2347",
+      "stock_name": "聯強國際股份有限公司",
+      "listing_date": "1995-12-13"
+    },
+    {
+      "stock_code": "2353",
+      "stock_name": "宏碁股份有限公司",
+      "listing_date": "1996-09-18"
+    },
+    {
+      "stock_code": "2354",
+      "stock_name": "鴻準精密工業股份有限公司",
+      "listing_date": "1996-10-08"
+    },
+    {
+      "stock_code": "2356",
+      "stock_name": "英業達股份有限公司",
+      "listing_date": "1996-11-13"
+    },
+    {
+      "stock_code": "2357",
+      "stock_name": "華碩電腦股份有限公司",
+      "listing_date": "1996-11-14"
+    },
+    {
+      "stock_code": "2360",
+      "stock_name": "致茂電子股份有限公司",
+      "listing_date": "1996-12-21"
+    },
+    {
+      "stock_code": "2368",
+      "stock_name": "金像電子(股)公司",
+      "listing_date": "1998-03-09"
+    },
+    {
+      "stock_code": "2371",
+      "stock_name": "大同股份有限公司",
+      "listing_date": "1962-02-09"
+    },
+    {
+      "stock_code": "2375",
+      "stock_name": "凱美電機股份有限公司",
+      "listing_date": "1998-08-29"
+    },
+    {
+      "stock_code": "2376",
+      "stock_name": "技嘉科技股份有限公司",
+      "listing_date": "1998-09-24"
+    },
+    {
+      "stock_code": "2377",
+      "stock_name": "微星科技股份有限公司",
+      "listing_date": "1998-10-31"
+    },
+    {
+      "stock_code": "2379",
+      "stock_name": "瑞昱半導體股份有限公司",
+      "listing_date": "1998-10-26"
+    },
+    {
+      "stock_code": "2382",
+      "stock_name": "廣達電腦股份有限公司",
+      "listing_date": "1999-01-08"
+    },
+    {
+      "stock_code": "2383",
+      "stock_name": "台光電子材料股份有限公司",
+      "listing_date": "1998-11-27"
+    },
+    {
+      "stock_code": "2385",
+      "stock_name": "群光電子股份有限公司",
+      "listing_date": "1999-01-05"
+    },
+    {
+      "stock_code": "2395",
+      "stock_name": "研華股份有限公司",
+      "listing_date": "1999-12-13"
+    },
+    {
+      "stock_code": "2404",
+      "stock_name": "漢唐集成股份有限公司",
+      "listing_date": "2000-03-14"
+    },
+    {
+      "stock_code": "2406",
+      "stock_name": "國碩科技工業股份有限公司",
+      "listing_date": "2000-04-29"
+    },
+    {
+      "stock_code": "2408",
+      "stock_name": "南亞科技股份有限公司",
+      "listing_date": "2000-08-17"
+    },
+    {
+      "stock_code": "2409",
+      "stock_name": "友達光電股份有限公司",
+      "listing_date": "2000-09-08"
+    },
+    {
+      "stock_code": "2412",
+      "stock_name": "中華電信股份有限公司",
+      "listing_date": "2000-10-27"
+    },
+    {
+      "stock_code": "2414",
+      "stock_name": "精技電腦股份有限公司",
+      "listing_date": "2000-09-11"
+    },
+    {
+      "stock_code": "2415",
+      "stock_name": "錩新科技股份有限公司",
+      "listing_date": "2000-09-11"
+    },
+    {
+      "stock_code": "2425",
+      "stock_name": "承啟科技股份有限公司",
+      "listing_date": "2000-09-11"
+    },
+    {
+      "stock_code": "2449",
+      "stock_name": "京元電子股份有限公司",
+      "listing_date": "2001-05-09"
+    },
+    {
+      "stock_code": "2451",
+      "stock_name": "創見資訊股份有限公司",
+      "listing_date": "2001-05-03"
+    },
+    {
+      "stock_code": "2454",
+      "stock_name": "聯發科技股份有限公司",
+      "listing_date": "2001-07-23"
+    },
+    {
+      "stock_code": "2455",
+      "stock_name": "全新光電科技股份有限公司",
+      "listing_date": "2002-01-24"
+    },
+    {
+      "stock_code": "2458",
+      "stock_name": "義隆電子股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2466",
+      "stock_name": "冠西電子企業股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2467",
+      "stock_name": "志聖工業股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2474",
+      "stock_name": "可成科技股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2478",
+      "stock_name": "大毅科技股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2484",
+      "stock_name": "希華晶體科技股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2491",
+      "stock_name": "吉祥全球實業股份有限公司",
+      "listing_date": "2001-09-19"
+    },
+    {
+      "stock_code": "2492",
+      "stock_name": "華新科技股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2493",
+      "stock_name": "揚博科技股份有限公司",
+      "listing_date": "2002-01-23"
+    },
+    {
+      "stock_code": "2504",
+      "stock_name": "國產建材實業股份有限公司",
+      "listing_date": "1978-03-14"
+    },
+    {
+      "stock_code": "2530",
+      "stock_name": "大華建設股份有限公司",
+      "listing_date": "1995-10-12"
+    },
+    {
+      "stock_code": "2542",
+      "stock_name": "興富發建設股份有限公司",
+      "listing_date": "1999-05-03"
+    },
+    {
+      "stock_code": "2597",
+      "stock_name": "潤弘精密工程事業股份有限公司",
+      "listing_date": "2010-03-26"
+    },
+    {
+      "stock_code": "2603",
+      "stock_name": "長榮海運股份有限公司",
+      "listing_date": "1987-09-21"
+    },
+    {
+      "stock_code": "2606",
+      "stock_name": "裕民航運股份有限公司",
+      "listing_date": "1990-12-08"
+    },
+    {
+      "stock_code": "2609",
+      "stock_name": "陽明海運股份有限公司",
+      "listing_date": "1992-04-20"
+    },
+    {
+      "stock_code": "2610",
+      "stock_name": "中華航空股份有限公司",
+      "listing_date": "1993-02-26"
+    },
+    {
+      "stock_code": "2615",
+      "stock_name": "萬海航運股份有限公司",
+      "listing_date": "1996-05-16"
+    },
+    {
+      "stock_code": "2618",
+      "stock_name": "長榮航空股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "2633",
+      "stock_name": "台灣高速鐵路股份有限公司",
+      "listing_date": "2016-10-27"
+    },
+    {
+      "stock_code": "2634",
+      "stock_name": "漢翔航空工業股份有限公司",
+      "listing_date": "2014-08-25"
+    },
+    {
+      "stock_code": "2637",
+      "stock_name": "慧洋海運股份有限公司",
+      "listing_date": "2010-12-01"
+    },
+    {
+      "stock_code": "2645",
+      "stock_name": "長榮航太科技股份有限公司",
+      "listing_date": "2023-03-14"
+    },
+    {
+      "stock_code": "2646",
+      "stock_name": "星宇航空股份有限公司",
+      "listing_date": "2024-10-25"
+    },
+    {
+      "stock_code": "2801",
+      "stock_name": "彰化商業銀行股份有限公司",
+      "listing_date": "1962-02-15"
+    },
+    {
+      "stock_code": "2812",
+      "stock_name": "台中商業銀行股份有限公司",
+      "listing_date": "1984-05-15"
+    },
+    {
+      "stock_code": "2834",
+      "stock_name": "臺灣中小企業銀行股份有限公司",
+      "listing_date": "1998-01-03"
+    },
+    {
+      "stock_code": "2838",
+      "stock_name": "聯邦商業銀行股份有限公司",
+      "listing_date": "1998-06-29"
+    },
+    {
+      "stock_code": "2851",
+      "stock_name": "中央再保險股份有限公司",
+      "listing_date": "2000-07-06"
+    },
+    {
+      "stock_code": "2855",
+      "stock_name": "統一綜合證券股份有限公司",
+      "listing_date": "2002-09-16"
+    },
+    {
+      "stock_code": "2880",
+      "stock_name": "華南金融控股股份有限公司",
+      "listing_date": "2001-12-19"
+    },
+    {
+      "stock_code": "2881",
+      "stock_name": "富邦金融控股股份有限公司",
+      "listing_date": "2001-12-19"
+    },
+    {
+      "stock_code": "2882",
+      "stock_name": "國泰金融控股股份有限公司",
+      "listing_date": "2001-12-31"
+    },
+    {
+      "stock_code": "2883",
+      "stock_name": "凱基金融控股股份有限公司",
+      "listing_date": "2001-12-28"
+    },
+    {
+      "stock_code": "2884",
+      "stock_name": "玉山金融控股股份有限公司",
+      "listing_date": "2002-01-28"
+    },
+    {
+      "stock_code": "2885",
+      "stock_name": "元大金融控股股份有限公司",
+      "listing_date": "2002-02-04"
+    },
+    {
+      "stock_code": "2886",
+      "stock_name": "兆豐金融控股股份有限公司",
+      "listing_date": "2002-02-04"
+    },
+    {
+      "stock_code": "2887",
+      "stock_name": "台新新光金融控股股份有限公司",
+      "listing_date": "2002-02-18"
+    },
+    {
+      "stock_code": "2890",
+      "stock_name": "永豐金融控股股份有限公司",
+      "listing_date": "2002-05-09"
+    },
+    {
+      "stock_code": "2891",
+      "stock_name": "中國信託金融控股股份有限公司",
+      "listing_date": "2002-05-17"
+    },
+    {
+      "stock_code": "2892",
+      "stock_name": "第一金融控股股份有限公司",
+      "listing_date": "2003-01-02"
+    },
+    {
+      "stock_code": "2912",
+      "stock_name": "統一超商股份有限公司",
+      "listing_date": "1997-08-22"
+    },
+    {
+      "stock_code": "3005",
+      "stock_name": "神基控股股份有限公司",
+      "listing_date": "2002-02-25"
+    },
+    {
+      "stock_code": "3008",
+      "stock_name": "大立光電股份有限公司",
+      "listing_date": "2002-03-11"
+    },
+    {
+      "stock_code": "3015",
+      "stock_name": "全漢企業股份有限公司",
+      "listing_date": "2002-10-16"
+    },
+    {
+      "stock_code": "3017",
+      "stock_name": "奇鋐科技股份有限公司",
+      "listing_date": "2002-09-27"
+    },
+    {
+      "stock_code": "3023",
+      "stock_name": "信邦電子股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3026",
+      "stock_name": "禾伸堂企業股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3030",
+      "stock_name": "德律科技股份有限公司",
+      "listing_date": "2002-10-29"
+    },
+    {
+      "stock_code": "3034",
+      "stock_name": "聯詠科技股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3036",
+      "stock_name": "文曄科技股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3037",
+      "stock_name": "欣興電子股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3044",
+      "stock_name": "健鼎科技股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3045",
+      "stock_name": "台灣大哥大股份有限公司",
+      "listing_date": "2002-08-26"
+    },
+    {
+      "stock_code": "3060",
+      "stock_name": "銘異科技股份有限公司",
+      "listing_date": "2003-04-21"
+    },
+    {
+      "stock_code": "3090",
+      "stock_name": "日電貿股份有限公司",
+      "listing_date": "2007-12-31"
+    },
+    {
+      "stock_code": "3167",
+      "stock_name": "大量科技股份有限公司",
+      "listing_date": "2013-10-21"
+    },
+    {
+      "stock_code": "3189",
+      "stock_name": "景碩科技股份有限公司",
+      "listing_date": "2004-11-01"
+    },
+    {
+      "stock_code": "3231",
+      "stock_name": "緯創資通股份有限公司",
+      "listing_date": "2003-08-19"
+    },
+    {
+      "stock_code": "3443",
+      "stock_name": "創意電子股份有限公司",
+      "listing_date": "2006-11-03"
+    },
+    {
+      "stock_code": "3481",
+      "stock_name": "群創光電股份有限公司",
+      "listing_date": "2006-10-24"
+    },
+    {
+      "stock_code": "3532",
+      "stock_name": "台塑勝高科技股份有限公司",
+      "listing_date": "2007-12-10"
+    },
+    {
+      "stock_code": "3533",
+      "stock_name": "嘉澤端子工業股份有限公司",
+      "listing_date": "2007-12-10"
+    },
+    {
+      "stock_code": "3550",
+      "stock_name": "聯穎科技股份有限公司",
+      "listing_date": "2010-11-10"
+    },
+    {
+      "stock_code": "3653",
+      "stock_name": "健策精密工業股份有限公司",
+      "listing_date": "2009-11-18"
+    },
+    {
+      "stock_code": "3661",
+      "stock_name": "世芯電子股份有限公司",
+      "listing_date": "2014-10-28"
+    },
+    {
+      "stock_code": "3665",
+      "stock_name": "貿聯控股(BizLink Holding Inc.)",
+      "listing_date": "2011-04-21"
+    },
+    {
+      "stock_code": "3702",
+      "stock_name": "大聯大控股股份有限公司",
+      "listing_date": "2005-11-09"
+    },
+    {
+      "stock_code": "3706",
+      "stock_name": "神達控股股份有限公司",
+      "listing_date": "2013-09-12"
+    },
+    {
+      "stock_code": "3708",
+      "stock_name": "上緯國際控股股份有限公司",
+      "listing_date": "2016-08-31"
+    },
+    {
+      "stock_code": "3711",
+      "stock_name": "日月光投資控股股份有限公司",
+      "listing_date": "2018-04-30"
+    },
+    {
+      "stock_code": "4551",
+      "stock_name": "智伸科技股份有限公司",
+      "listing_date": "2015-08-10"
+    },
+    {
+      "stock_code": "4583",
+      "stock_name": "台灣精銳科技股份有限公司",
+      "listing_date": "2022-05-09"
+    },
+    {
+      "stock_code": "4763",
+      "stock_name": "濟南大自然新材料股份有限公司",
+      "listing_date": "2015-11-09"
+    },
+    {
+      "stock_code": "4904",
+      "stock_name": "遠傳電信股份有限公司",
+      "listing_date": "2005-08-24"
+    },
+    {
+      "stock_code": "4915",
+      "stock_name": "致伸科技股份有限公司",
+      "listing_date": "2012-10-05"
+    },
+    {
+      "stock_code": "4919",
+      "stock_name": "新唐科技股份有限公司",
+      "listing_date": "2010-09-27"
+    },
+    {
+      "stock_code": "4938",
+      "stock_name": "和碩聯合科技股份有限公司",
+      "listing_date": "2010-06-24"
+    },
+    {
+      "stock_code": "4958",
+      "stock_name": "臻鼎科技控股股份有限公司",
+      "listing_date": "2011-12-26"
+    },
+    {
+      "stock_code": "4967",
+      "stock_name": "十銓科技股份有限公司",
+      "listing_date": "2019-01-14"
+    },
+    {
+      "stock_code": "5269",
+      "stock_name": "祥碩科技股份有限公司",
+      "listing_date": "2012-12-12"
+    },
+    {
+      "stock_code": "5292",
+      "stock_name": "華懋科技股份有限公司",
+      "listing_date": "2023-11-21"
+    },
+    {
+      "stock_code": "5434",
+      "stock_name": "崇越科技股份有限公司",
+      "listing_date": "2003-08-25"
+    },
+    {
+      "stock_code": "5522",
+      "stock_name": "遠雄建設事業股份有限公司",
+      "listing_date": "2007-08-06"
+    },
+    {
+      "stock_code": "5871",
+      "stock_name": "中租控股股份有限公司",
+      "listing_date": "2011-12-13"
+    },
+    {
+      "stock_code": "5876",
+      "stock_name": "上海商業儲蓄銀行股份有限公司",
+      "listing_date": "2018-10-19"
+    },
+    {
+      "stock_code": "5880",
+      "stock_name": "合作金庫金融控股股份有限公司",
+      "listing_date": "2011-12-01"
+    },
+    {
+      "stock_code": "6139",
+      "stock_name": "亞翔工程股份有限公司",
+      "listing_date": "2003-08-25"
+    },
+    {
+      "stock_code": "6155",
+      "stock_name": "鈞寶電子工業股份有限公司",
+      "listing_date": "2006-08-18"
+    },
+    {
+      "stock_code": "6196",
+      "stock_name": "帆宣系統科技股份有限公司",
+      "listing_date": "2004-05-24"
+    },
+    {
+      "stock_code": "6213",
+      "stock_name": "聯茂電子股份有限公司",
+      "listing_date": "2008-01-21"
+    },
+    {
+      "stock_code": "6226",
+      "stock_name": "光鼎電子股份有限公司",
+      "listing_date": "2008-11-10"
+    },
+    {
+      "stock_code": "6239",
+      "stock_name": "力成科技股份有限公司",
+      "listing_date": "2004-11-08"
+    },
+    {
+      "stock_code": "6257",
+      "stock_name": "矽格股份有限公司",
+      "listing_date": "2003-08-25"
+    },
+    {
+      "stock_code": "6282",
+      "stock_name": "康舒科技股份有限公司",
+      "listing_date": "2003-09-08"
+    },
+    {
+      "stock_code": "6285",
+      "stock_name": "啟碁科技股份有限公司",
+      "listing_date": "2003-09-22"
+    },
+    {
+      "stock_code": "6409",
+      "stock_name": "旭隼科技股份有限公司",
+      "listing_date": "2014-03-31"
+    },
+    {
+      "stock_code": "6415",
+      "stock_name": "矽力杰股份有限公司",
+      "listing_date": "2013-12-12"
+    },
+    {
+      "stock_code": "6442",
+      "stock_name": "光紅建聖股份有限公司",
+      "listing_date": "2015-07-14"
+    },
+    {
+      "stock_code": "6446",
+      "stock_name": "藥華醫藥股份有限公司",
+      "listing_date": "2024-01-25"
+    },
+    {
+      "stock_code": "6505",
+      "stock_name": "台塑石化股份有限公司",
+      "listing_date": "2003-12-26"
+    },
+    {
+      "stock_code": "6515",
+      "stock_name": "穎崴科技股份有限公司",
+      "listing_date": "2021-01-20"
+    },
+    {
+      "stock_code": "6525",
+      "stock_name": "捷敏股份有限公司",
+      "listing_date": "2016-04-12"
+    },
+    {
+      "stock_code": "6526",
+      "stock_name": "達發科技股份有限公司",
+      "listing_date": "2023-10-19"
+    },
+    {
+      "stock_code": "6531",
+      "stock_name": "愛普科技股份有限公司",
+      "listing_date": "2016-05-31"
+    },
+    {
+      "stock_code": "6585",
+      "stock_name": "鼎基先進材料股份有限公司",
+      "listing_date": "2022-05-20"
+    },
+    {
+      "stock_code": "6669",
+      "stock_name": "緯穎科技服務股份有限公司",
+      "listing_date": "2019-03-27"
+    },
+    {
+      "stock_code": "6670",
+      "stock_name": "復盛應用科技股份有限公司",
+      "listing_date": "2018-12-18"
+    },
+    {
+      "stock_code": "6672",
+      "stock_name": "騰輝電子國際集團股份有限公司",
+      "listing_date": "2019-04-17"
+    },
+    {
+      "stock_code": "6691",
+      "stock_name": "洋基工程股份有限公司",
+      "listing_date": "2022-01-03"
+    },
+    {
+      "stock_code": "6770",
+      "stock_name": "力晶積成電子製造股份有限公司",
+      "listing_date": "2021-12-06"
+    },
+    {
+      "stock_code": "6781",
+      "stock_name": "AES Holding Co., Ltd.",
+      "listing_date": "2021-03-22"
+    },
+    {
+      "stock_code": "6789",
+      "stock_name": "采鈺科技股份有限公司",
+      "listing_date": "2022-06-30"
+    },
+    {
+      "stock_code": "6805",
+      "stock_name": "富世達股份有限公司",
+      "listing_date": "2023-11-09"
+    },
+    {
+      "stock_code": "6834",
+      "stock_name": "天二科技股份有限公司",
+      "listing_date": "2022-09-01"
+    },
+    {
+      "stock_code": "6890",
+      "stock_name": "來億興業股份有限公司",
+      "listing_date": "2024-06-12"
+    },
+    {
+      "stock_code": "6919",
+      "stock_name": "康霈生技股份有限公司",
+      "listing_date": "2024-10-02"
+    },
+    {
+      "stock_code": "7722",
+      "stock_name": "連加網路商業股份有限公司",
+      "listing_date": "2024-12-05"
+    },
+    {
+      "stock_code": "7750",
+      "stock_name": "新代科技股份有限公司",
+      "listing_date": "2025-09-17"
+    },
+    {
+      "stock_code": "7769",
+      "stock_name": "鴻勁精密股份有限公司",
+      "listing_date": "2025-11-27"
+    },
+    {
+      "stock_code": "8021",
+      "stock_name": "尖點科技股份有限公司",
+      "listing_date": "2008-01-21"
+    },
+    {
+      "stock_code": "8033",
+      "stock_name": "雷虎科技股份有限公司",
+      "listing_date": "2007-06-21"
+    },
+    {
+      "stock_code": "8046",
+      "stock_name": "南亞電路板股份有限公司",
+      "listing_date": "2006-04-07"
+    },
+    {
+      "stock_code": "8105",
+      "stock_name": "凌巨科技股份有限公司",
+      "listing_date": "2006-12-27"
+    },
+    {
+      "stock_code": "8112",
+      "stock_name": "至上電子股份有限公司",
+      "listing_date": "2007-12-31"
+    },
+    {
+      "stock_code": "8210",
+      "stock_name": "勤誠興業股份有限公司",
+      "listing_date": "2011-12-01"
+    },
+    {
+      "stock_code": "8261",
+      "stock_name": "富鼎先進電子股份有限公司",
+      "listing_date": "2009-12-11"
+    },
+    {
+      "stock_code": "8271",
+      "stock_name": "宇瞻科技股份有限公司",
+      "listing_date": "2010-12-29"
+    },
+    {
+      "stock_code": "8454",
+      "stock_name": "富邦媒體科技股份有限公司",
+      "listing_date": "2014-12-19"
+    },
+    {
+      "stock_code": "8464",
+      "stock_name": "億豐綜合工業股份有限公司",
+      "listing_date": "2015-12-22"
+    },
+    {
+      "stock_code": "8476",
+      "stock_name": "台境企業股份有限公司",
+      "listing_date": "2023-10-31"
+    },
+    {
+      "stock_code": "8996",
+      "stock_name": "高力熱處理工業股份有限公司",
+      "listing_date": "2014-02-14"
+    },
+    {
+      "stock_code": "9904",
+      "stock_name": "寶成工業股份有限公司",
+      "listing_date": "1990-01-19"
+    },
+    {
+      "stock_code": "9910",
+      "stock_name": "豐泰企業股份有限公司",
+      "listing_date": "1992-02-18"
+    },
+    {
+      "stock_code": "9941",
+      "stock_name": "裕融企業股份有限公司",
+      "listing_date": "2001-09-17"
+    },
+    {
+      "stock_code": "9945",
+      "stock_name": "潤泰創新國際股份有限公司",
+      "listing_date": "1992-04-30"
+    },
+    {
+      "stock_code": "9946",
+      "stock_name": "三發地產股份有限公司",
+      "listing_date": "2013-09-17"
+    }
+  ],
+  "snapshot_checksum": "cc4a531dd4f821376a0e9ed138c99fc5f526c0b79879ec65499667fc63f07528"
+}
