@@ -12,6 +12,7 @@ SOURCE_LABELS = {
     "Manual Input": "手動輸入",
     "Watchlist": "觀察清單",
     "Saved Universe": "已儲存股票池",
+    "Frozen TWSE Research Universe": "研究股票池（Frozen TWSE 218）",
 }
 
 SCAN_STATUS_LABELS = {

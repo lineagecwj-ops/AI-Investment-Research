@@ -104,6 +104,7 @@ from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
 from historical_price_service import get_historical_prices
+from frozen_twse_research_universe_service import FrozenTWSEResearchUniverseError
 from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import build_diagnostic_technical_series
@@ -1916,6 +1917,10 @@ def render_swing_research() -> None:
         universe_ui.WATCHLIST_SOURCE,
         universe_ui.SAVED_UNIVERSE_SOURCE,
     ]
+    if scan_mode == swing_dashboard.CURRENT_SCAN_MODE:
+        source_options.append(universe_ui.FROZEN_TWSE_RESEARCH_SOURCE)
+    if st.session_state.get("swing_research_symbol_source") not in (None, *source_options):
+        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
     source_type = st.selectbox(
         "股票來源",
         source_options,
@@ -1938,7 +1943,7 @@ def render_swing_research() -> None:
             st.caption(f"觀察清單股票數：{len(watchlist_symbols)}")
             if not watchlist_symbols:
                 st.info("觀察清單目前沒有股票。")
-        else:
+        elif source_type == universe_ui.SAVED_UNIVERSE_SOURCE:
             if universes:
                 universe_labels = [
                     universe_ui.universe_selector_label(universe)
@@ -1959,6 +1964,22 @@ def render_swing_research() -> None:
                     st.write(universe_ui.symbols_to_text(selected_universe.symbols) or "N/A")
             else:
                 st.info("尚未建立自訂股票池。仍可使用手動輸入。")
+        else:
+            try:
+                frozen_universe = universe_ui.load_frozen_twse_research_source()
+                st.info(universe_ui.FROZEN_TWSE_RESEARCH_SOURCE_INFO)
+                st.caption(universe_ui.FROZEN_TWSE_RESEARCH_DISCLOSURE)
+                st.caption(
+                    f"股票來源：{get_source_label(universe_ui.FROZEN_TWSE_RESEARCH_SOURCE)} · "
+                    f"股票數：{len(frozen_universe.symbols)} · "
+                    f"Signal：{get_signal_definition_label(TECHNICAL_EXAMPLE_SIGNAL_V1.id)}"
+                )
+                st.caption(
+                    f"研究股票池版本：{frozen_universe.universe_version} · "
+                    f"Universe ID：{frozen_universe.universe_id}"
+                )
+            except FrozenTWSEResearchUniverseError:
+                st.error("研究股票池目前無法載入。")
         st.text_input("篩選規則", value=get_signal_definition_label(TECHNICAL_EXAMPLE_SIGNAL_V1.id), disabled=True, key="swing_signal_definition_label")
         st.caption("依均線、動能、成交量與接近前高等技術條件，判斷目前是否符合研究條件。")
         st.text_input("歷史研究目標", value=get_outcome_definition_label(RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1.id), disabled=True, key="swing_outcome_definition_label")
@@ -2029,12 +2050,21 @@ def render_swing_research() -> None:
             else "執行波段掃描"
         )
 
-    normalized_symbols, current_source_context = resolve_swing_research_source(
-        source_type=source_type,
-        input_symbols=input_symbols,
-        watchlist_symbols=watchlist_symbols,
-        selected_universe=selected_universe,
-    )
+    source_resolution_error = None
+    try:
+        normalized_symbols, current_source_context = resolve_swing_research_source(
+            source_type=source_type,
+            input_symbols=input_symbols,
+            watchlist_symbols=watchlist_symbols,
+            selected_universe=selected_universe,
+        )
+    except FrozenTWSEResearchUniverseError as error:
+        normalized_symbols = tuple()
+        current_source_context = universe_ui.build_source_context(
+            source_type=source_type,
+            symbols=tuple(),
+        )
+        source_resolution_error = f"研究股票池目前無法載入。{error}"
     if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
         current_fingerprint = oos_dashboard.build_oos_validation_request_fingerprint(
             normalized_symbols=normalized_symbols,
@@ -2103,7 +2133,13 @@ def render_swing_research() -> None:
         st.info("訊號間隔限制：會減少彼此相近的重複事件，但不代表事件完全獨立。")
 
     if submitted:
-        if not normalized_symbols:
+        if source_resolution_error:
+            st.session_state["swing_research_result"] = None
+            st.session_state["swing_research_config_fingerprint"] = None
+            st.session_state["swing_research_price_series_by_symbol"] = {}
+            st.session_state["swing_research_source_context"] = None
+            st.session_state["swing_research_last_error"] = source_resolution_error
+        elif not normalized_symbols:
             if scan_mode == oos_dashboard.OOS_VALIDATION_MODE:
                 st.session_state["oos_validation_result"] = None
                 st.session_state["oos_validation_fingerprint"] = None
@@ -2307,6 +2343,12 @@ def resolve_swing_research_source(
             symbols=symbols,
             universe_id=selected_universe.id,
             universe_name=selected_universe.name,
+        )
+    if source_type == universe_ui.FROZEN_TWSE_RESEARCH_SOURCE:
+        frozen_universe = universe_ui.load_frozen_twse_research_source()
+        return (
+            frozen_universe.symbols,
+            universe_ui.frozen_twse_research_source_context(frozen_universe),
         )
 
     symbols = swing_dashboard.parse_swing_symbol_input(input_symbols)

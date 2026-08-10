@@ -3,6 +3,8 @@ import re
 from datetime import datetime
 
 from models import ResearchUniverse
+from frozen_twse_research_universe_service import FrozenTWSEResearchUniverse
+from frozen_twse_research_universe_service import load_frozen_twse_research_universe
 from universe_service import MAX_UNIVERSE_DESCRIPTION_LENGTH
 from universe_service import MAX_UNIVERSE_NAME_LENGTH
 from universe_service import normalize_universe_symbols
@@ -12,9 +14,20 @@ from ui_terminology import get_source_label
 MANUAL_SOURCE = "Manual Input"
 WATCHLIST_SOURCE = "Watchlist"
 SAVED_UNIVERSE_SOURCE = "Saved Universe"
-SOURCE_OPTIONS = (MANUAL_SOURCE, WATCHLIST_SOURCE, SAVED_UNIVERSE_SOURCE)
+FROZEN_TWSE_RESEARCH_SOURCE = "Frozen TWSE Research Universe"
+SOURCE_OPTIONS = (
+    MANUAL_SOURCE,
+    WATCHLIST_SOURCE,
+    SAVED_UNIVERSE_SOURCE,
+    FROZEN_TWSE_RESEARCH_SOURCE,
+)
 LARGE_UNIVERSE_WARNING_THRESHOLD = 50
 UNIVERSE_SEMANTICS_CAPTION = "股票池只是研究標的集合，不代表投資建議或預測。"
+FROZEN_TWSE_RESEARCH_SOURCE_INFO = "使用目前鎖定的 TWSE 研究股票池，共 218 檔。"
+FROZEN_TWSE_RESEARCH_DISCLOSURE = (
+    "此股票池為目前研究使用的 Frozen TWSE universe，不是全部上市櫃股票，"
+    "且為 2026 current ETF constituent-derived universe。"
+)
 
 
 def parse_universe_symbol_text(symbol_text: str) -> tuple[str, ...]:
@@ -62,6 +75,21 @@ def build_source_context(
         "symbols_copy": tuple(symbols),
         "symbol_count": len(symbols),
     }
+
+
+def load_frozen_twse_research_source() -> FrozenTWSEResearchUniverse:
+    return load_frozen_twse_research_universe()
+
+
+def frozen_twse_research_source_context(
+    universe: FrozenTWSEResearchUniverse,
+) -> dict[str, object]:
+    return build_source_context(
+        source_type=FROZEN_TWSE_RESEARCH_SOURCE,
+        symbols=universe.symbols,
+        universe_id=universe.universe_id,
+        universe_name=get_source_label(FROZEN_TWSE_RESEARCH_SOURCE),
+    )
 
 
 def universe_symbols_fingerprint(symbols: tuple[str, ...]) -> str:
