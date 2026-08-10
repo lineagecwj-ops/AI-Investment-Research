@@ -13,10 +13,13 @@ if str(SRC_PATH) not in sys.path:
 
 from models import ResearchUniverse
 from universe_dashboard import LARGE_UNIVERSE_WARNING_THRESHOLD
+from universe_dashboard import FROZEN_TWSE_RESEARCH_SOURCE
 from universe_dashboard import MANUAL_SOURCE
 from universe_dashboard import SAVED_UNIVERSE_SOURCE
+from universe_dashboard import SOURCE_OPTIONS
 from universe_dashboard import WATCHLIST_SOURCE
 from universe_dashboard import build_source_context
+from universe_dashboard import frozen_twse_research_source_context
 from universe_dashboard import build_universe_form_defaults
 from universe_dashboard import format_universe_updated_at
 from universe_dashboard import parse_universe_symbol_text
@@ -27,6 +30,7 @@ from universe_dashboard import symbols_to_text
 from universe_dashboard import universe_selector_label
 from universe_dashboard import universe_symbols_fingerprint
 from universe_dashboard import validate_form_lengths
+from frozen_twse_research_universe_service import FrozenTWSEResearchUniverse
 
 
 class UniverseDashboardTestCase(unittest.TestCase):
@@ -65,11 +69,26 @@ class UniverseDashboardTestCase(unittest.TestCase):
         self.assertEqual(source_display_name(source_type=MANUAL_SOURCE), "手動輸入")
         self.assertEqual(source_display_name(source_type=WATCHLIST_SOURCE), "觀察清單")
         self.assertEqual(
+            source_display_name(source_type=FROZEN_TWSE_RESEARCH_SOURCE),
+            "研究股票池（Frozen TWSE 218）",
+        )
+        self.assertEqual(
             source_display_name(
                 source_type=SAVED_UNIVERSE_SOURCE,
                 universe_name="AI Server",
             ),
             "已儲存股票池 - AI Server",
+        )
+
+    def test_source_options_include_frozen_twse_research_source(self):
+        self.assertEqual(
+            SOURCE_OPTIONS,
+            (
+                MANUAL_SOURCE,
+                WATCHLIST_SOURCE,
+                SAVED_UNIVERSE_SOURCE,
+                FROZEN_TWSE_RESEARCH_SOURCE,
+            ),
         )
 
     def test_build_source_context_freezes_symbols(self):
@@ -83,6 +102,25 @@ class UniverseDashboardTestCase(unittest.TestCase):
         self.assertEqual(context["source_universe_id"], "u-1")
         self.assertEqual(context["source_universe_name"], "AI Server")
         self.assertEqual(context["symbols_copy"], ("NVDA", "AAPL"))
+        self.assertEqual(context["symbol_count"], 2)
+
+    def test_frozen_twse_context_uses_read_only_research_identity(self):
+        universe = FrozenTWSEResearchUniverse(
+            universe_id="frozen_twse_research_universe_2026_08_09",
+            universe_version="2026-08-current-etf-constituent-v1",
+            symbols=("1101.TW", "2330.TW"),
+            frozen_total_count=224,
+            twse_count=218,
+            tpex_excluded_count=6,
+            selection_rule="test",
+        )
+
+        context = frozen_twse_research_source_context(universe)
+
+        self.assertEqual(context["source_type"], FROZEN_TWSE_RESEARCH_SOURCE)
+        self.assertEqual(context["source_universe_id"], universe.universe_id)
+        self.assertEqual(context["source_universe_name"], "研究股票池（Frozen TWSE 218）")
+        self.assertEqual(context["symbols_copy"], ("1101.TW", "2330.TW"))
         self.assertEqual(context["symbol_count"], 2)
 
     def test_symbols_fingerprint_changes_when_content_changes(self):
