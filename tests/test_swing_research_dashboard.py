@@ -7,6 +7,7 @@ from datetime import date
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +44,9 @@ from swing_research_dashboard import CASE_PREVIEW_LIMIT
 from swing_research_dashboard import CURRENT_SCAN_MODE
 from swing_research_dashboard import HISTORICAL_REPLAY_MODE
 from swing_research_dashboard import WALK_FORWARD_REPLAY_MODE
+from swing_research_dashboard import CandidateDisplayDashboardProjection
 from swing_research_dashboard import build_candidate_table_rows
+from swing_research_dashboard import build_candidate_display_dashboard_projection
 from swing_research_dashboard import build_case_preview_count_rows
 from swing_research_dashboard import build_case_preview_views
 from swing_research_dashboard import build_condition_trace_rows
@@ -947,6 +950,161 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         }
         for row in view.formal_v1_rows + view.near_match_rows + view.exploratory_rows:
             self.assertTrue(forbidden_columns.isdisjoint(set(row)))
+
+    def test_candidate_display_dashboard_projection_uses_phase3_classes(self):
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        formal = evaluate_signal_conditions(
+            self.snapshot(symbol="1001.TW", volume_ratio_20=1.20),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        priority_a = evaluate_signal_conditions(
+            self.snapshot(symbol="1002.TW", rsi_14=72.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        priority_b = evaluate_signal_conditions(
+            self.snapshot(symbol="2368.TW", volume_ratio_20=1.10),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        watch = evaluate_signal_conditions(
+            self.snapshot(symbol="1004.TW", distance_to_prior_60d_high=-0.08),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        other_four = evaluate_signal_conditions(
+            self.snapshot(symbol="1005.TW", sma_20=80.0, sma_60=90.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        three = evaluate_signal_conditions(
+            self.snapshot(symbol="1006.TW", volume_ratio_20=1.10, rsi_14=72.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        below = evaluate_signal_conditions(
+            self.snapshot(symbol="1007.TW", volume_ratio_20=1.10, rsi_14=72.0, analysis_close=90.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(formal, priority_a, priority_b, watch, other_four, three, below),
+            matched_candidates=(SimpleNamespace(symbol="1001.TW"),),
+        )
+
+        view = build_scanner_condition_coverage_view(result)
+        projection = view.experimental_candidate_projection
+
+        self.assertIsNotNone(projection)
+        self.assertTrue(projection.reconciled)
+        self.assertEqual(projection.evaluated_symbol_count, 7)
+        self.assertEqual([row["股票"] for row in projection.formal_v1_rows], ["1001.TW"])
+        self.assertEqual(projection.priority_a_rows[0]["分類"], "研究優先觀察 A")
+        self.assertEqual(projection.priority_a_rows[0]["Production V1"], "不符合")
+        self.assertEqual(projection.priority_a_rows[0]["Experimental Candidate"], "實驗研究分類")
+        self.assertIn("RSI", projection.priority_a_rows[0]["未符合條件"])
+        self.assertEqual(projection.priority_b_rows[0]["股票"], "2368.TW")
+        self.assertEqual(projection.priority_b_rows[0]["V1.1 實驗版"], "V1.1 實驗版符合")
+        self.assertEqual(projection.priority_b_rows[0]["Production V1"], "不符合")
+        self.assertEqual(projection.watch_rows[0]["分類"], "研究觀察")
+        self.assertIn("距離", projection.watch_rows[0]["未符合條件"])
+        self.assertEqual(projection.other_four_of_five_rows[0]["分類"], "探索觀察")
+        self.assertEqual(projection.other_four_of_five_rows[0]["條件覆蓋"], "4/5")
+        self.assertEqual(projection.three_of_five_rows[0]["分類"], "探索觀察")
+        self.assertEqual(projection.three_of_five_rows[0]["條件覆蓋"], "3/5")
+        self.assertEqual(projection.below_display_scope_count, 1)
+
+    def test_candidate_display_dashboard_projection_has_no_forbidden_fields_or_columns(self):
+        projection_fields = {field.name for field in fields(CandidateDisplayDashboardProjection)}
+        forbidden_fragments = (
+            "score",
+            "rank",
+            "probability",
+            "confidence",
+            "recommendation",
+            "expected_return",
+        )
+        self.assertTrue(
+            all(
+                fragment not in field_name
+                for field_name in projection_fields
+                for fragment in forbidden_fragments
+            )
+        )
+
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(formal,),
+            matched_candidates=(SimpleNamespace(symbol="2330.TW"),),
+        )
+
+        projection = build_scanner_condition_coverage_view(result).experimental_candidate_projection
+        self.assertIsNotNone(projection)
+        row_columns = set(projection.formal_v1_rows[0])
+
+        self.assertTrue(
+            all(
+                fragment not in column.lower()
+                for column in row_columns
+                for fragment in forbidden_fragments
+            )
+        )
+
+    def test_candidate_display_projection_formal_identity_equals_production_hits(self):
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        first_formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        second_formal = evaluate_signal_conditions(self.snapshot(symbol="6789.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        priority_a = evaluate_signal_conditions(
+            self.snapshot(symbol="1002.TW", rsi_14=72.0),
+            TECHNICAL_EXAMPLE_SIGNAL_V1,
+        )
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(priority_a, first_formal, second_formal),
+            matched_candidates=(SimpleNamespace(symbol="6789.TW"), SimpleNamespace(symbol="2330.TW")),
+        )
+
+        view = build_scanner_condition_coverage_view(result)
+        projection = view.experimental_candidate_projection
+
+        self.assertIsNotNone(projection)
+        self.assertEqual(tuple(row["股票"] for row in view.formal_v1_rows), ("6789.TW", "2330.TW"))
+        self.assertEqual(set(row["股票"] for row in projection.formal_v1_rows), {"2330.TW", "6789.TW"})
+        self.assertEqual(projection.formal_v1_rows[0]["Production V1"], "正式命中")
+
+    def test_candidate_display_dashboard_projection_empty_groups_are_safe(self):
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(formal,),
+            matched_candidates=(SimpleNamespace(symbol="2330.TW"),),
+        )
+
+        projection = build_scanner_condition_coverage_view(result).experimental_candidate_projection
+
+        self.assertIsNotNone(projection)
+        self.assertEqual(projection.priority_a_rows, [])
+        self.assertEqual(projection.priority_b_rows, [])
+        self.assertEqual(projection.watch_rows, [])
+        self.assertEqual(projection.other_four_of_five_rows, [])
+        self.assertEqual(projection.three_of_five_rows, [])
+
+    def test_candidate_display_projection_failure_keeps_formal_rows_available(self):
+        config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
+        formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        result = SimpleNamespace(
+            config=config,
+            current_signal_details=(formal,),
+            matched_candidates=(SimpleNamespace(symbol="2330.TW"),),
+        )
+
+        with patch(
+            "swing_research_dashboard.build_candidate_display_dashboard_projection",
+            side_effect=RuntimeError("projection failed"),
+        ):
+            view = build_scanner_condition_coverage_view(result)
+
+        self.assertEqual(view.formal_v1_rows[0]["股票"], "2330.TW")
+        self.assertIsNone(view.experimental_candidate_projection)
+        self.assertIn("projection failed", view.experimental_candidate_error)
 
     def test_percentage_formatter(self):
         self.assertEqual(format_percentage(0.72), "72.00%")

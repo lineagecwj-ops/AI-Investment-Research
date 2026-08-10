@@ -296,6 +296,22 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         self.assertNotIn("Enable V1.1 alerts", source)
         self.assertNotIn("TECHNICAL_EXAMPLE_SIGNAL_V1_1_EXPERIMENTAL", source)
 
+    def test_experimental_candidate_view_source_keeps_formal_primary_and_error_isolated(self):
+        import app as app_module
+
+        source = inspect.getsource(app_module.render_scanner_condition_coverage)
+
+        self.assertLess(source.index("#### 正式 V1 命中"), source.index("#### 實驗候選觀察"))
+        self.assertIn("實驗候選觀察暫時無法載入", source)
+        self.assertIn("條件覆蓋詳細列表與未符合項目統計", source)
+        self.assertNotIn("RESEARCH_PRIORITY_A", source)
+        self.assertNotIn("if missing", source)
+        self.assertNotIn("High probability", source)
+        self.assertNotIn("Strong signal", source)
+        self.assertNotIn("優先買", source)
+        self.assertNotIn("值得買", source)
+        self.assertNotIn("最佳候選", source)
+
     def test_historical_condition_dashboard_contract_covers_renderer_references(self):
         import app as app_module
 
