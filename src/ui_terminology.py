@@ -31,6 +31,7 @@ SIGNAL_STATUS_LABELS = {
 
 SIGNAL_DEFINITION_LABELS = {
     "technical_example_v1": "波段技術篩選 V1",
+    "technical_example_v1_1_experimental": "波段技術篩選 V1.1 實驗版",
 }
 
 OUTCOME_DEFINITION_LABELS = {
@@ -184,6 +185,12 @@ DIAGNOSTIC_LABELS = {
     "Sample Concentration": "樣本集中程度",
     "Original Five Benchmark": "原始五檔基準",
     "Expanded Sample Result": "擴大樣本結果",
+    "Formal V1": "正式 V1",
+    "V1.1 Experimental": "V1.1 實驗版",
+    "V1.1 Shadow Comparison": "V1.1 實驗比較",
+    "Shared Observations": "共同樣本",
+    "Incremental V1.1 Observations": "新增樣本",
+    "Experimental Comparison": "實驗比較",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {

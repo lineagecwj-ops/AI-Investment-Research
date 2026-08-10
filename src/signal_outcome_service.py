@@ -66,6 +66,50 @@ TECHNICAL_EXAMPLE_SIGNAL_V1 = SignalDefinition(
     description="Neutral example technical research condition for Batch C tests.",
 )
 
+TECHNICAL_EXAMPLE_SIGNAL_V1_1_EXPERIMENTAL = SignalDefinition(
+    id="technical_example_v1_1_experimental",
+    name="Technical Example V1.1 Experimental",
+    conditions=(
+        TechnicalSignalCondition(
+            metric="analysis_close",
+            operator=SignalConditionOperator.GREATER_THAN,
+            secondary_metric="sma_20",
+        ),
+        TechnicalSignalCondition(
+            metric="sma_20",
+            operator=SignalConditionOperator.GREATER_THAN,
+            secondary_metric="sma_60",
+        ),
+        TechnicalSignalCondition(
+            metric="volume_ratio_20",
+            operator=SignalConditionOperator.GREATER_THAN_OR_EQUAL,
+            value=1.1,
+        ),
+        TechnicalSignalCondition(
+            metric="rsi_14",
+            operator=SignalConditionOperator.BETWEEN,
+            value=(50.0, 70.0),
+        ),
+        TechnicalSignalCondition(
+            metric="distance_to_prior_60d_high",
+            operator=SignalConditionOperator.GREATER_THAN_OR_EQUAL,
+            value=-0.05,
+        ),
+    ),
+    minimum_required_features=(
+        "analysis_close",
+        "sma_20",
+        "sma_60",
+        "volume_ratio_20",
+        "rsi_14",
+        "distance_to_prior_60d_high",
+    ),
+    description=(
+        "EXPERIMENTAL / V1.1 實驗版 shadow research definition. "
+        "Production V1 remains technical_example_v1 with volume_ratio_20 >= 1.20."
+    ),
+)
+
 RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1 = OutcomeDefinition(
     id="raw_high_breakout_60d_within_20d_v1",
     outcome_type=OutcomeType.RAW_HIGH_BREAKOUT,
