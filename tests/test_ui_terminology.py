@@ -263,6 +263,24 @@ class UiTerminologyTestCase(unittest.TestCase):
         self.assertIn("增加更多股票", explanation)
         self.assertIn("是否只出現在少數股票", explanation)
 
+    def test_v1_1_shadow_dashboard_terminology_is_experimental_not_recommendation(self):
+        self.assertEqual(get_diagnostic_label("Formal V1"), "正式 V1")
+        self.assertEqual(get_diagnostic_label("V1.1 Experimental"), "V1.1 實驗版")
+        self.assertEqual(get_diagnostic_label("Shared Observations"), "共同樣本")
+        self.assertEqual(get_diagnostic_label("V1.1 Added Observations"), "V1.1 新增樣本")
+        self.assertEqual(get_diagnostic_label("Research Evidence"), "研究證據")
+        self.assertEqual(get_diagnostic_label("Historical Hit Rate Difference PP"), "差異（百分點）")
+
+        labels = (
+            get_diagnostic_label("V1.1 Experimental"),
+            get_diagnostic_label("V1.1 Shadow Comparison"),
+            get_diagnostic_label("Experimental Comparison"),
+        )
+        forbidden = ("升級", "更佳", "更強", "推薦", "最佳")
+        for label in labels:
+            for word in forbidden:
+                self.assertNotIn(word, label)
+
 
 if __name__ == "__main__":
     unittest.main()

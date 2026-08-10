@@ -6,6 +6,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
@@ -128,6 +129,66 @@ def stale_historical_condition_dashboard_module_app():
         app_module.swing_dashboard = importlib.reload(swing_research_dashboard)
 
 
+def v1_1_shadow_dashboard_app():
+    import streamlit as st
+    import app as app_module
+    from types import SimpleNamespace
+
+    st.session_state["v1_1_shadow_dashboard_last_error"] = None
+    st.session_state["v1_1_shadow_dashboard_view"] = SimpleNamespace(
+        production_card={
+            "Definition": "Production V1",
+            "Status": "正式 V1 / Production",
+            "Definition ID": "technical_example_v1",
+            "Volume Threshold": "volume_ratio_20 >= 1.20",
+            "Observation Count": 1821,
+            "Historical Hit Rate Display": "86.05%",
+            "Resolved Count": 1821,
+            "HIT": 1567,
+            "MISS": 254,
+        },
+        experimental_card={
+            "Definition": "V1.1 Experimental",
+            "Status": "V1.1 實驗版 / Experimental Shadow",
+            "Definition ID": "technical_example_v1_1_experimental",
+            "Volume Threshold": "volume_ratio_20 >= 1.10",
+            "Observation Count": 2072,
+            "Historical Hit Rate Display": "85.33%",
+            "Resolved Count": 2072,
+            "HIT": 1768,
+            "MISS": 304,
+        },
+        delta_rows=[
+            {"Metric": "共同樣本", "Display": "1821"},
+            {"Metric": "V1.1 新增樣本", "Display": "+251"},
+            {"Metric": "Observation increase", "Display": "13.78%"},
+            {"Metric": "HHR difference", "Display": "-0.72 pp"},
+        ],
+        definition_rows=[
+            {"Condition": "Price > SMA20", "Production V1": "analysis_close > sma_20", "V1.1 Experimental": "analysis_close > sma_20", "Status": "相同"},
+            {"Condition": "Volume ratio", "Production V1": "volume_ratio_20 >= 1.20", "V1.1 Experimental": "volume_ratio_20 >= 1.10", "Status": "唯一差異"},
+        ],
+        evidence_rows=[
+            {"Evidence": "Daily", "V1 n": 1821, "V1 HHR": "86.05%", "V1.1 n": 2072, "V1.1 HHR": "85.33%", "Delta pp": "-0.72 pp"},
+        ],
+        time_robustness_rows=[
+            {"Period": "2018-2020", "V1 HHR": "80.00%", "V1.1 HHR": "79.00%", "Delta pp": "-1.00 pp"},
+        ],
+        incremental_rows=[
+            {
+                "symbol": "2330.TW",
+                "trading_date": "2025-01-01",
+                "volume_ratio_20": 1.100186,
+                "outcome status": "達成研究目標（HIT）",
+                "signal_definition_id": "technical_example_v1_1_experimental",
+            },
+        ],
+        limitation_rows=[{"限制": "survivorship bias"}],
+        safety_notes=["Production V1 remains default. V1.1 is experimental / shadow only."],
+    )
+    app_module.render_v1_1_shadow_dashboard_comparison()
+
+
 def stale_detail_view_schema_app():
     import app as app_module
     import importlib
@@ -208,6 +269,32 @@ class SwingTechnicalConditionDetailAppTestCase(unittest.TestCase):
         text = " ".join(str(item.value) for item in at.markdown)
         self.assertEqual(len(at.exception), 0)
         self.assertIn("V1 歷史條件診斷", text)
+
+    def test_v1_1_shadow_dashboard_comparison_renders_preloaded_view(self):
+        at = AppTest.from_function(v1_1_shadow_dashboard_app)
+
+        at.run(timeout=10)
+
+        text = " ".join(
+            str(item.value)
+            for collection in (at.markdown, at.caption, at.info, at.button)
+            for item in collection
+        )
+        self.assertEqual(len(at.exception), 0)
+        self.assertIn("V1 與 V1.1 實驗版比較", text)
+        self.assertIn("V1 vs V1.1 Experimental Comparison", text)
+        self.assertIn("Production V1", text)
+        self.assertIn("V1.1 Experimental", text)
+        self.assertGreaterEqual(len(at.dataframe), 5)
+
+    def test_v1_1_shadow_dashboard_source_has_no_production_switch(self):
+        source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+
+        self.assertIn("render_v1_1_shadow_dashboard_comparison()", source)
+        self.assertNotIn("Use V1.1", source)
+        self.assertNotIn("Set V1.1 as default", source)
+        self.assertNotIn("Enable V1.1 alerts", source)
+        self.assertNotIn("TECHNICAL_EXAMPLE_SIGNAL_V1_1_EXPERIMENTAL", source)
 
     def test_historical_condition_dashboard_contract_covers_renderer_references(self):
         import app as app_module
