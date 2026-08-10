@@ -112,4 +112,3 @@ Database safety audit before and after live projection:
 - Duplicates: `0`
 - Integrity: `ok`
 - SHA-256: `aa90f60d00e96c31630c9edede7af7a4b0ceedbb15a5fbbaf30042174920ae06`
-
