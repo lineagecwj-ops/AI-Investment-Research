@@ -191,6 +191,10 @@ DIAGNOSTIC_LABELS = {
     "Shared Observations": "共同樣本",
     "Incremental V1.1 Observations": "新增樣本",
     "Experimental Comparison": "實驗比較",
+    "V1.1 Added Observations": "V1.1 新增樣本",
+    "Research Evidence": "研究證據",
+    "Observation Count Label": "觀察數",
+    "Historical Hit Rate Difference PP": "差異（百分點）",
 }
 
 DIAGNOSTIC_CONDITION_LABELS = {

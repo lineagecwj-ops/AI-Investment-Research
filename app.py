@@ -154,6 +154,7 @@ from universe_service import UniverseAlreadyExistsError
 from universe_service import UniverseError
 from universe_service import UniverseNotFoundError
 from universe_service import UniverseValidationError
+from v1_1_shadow_dashboard_service import build_official_v1_1_shadow_dashboard_view
 from models import HistoricalPriceSeries
 from models import OutcomeEvaluationStatus
 from models import OverlappingSignalPolicy
@@ -297,6 +298,8 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("historical_condition_dashboard_fingerprint", None)
     st.session_state.setdefault("historical_condition_dashboard_last_error", None)
     st.session_state.setdefault("historical_condition_dashboard_error_details", None)
+    st.session_state.setdefault("v1_1_shadow_dashboard_view", None)
+    st.session_state.setdefault("v1_1_shadow_dashboard_last_error", None)
 
 
 def render_query_failures(failures) -> None:
@@ -1511,6 +1514,11 @@ def build_historical_condition_dashboard_payload(
     }
 
 
+@st.cache_data(show_spinner=False)
+def load_official_v1_1_shadow_dashboard_view():
+    return build_official_v1_1_shadow_dashboard_view()
+
+
 def ensure_swing_scanner_result_contract() -> None:
     global SwingScannerConfig
     global SwingScannerService
@@ -1813,6 +1821,72 @@ def render_historical_condition_dashboard() -> None:
         st.dataframe(pd.DataFrame(view.metadata_rows).astype(str), width="stretch", hide_index=True)
 
 
+def render_v1_1_shadow_dashboard_comparison() -> None:
+    st.markdown("### V1 與 V1.1 實驗版比較")
+    st.caption("V1 vs V1.1 Experimental Comparison")
+    st.info(
+        "正式 V1 仍是 production default；V1.1 只是在此區塊中以 experimental / shadow 方式查看，"
+        "不會切換 scanner、alerts、Replay、Walk-Forward、OOS 或任何 production behavior。"
+    )
+    if st.button("載入 V1 / V1.1 實驗比較", key="load_v1_1_shadow_dashboard_view"):
+        try:
+            with st.spinner("正在載入 V1.1 實驗比較結果…"):
+                st.session_state["v1_1_shadow_dashboard_view"] = load_official_v1_1_shadow_dashboard_view()
+            st.session_state["v1_1_shadow_dashboard_last_error"] = None
+        except Exception as error:
+            st.session_state["v1_1_shadow_dashboard_view"] = None
+            st.session_state["v1_1_shadow_dashboard_last_error"] = safe_error_message(error)
+
+    if st.session_state["v1_1_shadow_dashboard_last_error"]:
+        st.error(f"V1.1 實驗比較暫時無法載入：{st.session_state['v1_1_shadow_dashboard_last_error']}")
+
+    view = st.session_state.get("v1_1_shadow_dashboard_view")
+    if view is None:
+        st.caption("載入後會使用本機 read-only historical price cache 與 official listing-date input。")
+        return
+
+    left, right = st.columns(2)
+    _render_shadow_definition_card(left, view.production_card)
+    _render_shadow_definition_card(right, view.experimental_card)
+
+    st.markdown("#### 差異摘要")
+    st.dataframe(pd.DataFrame(view.delta_rows).astype(str), width="stretch", hide_index=True)
+    st.caption("以上差異是 factual delta，不代表 winner、best threshold 或 recommendation。")
+
+    st.markdown("#### Definition detail")
+    st.dataframe(pd.DataFrame(view.definition_rows).astype(str), width="stretch", hide_index=True)
+
+    st.markdown("#### 研究證據")
+    st.write("V1.1 增加樣本 / event，但目前沒有證據顯示 Historical Hit Rate 高於正式 V1。")
+    st.dataframe(pd.DataFrame(view.evidence_rows).astype(str), width="stretch", hide_index=True)
+
+    if view.time_robustness_rows:
+        st.markdown("#### Time robustness")
+        st.dataframe(pd.DataFrame(view.time_robustness_rows).astype(str), width="stretch", hide_index=True)
+
+    st.markdown("#### 共同樣本 / V1.1 新增樣本")
+    st.caption("V1.1 新增樣本定義：其他四項 V1 條件通過，且 1.10 <= volume_ratio_20 < 1.20。")
+    st.dataframe(pd.DataFrame(view.incremental_rows).astype(str), width="stretch", hide_index=True)
+
+    with st.expander("Limitations", expanded=False):
+        st.dataframe(pd.DataFrame(view.limitation_rows).astype(str), width="stretch", hide_index=True)
+        for note in view.safety_notes:
+            st.caption(note)
+
+
+def _render_shadow_definition_card(column, card: dict[str, object]) -> None:
+    with column.container(border=True):
+        st.markdown(f"##### {card['Definition']}")
+        st.caption(str(card["Status"]))
+        st.write(f"Definition ID：{card['Definition ID']}")
+        st.write(f"Volume threshold：{card['Volume Threshold']}")
+        metric_cols = st.columns(2)
+        metric_cols[0].metric("觀察數", card["Observation Count"])
+        metric_cols[1].metric("歷史命中率", card["Historical Hit Rate Display"])
+        st.write(f"Resolved：{card['Resolved Count']}")
+        st.write(f"HIT：{card['HIT']} / MISS：{card['MISS']}")
+
+
 def render_swing_research() -> None:
     st.header("Swing Research（波段研究）")
     st.caption(
@@ -1820,6 +1894,7 @@ def render_swing_research() -> None:
         "符合條件的股票只是研究候選，不是交易清單；研究優先順序只是檢視順序。"
     )
     render_historical_condition_dashboard()
+    render_v1_1_shadow_dashboard_comparison()
 
     universes = read_universes_for_ui()
     watchlist_symbols = read_watchlist_for_ui(show_error=False)
