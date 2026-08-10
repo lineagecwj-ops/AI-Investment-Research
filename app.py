@@ -2544,19 +2544,54 @@ def render_scanner_condition_coverage(result) -> None:
     else:
         st.info("本次掃描沒有 5/5 正式 V1 命中。")
 
-    st.markdown("#### 接近條件")
-    if view.near_match_rows:
-        st.dataframe(pd.DataFrame(view.near_match_rows).astype(str), width="stretch", hide_index=True)
+    st.markdown("#### 實驗候選觀察")
+    st.caption("以下分類為歷史研究衍生的實驗顯示，不改變正式 V1 訊號，也不代表個別股票的上漲機率或投資建議。")
+    experimental_view = view.experimental_candidate_projection
+    if experimental_view is None:
+        st.warning("實驗候選觀察暫時無法載入。")
     else:
-        st.info("本次掃描沒有 4/5 接近條件。")
+        experimental_summary_cols = st.columns(7)
+        for col, row in zip(experimental_summary_cols, experimental_view.summary_rows):
+            col.metric(row["分類"], row["數量"])
 
-    st.markdown("#### 觀察")
-    if view.exploratory_rows:
-        st.dataframe(pd.DataFrame(view.exploratory_rows).astype(str), width="stretch", hide_index=True)
-    else:
-        st.info("本次掃描沒有 3/5 觀察股票。")
+        _render_dataframe_or_info(
+            "##### 研究優先觀察 A",
+            experimental_view.priority_a_rows,
+            "本次掃描沒有研究優先觀察 A。",
+        )
+        _render_dataframe_or_info(
+            "##### 研究優先觀察 B",
+            experimental_view.priority_b_rows,
+            "本次掃描沒有研究優先觀察 B。",
+        )
+        _render_dataframe_or_info(
+            "##### 研究觀察",
+            experimental_view.watch_rows,
+            "本次掃描沒有研究觀察。",
+        )
+        with st.expander("探索觀察 4/5", expanded=False):
+            if experimental_view.other_four_of_five_rows:
+                st.dataframe(pd.DataFrame(experimental_view.other_four_of_five_rows).astype(str), width="stretch", hide_index=True)
+            else:
+                st.info("本次掃描沒有探索觀察 4/5。")
+        with st.expander("探索觀察 3/5", expanded=False):
+            if experimental_view.three_of_five_rows:
+                st.dataframe(pd.DataFrame(experimental_view.three_of_five_rows).astype(str), width="stretch", hide_index=True)
+            else:
+                st.info("本次掃描沒有探索觀察 3/5。")
+        st.write(f"0-2/5 預設隱藏數量：{experimental_view.below_display_scope_count}")
 
-    with st.expander("未展開股票與未符合項目統計", expanded=False):
+    with st.expander("條件覆蓋詳細列表與未符合項目統計", expanded=False):
+        st.markdown("##### 接近條件 4/5")
+        if view.near_match_rows:
+            st.dataframe(pd.DataFrame(view.near_match_rows).astype(str), width="stretch", hide_index=True)
+        else:
+            st.info("本次掃描沒有 4/5 接近條件。")
+        st.markdown("##### 觀察 3/5")
+        if view.exploratory_rows:
+            st.dataframe(pd.DataFrame(view.exploratory_rows).astype(str), width="stretch", hide_index=True)
+        else:
+            st.info("本次掃描沒有 3/5 觀察股票。")
         st.write(f"0-2/5 預設隱藏數量：{view.below_display_threshold_count}")
         if view.hidden_rows:
             st.dataframe(pd.DataFrame(view.hidden_rows).astype(str), width="stretch", hide_index=True)
@@ -2574,6 +2609,14 @@ def render_scanner_condition_coverage(result) -> None:
                 width="stretch",
                 hide_index=True,
             )
+
+
+def _render_dataframe_or_info(title: str, rows: list[dict[str, object]], empty_message: str) -> None:
+    st.markdown(title)
+    if rows:
+        st.dataframe(pd.DataFrame(rows).astype(str), width="stretch", hide_index=True)
+    else:
+        st.info(empty_message)
 
 
 def render_swing_technical_condition_detail(result) -> None:

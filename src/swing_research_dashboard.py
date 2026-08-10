@@ -7,6 +7,9 @@ from historical_case_service import HistoricalCaseDataError
 from historical_case_service import HistoricalCaseWindowConfig
 from historical_case_service import HistoricalCaseView
 from historical_case_service import build_historical_case_views
+from candidate_display_research_service import CandidateDisplayClassification
+from candidate_display_research_service import CandidateDisplayResearchResult
+from candidate_display_research_service import build_candidate_display_research_summary
 from models import EvaluatedSignalCondition
 from models import HistoricalPriceSeries
 from models import OutcomeEvaluationStatus
@@ -150,6 +153,10 @@ class ScannerConditionCoverageView:
 
     summary_rows: list[dict[str, object]]
 
+    experimental_candidate_projection: "CandidateDisplayDashboardProjection | None"
+
+    experimental_candidate_error: str | None
+
     formal_v1_rows: list[dict[str, object]]
 
     near_match_rows: list[dict[str, object]]
@@ -165,6 +172,30 @@ class ScannerConditionCoverageView:
     evaluated_symbol_count: int
 
     below_display_threshold_count: int
+
+
+@dataclass(frozen=True)
+class CandidateDisplayDashboardProjection:
+
+    summary_rows: list[dict[str, object]]
+
+    formal_v1_rows: list[dict[str, object]]
+
+    priority_a_rows: list[dict[str, object]]
+
+    priority_b_rows: list[dict[str, object]]
+
+    watch_rows: list[dict[str, object]]
+
+    other_four_of_five_rows: list[dict[str, object]]
+
+    three_of_five_rows: list[dict[str, object]]
+
+    below_display_scope_count: int
+
+    evaluated_symbol_count: int
+
+    reconciled: bool
 
 
 def parse_swing_symbol_input(user_input: str) -> tuple[str, ...]:
@@ -320,11 +351,14 @@ def build_scanner_condition_coverage_view(
         result,
         production_signal_definition=result.config.signal_definition,
     )
+    experimental_projection, experimental_error = _build_candidate_display_dashboard_projection_safely(summary)
     return ScannerConditionCoverageView(
         summary_rows=_scanner_condition_coverage_summary_rows(summary),
-        formal_v1_rows=_scanner_condition_coverage_rows(
+        experimental_candidate_projection=experimental_projection,
+        experimental_candidate_error=experimental_error,
+        formal_v1_rows=_scanner_condition_coverage_formal_rows(
             summary,
-            classification=ConditionCoverageClassification.FORMAL_V1_MATCH,
+            result,
         ),
         near_match_rows=_scanner_condition_coverage_rows(
             summary,
@@ -343,6 +377,109 @@ def build_scanner_condition_coverage_view(
         evaluated_symbol_count=summary.evaluated_symbol_count,
         below_display_threshold_count=summary.below_display_threshold_count,
     )
+
+
+def _build_candidate_display_dashboard_projection_safely(
+    coverage_summary: ScannerConditionCoverageSummary,
+) -> tuple[CandidateDisplayDashboardProjection | None, str | None]:
+    try:
+        return build_candidate_display_dashboard_projection(coverage_summary), None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def build_candidate_display_dashboard_projection(
+    coverage_summary: ScannerConditionCoverageSummary,
+) -> CandidateDisplayDashboardProjection:
+    phase3_summary = build_candidate_display_research_summary(coverage_summary)
+    by_symbol = {item.symbol: item for item in coverage_summary.results}
+    rows_by_classification = {
+        classification: []
+        for classification in CandidateDisplayClassification
+    }
+    for result in phase3_summary.results:
+        rows_by_classification[result.display_classification].append(
+            _candidate_display_dashboard_row(result, by_symbol[result.symbol])
+        )
+    reconciliation = phase3_summary.count_reconciliation
+    return CandidateDisplayDashboardProjection(
+        summary_rows=[
+            {"分類": "正式 V1 命中", "數量": reconciliation.formal_v1_count},
+            {"分類": "研究優先觀察 A", "數量": reconciliation.research_priority_a_count},
+            {"分類": "研究優先觀察 B", "數量": reconciliation.research_priority_b_count},
+            {"分類": "研究觀察", "數量": reconciliation.research_watch_count},
+            {"分類": "探索觀察 4/5", "數量": reconciliation.other_4of5_exploratory_count},
+            {"分類": "探索觀察 3/5", "數量": reconciliation.three_of_five_exploratory_count},
+            {"分類": "預設隱藏 0-2/5", "數量": reconciliation.below_display_scope_count},
+        ],
+        formal_v1_rows=rows_by_classification[CandidateDisplayClassification.FORMAL_V1],
+        priority_a_rows=rows_by_classification[CandidateDisplayClassification.RESEARCH_PRIORITY_A],
+        priority_b_rows=rows_by_classification[CandidateDisplayClassification.RESEARCH_PRIORITY_B],
+        watch_rows=rows_by_classification[CandidateDisplayClassification.RESEARCH_WATCH],
+        other_four_of_five_rows=[
+            row
+            for row in rows_by_classification[CandidateDisplayClassification.EXPLORATORY]
+            if row["條件覆蓋"] == "4/5"
+        ],
+        three_of_five_rows=[
+            row
+            for row in rows_by_classification[CandidateDisplayClassification.EXPLORATORY]
+            if row["條件覆蓋"] == "3/5"
+        ],
+        below_display_scope_count=reconciliation.below_display_scope_count,
+        evaluated_symbol_count=reconciliation.evaluated_symbol_count,
+        reconciled=reconciliation.reconciled,
+    )
+
+
+def _candidate_display_dashboard_row(
+    result: CandidateDisplayResearchResult,
+    coverage_result,
+) -> dict[str, object]:
+    display_title, display_reason, experimental_label = _candidate_display_labels(result)
+    return {
+        "股票": result.symbol,
+        "最新交易日": format_date(result.as_of_date),
+        "條件覆蓋": f"{result.coverage_count}/5",
+        "未符合條件": format_condition_labels(result.missing_condition_ids),
+        "Production V1": "正式命中" if result.formal_v1_qualified else "不符合",
+        "Experimental Candidate": experimental_label,
+        "分類": display_title,
+        "分類原因": display_reason,
+        "RSI 14": _condition_actual_value(coverage_result.condition_details, "rsi_14"),
+        "volume_ratio_20": format_metric_value("volume_ratio_20", coverage_result.volume_ratio_20),
+        "distance_to_prior_60d_high": _condition_actual_value(
+            coverage_result.condition_details,
+            "distance_to_prior_60d_high",
+        ),
+        "V1.1 實驗版": "V1.1 實驗版符合" if result.v1_1_experimental_match else "N/A",
+    }
+
+
+def _candidate_display_labels(result: CandidateDisplayResearchResult) -> tuple[str, str, str]:
+    if result.display_classification is CandidateDisplayClassification.FORMAL_V1:
+        return "正式 V1 命中", "5/5，Production V1 正式命中", "N/A"
+    if result.display_classification is CandidateDisplayClassification.RESEARCH_PRIORITY_A:
+        return "研究優先觀察 A", "4/5，唯一未符合 RSI", "實驗研究分類"
+    if result.display_classification is CandidateDisplayClassification.RESEARCH_PRIORITY_B:
+        return "研究優先觀察 B", "4/5，唯一未符合成交量", "實驗研究分類"
+    if result.display_classification is CandidateDisplayClassification.RESEARCH_WATCH:
+        return "研究觀察", "4/5，唯一未符合距離前高條件", "實驗研究分類"
+    if result.coverage_count == 4:
+        return "探索觀察", "4/5，其他未符合條件", "實驗研究分類"
+    if result.coverage_count == 3:
+        return "探索觀察", "3/5，探索觀察", "實驗研究分類"
+    return "預設隱藏", "0-2/5，預設不展開完整列表", "N/A"
+
+
+def _condition_actual_value(
+    conditions: tuple[EvaluatedSignalCondition, ...],
+    metric: str,
+) -> str:
+    for condition in conditions:
+        if condition.metric == metric:
+            return format_metric_value(metric, condition.actual_value)
+    return "N/A"
 
 
 def _scanner_condition_coverage_summary_rows(
@@ -381,6 +518,21 @@ def _scanner_condition_coverage_rows(
             }
         )
     return rows
+
+
+def _scanner_condition_coverage_formal_rows(
+    summary: ScannerConditionCoverageSummary,
+    result: SwingScannerResult,
+) -> list[dict[str, object]]:
+    formal_rows = _scanner_condition_coverage_rows(
+        summary,
+        classification=ConditionCoverageClassification.FORMAL_V1_MATCH,
+    )
+    by_symbol = {row["股票"]: row for row in formal_rows}
+    production_order = tuple(candidate.symbol for candidate in getattr(result, "matched_candidates", tuple()))
+    ordered_rows = [by_symbol[symbol] for symbol in production_order if symbol in by_symbol]
+    remaining_rows = [row for row in formal_rows if row["股票"] not in production_order]
+    return ordered_rows + remaining_rows
 
 
 def _condition_status_columns(
