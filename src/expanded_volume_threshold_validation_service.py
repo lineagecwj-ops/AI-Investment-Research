@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC
@@ -36,6 +38,11 @@ from volume_threshold_robustness_service import analyze_volume_threshold_robustn
 ORIGINAL_FIVE_SYMBOLS = ("2330.TW", "0050.TW", "2337.TW", "2404.TW", "2454.TW")
 EXCLUDED_DATA_COVERAGE = "EXCLUDED_DATA_COVERAGE"
 EXCLUDED_NOT_TAIWAN_UNIVERSE = "EXCLUDED_NOT_TAIWAN_UNIVERSE"
+LISTING_DATE_SOURCE_OFFICIAL_SNAPSHOT = "OFFICIAL_SNAPSHOT"
+LISTING_DATE_SOURCE_FALLBACK = "UNAVAILABLE_CURRENT_RUN_DB_FIRST_DATE_FALLBACK"
+READINESS_FULL_WINDOW_ELIGIBLE = "FULL_WINDOW_ELIGIBLE"
+READINESS_PARTIAL_WINDOW_VALID = "PARTIAL_WINDOW_VALID"
+READINESS_DATA_QUALITY_BLOCKED = "DATA_QUALITY_BLOCKED"
 OLD_FIVE_DAILY_BENCHMARK = {
     1.00: (114, 92.11),
     1.10: (96, 91.67),
@@ -53,9 +60,47 @@ class ExpandedVolumeThresholdValidationError(Exception):
 
 
 @dataclass(frozen=True)
+class TWSEListingDateSnapshot:
+
+    source_authority: str
+
+    source_url: str
+
+    source_report_date: date
+
+    source_report_date_raw: str
+
+    retrieved_at: datetime
+
+    source_checksum: str
+
+    snapshot_checksum: str
+
+    records: tuple[dict[str, str], ...]
+
+    listing_dates_by_symbol: dict[str, date]
+
+
+@dataclass(frozen=True)
 class ExpandedSymbolUniverseConfig:
 
     symbols: tuple[str, ...]
+
+    frozen_total_count: int
+
+    twse_count: int
+
+    tpex_count: int
+
+    unknown_exchange_count: int
+
+    full_window_eligible_count: int | None
+
+    partial_window_valid_count: int | None
+
+    data_quality_blocked_count: int | None
+
+    listing_date_source: str
 
     selection_rule: str
 
@@ -79,6 +124,10 @@ class SymbolCoverageAudit:
 
     symbol: str
 
+    exchange: str
+
+    official_listing_date: date | None
+
     earliest_raw_price_date: date | None
 
     latest_raw_price_date: date | None
@@ -97,6 +146,8 @@ class SymbolCoverageAudit:
 
     included: bool
 
+    readiness_status: str | None
+
     exclusion_reason: str | None
 
     exclusion_detail: str | None
@@ -109,17 +160,27 @@ class ExpandedThresholdSymbolSummary:
 
     threshold: float
 
+    eligible_observation_date_count: int
+
     observation_count: int
 
     hit_count: int
 
     miss_count: int
 
+    incomplete_count: int
+
+    not_evaluable_count: int
+
     resolved_count: int
 
     historical_hit_rate: float | None
 
     delta_hit_rate_vs_1_20_pp: float | None
+
+    observation_count_delta_vs_1_20: int
+
+    observation_count_change_rate_vs_1_20: float | None
 
 
 @dataclass(frozen=True)
@@ -129,17 +190,25 @@ class ExpandedThresholdYearSummary:
 
     threshold: float
 
+    eligible_symbol_count: int
+
     observation_count: int
 
     hit_count: int
 
     miss_count: int
 
+    incomplete_count: int
+
+    not_evaluable_count: int
+
     resolved_count: int
 
     historical_hit_rate: float | None
 
     delta_hit_rate_vs_1_20_pp: float | None
+
+    observation_count_delta_vs_1_20: int
 
 
 @dataclass(frozen=True)
@@ -181,19 +250,61 @@ class SymbolBreadthSummary:
 
     candidate_unavailable_symbols: int
 
+    candidate_added_sample_symbols: tuple[str, ...]
+
+    baseline_resolved_sample_sizes: tuple[int, ...]
+
+    candidate_resolved_sample_sizes: tuple[int, ...]
+
 
 @dataclass(frozen=True)
 class ThresholdConcentrationMetric:
 
     threshold: float
 
+    observation_count: int
+
+    year_2025_share: float | None
+
     latest_year: int | None
 
     latest_year_share: float | None
 
+    largest_year: int | None
+
+    largest_year_share: float | None
+
+    top_1_symbol_share: float | None
+
     top_2_symbol_share: float | None
 
     top_5_symbol_share: float | None
+
+    top_10_symbol_share: float | None
+
+
+@dataclass(frozen=True)
+class UniverseSubsetThresholdSummary:
+
+    subset_name: str
+
+    threshold: float
+
+    symbol_count: int
+
+    observation_count: int
+
+    hit_count: int
+
+    miss_count: int
+
+    incomplete_count: int
+
+    not_evaluable_count: int
+
+    resolved_count: int
+
+    historical_hit_rate: float | None
 
 
 @dataclass(frozen=True)
@@ -222,6 +333,8 @@ class CandidateRobustnessClassification:
     aggregate: str
 
     symbol_breadth: str
+
+    year_consistency: str
 
     year_coverage: str
 
@@ -263,6 +376,12 @@ class ExpandedVolumeThresholdValidationResult:
 
     candidate_classifications: tuple[CandidateRobustnessClassification, ...]
 
+    full_window_summaries: tuple[UniverseSubsetThresholdSummary, ...]
+
+    partial_window_summaries: tuple[UniverseSubsetThresholdSummary, ...]
+
+    year_consistency_by_threshold: dict[float, dict[str, int]]
+
     effective_years_by_threshold: dict[float, int]
 
     generated_at: datetime
@@ -271,29 +390,52 @@ class ExpandedVolumeThresholdValidationResult:
 def run_expanded_volume_threshold_validation(
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    official_listing_dates_by_symbol: dict[str, date] | None = None,
     generated_at: datetime | None = None,
 ) -> ExpandedVolumeThresholdValidationResult:
     generated_at = generated_at or datetime.now(UTC)
-    audits = audit_expanded_symbol_universe(db_path=db_path)
+    official_listing_dates_by_symbol = official_listing_dates_by_symbol or {}
+    audits = audit_expanded_symbol_universe(
+        db_path=db_path,
+        official_listing_dates_by_symbol=official_listing_dates_by_symbol,
+    )
     included = tuple(audit.symbol for audit in audits if audit.included)
-    if not included:
-        raise ExpandedVolumeThresholdValidationError("No local Taiwan symbols satisfy the frozen coverage rule.")
+    if len(included) != 218:
+        raise ExpandedVolumeThresholdValidationError(
+            f"Expanded TWSE validation requires exactly 218 materialized TWSE common stocks; got {len(included)}."
+        )
 
     universe_config = ExpandedSymbolUniverseConfig(
         symbols=included,
+        frozen_total_count=224,
+        twse_count=218,
+        tpex_count=6,
+        unknown_exchange_count=0,
+        full_window_eligible_count=None,
+        partial_window_valid_count=None,
+        data_quality_blocked_count=None,
+        listing_date_source=(
+            LISTING_DATE_SOURCE_OFFICIAL_SNAPSHOT
+            if official_listing_dates_by_symbol
+            else LISTING_DATE_SOURCE_FALLBACK
+        ),
         selection_rule=(
-            "Deterministic local Taiwan universe: symbols already present in data/stocks.db "
-            "historical_prices whose symbol ends with .TW or .TWO; no threshold outcome, "
-            "hit rate, scanner result, or profitability data is used."
+            "Materialized frozen TWSE common-stock universe in data/stocks.db: four-digit .TW "
+            "symbols excluding ETF 0050.TW and non-Taiwan symbols; no threshold outcome, hit "
+            "rate, scanner result, or profitability data is used."
         ),
         minimum_coverage_requirement=(
-            "At least 60 pre-window trading bars before 2018-01-01, at least one raw row "
-            "inside 2018-01-01 through 2025-12-31, at least 20 post-window trading bars "
-            "after 2025-12-31, no duplicate trading dates, and usable OHLCV rows."
+            "All 218 materialized TWSE symbols are retained. Observation eligibility is applied "
+            "per symbol and per date after official listing date, 60 trading-bar warm-up, "
+            "technical indicator evaluability, and 20-bar outcome support."
         ),
         generated_at=generated_at,
     )
-    comparison_price_series, technical_series = _prepare_research_inputs(included, db_path=db_path)
+    comparison_price_series, technical_series = _prepare_research_inputs(
+        included,
+        db_path=db_path,
+        official_listing_dates_by_symbol=official_listing_dates_by_symbol,
+    )
     diagnostics = HistoricalConditionDiagnosticsService(
         price_loader=lambda *args, **kwargs: _unexpected_price_load(),
         technical_builder=lambda *args, **kwargs: _unexpected_technical_build(),
@@ -333,12 +475,42 @@ def run_expanded_volume_threshold_validation(
     )
 
     per_symbol = _expanded_symbol_summaries(robustness.per_symbol_summaries)
-    per_year = _expanded_year_summaries(robustness.per_year_summaries)
+    per_year = _expanded_year_summaries_with_eligible_symbols(
+        robustness.per_year_summaries,
+        _eligible_symbol_count_by_year(included, comparison.outcome_observations),
+    )
     overlap = _aggregate_overlap_summaries(robustness)
     per_symbol_overlap = _per_symbol_overlap_summaries(robustness)
     breadth = _symbol_breadth_summaries(robustness)
     concentration = _concentration_metrics(robustness)
     effective_years = _effective_years_by_threshold(robustness.per_year_summaries)
+    readiness_by_symbol = _readiness_classification_by_symbol(
+        included,
+        comparison.outcome_observations,
+        official_listing_dates_by_symbol=official_listing_dates_by_symbol,
+        research_start=universe_config.research_start,
+    )
+    readiness = _readiness_counts(readiness_by_symbol)
+    year_consistency = _year_consistency_by_threshold(robustness.per_year_summaries)
+    universe_config = ExpandedSymbolUniverseConfig(
+        symbols=universe_config.symbols,
+        frozen_total_count=universe_config.frozen_total_count,
+        twse_count=universe_config.twse_count,
+        tpex_count=universe_config.tpex_count,
+        unknown_exchange_count=universe_config.unknown_exchange_count,
+        full_window_eligible_count=readiness[READINESS_FULL_WINDOW_ELIGIBLE],
+        partial_window_valid_count=readiness[READINESS_PARTIAL_WINDOW_VALID],
+        data_quality_blocked_count=readiness[READINESS_DATA_QUALITY_BLOCKED],
+        listing_date_source=universe_config.listing_date_source,
+        selection_rule=universe_config.selection_rule,
+        minimum_coverage_requirement=universe_config.minimum_coverage_requirement,
+        research_start=universe_config.research_start,
+        research_end=universe_config.research_end,
+        warmup_trading_bars=universe_config.warmup_trading_bars,
+        outcome_horizon_bars=universe_config.outcome_horizon_bars,
+        source_version=universe_config.source_version,
+        generated_at=universe_config.generated_at,
+    )
 
     return ExpandedVolumeThresholdValidationResult(
         universe_config=universe_config,
@@ -361,33 +533,150 @@ def run_expanded_volume_threshold_validation(
             overlap,
             concentration,
             effective_years,
+            year_consistency,
         ),
+        full_window_summaries=_subset_summaries(
+            READINESS_FULL_WINDOW_ELIGIBLE,
+            tuple(
+                symbol
+                for symbol, status in readiness_by_symbol.items()
+                if status == READINESS_FULL_WINDOW_ELIGIBLE
+            ),
+            robustness,
+        ),
+        partial_window_summaries=_subset_summaries(
+            READINESS_PARTIAL_WINDOW_VALID,
+            tuple(
+                symbol
+                for symbol, status in readiness_by_symbol.items()
+                if status == READINESS_PARTIAL_WINDOW_VALID
+            ),
+            robustness,
+        ),
+        year_consistency_by_threshold=year_consistency,
         effective_years_by_threshold=effective_years,
         generated_at=generated_at,
     )
 
 
+def run_final_expanded_volume_threshold_validation(
+    *,
+    listing_date_snapshot_path: Path | str,
+    db_path: Path | str = DEFAULT_DB_PATH,
+    generated_at: datetime | None = None,
+) -> ExpandedVolumeThresholdValidationResult:
+    symbols = _materialized_twse_common_stock_symbols(db_path)
+    snapshot = load_twse_listing_date_snapshot(
+        listing_date_snapshot_path,
+        required_symbols=symbols,
+    )
+    return run_expanded_volume_threshold_validation(
+        db_path=db_path,
+        official_listing_dates_by_symbol=snapshot.listing_dates_by_symbol,
+        generated_at=generated_at,
+    )
+
+
+def is_final_listing_date_source(listing_date_source: str) -> bool:
+    return listing_date_source == LISTING_DATE_SOURCE_OFFICIAL_SNAPSHOT
+
+
+def load_twse_listing_date_snapshot(
+    snapshot_path: Path | str,
+    *,
+    required_symbols: tuple[str, ...] | None = None,
+) -> TWSEListingDateSnapshot:
+    path = Path(snapshot_path)
+    payload = json.loads(path.read_text())
+    _validate_snapshot_checksum(payload)
+    records = tuple(payload["records"])
+    listing_dates_by_symbol: dict[str, date] = {}
+    seen_codes: set[str] = set()
+    duplicate_codes = []
+    invalid_dates = []
+    for record in records:
+        code = str(record.get("stock_code", "")).strip()
+        listing_date_text = str(record.get("listing_date", "")).strip()
+        if code in seen_codes:
+            duplicate_codes.append(code)
+        seen_codes.add(code)
+        if len(listing_date_text) != 10 or listing_date_text[4] != "-" or listing_date_text[7] != "-":
+            invalid_dates.append((code, listing_date_text))
+            continue
+        try:
+            listing_date = date.fromisoformat(listing_date_text)
+        except ValueError:
+            invalid_dates.append((code, listing_date_text))
+            continue
+        listing_dates_by_symbol[f"{code}.TW"] = listing_date
+    if duplicate_codes:
+        raise ExpandedVolumeThresholdValidationError(
+            f"TWSE listing-date snapshot has duplicate stock codes: {tuple(sorted(duplicate_codes))}."
+        )
+    if invalid_dates:
+        raise ExpandedVolumeThresholdValidationError(
+            f"TWSE listing-date snapshot has invalid listing dates: {tuple(invalid_dates)}."
+        )
+    if required_symbols is not None:
+        missing = tuple(symbol for symbol in required_symbols if symbol not in listing_dates_by_symbol)
+        if missing:
+            raise ExpandedVolumeThresholdValidationError(
+                f"Official TWSE listing-date snapshot is missing {len(missing)} required symbols: {missing}."
+            )
+    return TWSEListingDateSnapshot(
+        source_authority=str(payload["source_authority"]),
+        source_url=str(payload["source_url"]),
+        source_report_date=date.fromisoformat(str(payload["source_report_date"])),
+        source_report_date_raw=str(payload["source_report_date_raw"]),
+        retrieved_at=_parse_snapshot_retrieved_at(str(payload["retrieved_at"])),
+        source_checksum=str(payload["source_checksum"]),
+        snapshot_checksum=str(payload["snapshot_checksum"]),
+        records=records,
+        listing_dates_by_symbol=listing_dates_by_symbol,
+    )
+
+
+def _validate_snapshot_checksum(payload: dict) -> None:
+    expected = str(payload.get("snapshot_checksum", ""))
+    stable = {key: value for key, value in payload.items() if key not in {"retrieved_at", "snapshot_checksum"}}
+    actual = hashlib.sha256(
+        json.dumps(stable, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if actual != expected:
+        raise ExpandedVolumeThresholdValidationError(
+            f"TWSE listing-date snapshot checksum mismatch: expected {expected}, got {actual}."
+        )
+
+
+def _parse_snapshot_retrieved_at(value: str) -> datetime:
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def audit_expanded_symbol_universe(
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    official_listing_dates_by_symbol: dict[str, date] | None = None,
     start_date: date = DEFAULT_OBSERVATION_START,
     end_date: date = DEFAULT_OBSERVATION_END,
     warmup_trading_bars: int = DEFAULT_WARMUP_TRADING_BARS,
     outcome_horizon_bars: int = DEFAULT_OUTCOME_HORIZON_BARS,
 ) -> tuple[SymbolCoverageAudit, ...]:
+    official_listing_dates_by_symbol = official_listing_dates_by_symbol or {}
     rows = _coverage_rows(db_path, start_date=start_date, end_date=end_date)
     audits = []
     for row in rows:
         symbol = row["symbol"]
         exclusion_reason = None
         exclusion_detail = None
-        if not _is_taiwan_symbol(symbol):
+        if not _is_materialized_twse_common_stock(symbol):
             exclusion_reason = EXCLUDED_NOT_TAIWAN_UNIVERSE
-            exclusion_detail = "Symbol does not end with .TW or .TWO."
+            exclusion_detail = "Symbol is not a materialized four-digit TWSE common stock."
         else:
             coverage_issues = []
-            if row["pre_rows"] < warmup_trading_bars:
-                coverage_issues.append(f"warmup bars {row['pre_rows']} < {warmup_trading_bars}")
             if row["window_rows"] <= 0:
                 coverage_issues.append("no rows in observation window")
             if row["post_rows"] < outcome_horizon_bars:
@@ -402,6 +691,8 @@ def audit_expanded_symbol_universe(
         audits.append(
             SymbolCoverageAudit(
                 symbol=symbol,
+                exchange="TWSE" if _is_materialized_twse_common_stock(symbol) else "UNKNOWN",
+                official_listing_date=official_listing_dates_by_symbol.get(symbol),
                 earliest_raw_price_date=row["earliest"],
                 latest_raw_price_date=row["latest"],
                 total_rows=row["total_rows"],
@@ -411,6 +702,7 @@ def audit_expanded_symbol_universe(
                 duplicate_date_count=row["duplicate_dates"],
                 invalid_ohlcv_rows=row["invalid_ohlcv_rows"],
                 included=exclusion_reason is None,
+                readiness_status=None,
                 exclusion_reason=exclusion_reason,
                 exclusion_detail=exclusion_detail,
             )
@@ -456,11 +748,14 @@ def _prepare_research_inputs(
     symbols: tuple[str, ...],
     *,
     db_path: Path | str,
+    official_listing_dates_by_symbol: dict[str, date] | None = None,
 ) -> tuple[dict[str, HistoricalPriceSeries], dict[str, object]]:
+    official_listing_dates_by_symbol = official_listing_dates_by_symbol or {}
     price_series_by_symbol = {}
     technical_series_by_symbol = {}
     for symbol in symbols:
         raw = load_historical_price_series_read_only(symbol, db_path=db_path)
+        raw = _trim_before_official_listing(raw, official_listing_dates_by_symbol.get(symbol))
         prepared = prepare_diagnostic_research_series(
             raw,
             observation_start=DEFAULT_OBSERVATION_START,
@@ -522,6 +817,23 @@ def _coverage_rows(db_path: Path | str, *, start_date: date, end_date: date) -> 
     return tuple(hydrated)
 
 
+def _materialized_twse_common_stock_symbols(db_path: Path | str) -> tuple[str, ...]:
+    connection = _connect_read_only(db_path)
+    try:
+        rows = connection.execute(
+            """
+            SELECT DISTINCT symbol
+            FROM historical_prices
+            WHERE symbol GLOB '[0-9][0-9][0-9][0-9].TW'
+              AND symbol != '0050.TW'
+            ORDER BY symbol ASC
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+    return tuple(row[0] for row in rows)
+
+
 def _connect_read_only(db_path: Path | str) -> sqlite3.Connection:
     uri = Path(db_path).resolve().as_uri() + "?mode=ro"
     return sqlite3.connect(uri, uri=True)
@@ -531,6 +843,27 @@ def _is_taiwan_symbol(symbol: str) -> bool:
     return symbol.endswith(".TW") or symbol.endswith(".TWO")
 
 
+def _is_materialized_twse_common_stock(symbol: str) -> bool:
+    code, _, suffix = symbol.partition(".")
+    return code.isdigit() and len(code) == 4 and suffix == "TW" and symbol != "0050.TW"
+
+
+def _trim_before_official_listing(
+    price_series: HistoricalPriceSeries,
+    official_listing_date: date | None,
+) -> HistoricalPriceSeries:
+    if official_listing_date is None:
+        return price_series
+    return HistoricalPriceSeries(
+        symbol=price_series.symbol,
+        currency=price_series.currency,
+        bars=tuple(bar for bar in price_series.bars if bar.trading_date >= official_listing_date),
+        fetched_at=price_series.fetched_at,
+        is_stale=price_series.is_stale,
+        source=price_series.source,
+    )
+
+
 def _expanded_symbol_summaries(
     rows: tuple[ThresholdSymbolRobustnessSummary, ...],
 ) -> tuple[ExpandedThresholdSymbolSummary, ...]:
@@ -538,12 +871,17 @@ def _expanded_symbol_summaries(
         ExpandedThresholdSymbolSummary(
             symbol=row.symbol,
             threshold=row.threshold,
+            eligible_observation_date_count=row.observation_count,
             observation_count=row.observation_count,
             hit_count=row.hit_count,
             miss_count=row.miss_count,
+            incomplete_count=row.incomplete_count,
+            not_evaluable_count=row.not_evaluable_count,
             resolved_count=row.resolved_count,
             historical_hit_rate=row.historical_hit_rate,
             delta_hit_rate_vs_1_20_pp=row.delta_hit_rate_vs_1_20_pp,
+            observation_count_delta_vs_1_20=row.observation_count_delta_vs_1_20,
+            observation_count_change_rate_vs_1_20=row.observation_count_change_rate_vs_1_20,
         )
         for row in rows
     )
@@ -556,12 +894,39 @@ def _expanded_year_summaries(
         ExpandedThresholdYearSummary(
             year=row.year,
             threshold=row.threshold,
+            eligible_symbol_count=0,
             observation_count=row.observation_count,
             hit_count=row.hit_count,
             miss_count=row.miss_count,
+            incomplete_count=row.incomplete_count,
+            not_evaluable_count=row.not_evaluable_count,
             resolved_count=row.resolved_count,
             historical_hit_rate=row.historical_hit_rate,
             delta_hit_rate_vs_1_20_pp=row.delta_hit_rate_vs_1_20_pp,
+            observation_count_delta_vs_1_20=row.observation_count_delta_vs_1_20,
+        )
+        for row in rows
+    )
+
+
+def _expanded_year_summaries_with_eligible_symbols(
+    rows: tuple[ThresholdYearRobustnessSummary, ...],
+    eligible_symbol_count_by_year: dict[int, int],
+) -> tuple[ExpandedThresholdYearSummary, ...]:
+    return tuple(
+        ExpandedThresholdYearSummary(
+            year=row.year,
+            threshold=row.threshold,
+            eligible_symbol_count=eligible_symbol_count_by_year.get(row.year, 0),
+            observation_count=row.observation_count,
+            hit_count=row.hit_count,
+            miss_count=row.miss_count,
+            incomplete_count=row.incomplete_count,
+            not_evaluable_count=row.not_evaluable_count,
+            resolved_count=row.resolved_count,
+            historical_hit_rate=row.historical_hit_rate,
+            delta_hit_rate_vs_1_20_pp=row.delta_hit_rate_vs_1_20_pp,
+            observation_count_delta_vs_1_20=row.observation_count_delta_vs_1_20,
         )
         for row in rows
     )
@@ -574,11 +939,19 @@ def _symbol_breadth_summaries(
     summaries = []
     for threshold in (1.00, 1.10):
         positive = negative = same = unavailable = baseline_resolved = 0
+        added = []
+        baseline_sizes = []
+        candidate_sizes = []
         for symbol in robustness.symbols:
             baseline = rows[(symbol, robustness.baseline_threshold)]
             candidate = rows[(symbol, threshold)]
             if baseline.resolved_count > 0:
                 baseline_resolved += 1
+                baseline_sizes.append(baseline.resolved_count)
+            if candidate.resolved_count > 0:
+                candidate_sizes.append(candidate.resolved_count)
+            if baseline.observation_count == 0 and candidate.observation_count > 0:
+                added.append(symbol)
             if baseline.historical_hit_rate is None or candidate.historical_hit_rate is None:
                 unavailable += 1
             elif candidate.historical_hit_rate > baseline.historical_hit_rate:
@@ -596,6 +969,9 @@ def _symbol_breadth_summaries(
                 candidate_negative_delta_symbols=negative,
                 candidate_same_delta_symbols=same,
                 candidate_unavailable_symbols=unavailable,
+                candidate_added_sample_symbols=tuple(added),
+                baseline_resolved_sample_sizes=tuple(sorted(baseline_sizes)),
+                candidate_resolved_sample_sizes=tuple(sorted(candidate_sizes)),
             )
         )
     return tuple(summaries)
@@ -686,16 +1062,146 @@ def _concentration_metrics(
         years = [row for row in robustness.per_year_summaries if row.threshold == threshold and row.observation_count > 0]
         latest_year = max((row.year for row in years), default=None)
         latest_year_count = next((row.observation_count for row in years if row.year == latest_year), 0)
+        largest_year_row = max(years, key=lambda row: (row.observation_count, -row.year), default=None)
+        year_2025_count = next((row.observation_count for row in years if row.year == 2025), 0)
         rows.append(
             ThresholdConcentrationMetric(
                 threshold=threshold,
+                observation_count=total,
+                year_2025_share=None if total == 0 else year_2025_count / total,
                 latest_year=latest_year,
                 latest_year_share=None if total == 0 else latest_year_count / total,
+                largest_year=None if largest_year_row is None else largest_year_row.year,
+                largest_year_share=None if total == 0 or largest_year_row is None else largest_year_row.observation_count / total,
+                top_1_symbol_share=None if total == 0 else sum(top_counts[:1]) / total,
                 top_2_symbol_share=None if total == 0 else sum(top_counts[:2]) / total,
                 top_5_symbol_share=None if total == 0 else sum(top_counts[:5]) / total,
+                top_10_symbol_share=None if total == 0 else sum(top_counts[:10]) / total,
             )
         )
     return tuple(rows)
+
+
+def _eligible_years_by_symbol(symbols, observations) -> dict[str, set[int]]:
+    years_by_symbol = {symbol: set() for symbol in symbols}
+    for observation in observations:
+        if observation.status.name == "NOT_EVALUABLE":
+            continue
+        years_by_symbol.setdefault(observation.symbol, set()).add(observation.trading_date.year)
+    return years_by_symbol
+
+
+def _eligible_symbol_count_by_year(symbols, observations) -> dict[int, int]:
+    by_year: dict[int, set[str]] = {year: set() for year in range(2018, 2026)}
+    for observation in observations:
+        if observation.status.name == "NOT_EVALUABLE":
+            continue
+        if observation.symbol in symbols and observation.trading_date.year in by_year:
+            by_year[observation.trading_date.year].add(observation.symbol)
+    return {year: len(symbols_for_year) for year, symbols_for_year in by_year.items()}
+
+
+def _readiness_classification_by_symbol(
+    symbols,
+    observations,
+    *,
+    official_listing_dates_by_symbol: dict[str, date] | None,
+    research_start: date,
+) -> dict[str, str]:
+    full_years = set(range(2018, 2026))
+    by_symbol = _eligible_years_by_symbol(symbols, observations)
+    listing_dates = official_listing_dates_by_symbol or {}
+    classifications = {}
+    for symbol in symbols:
+        years = by_symbol.get(symbol, set())
+        listing_date = listing_dates.get(symbol)
+        listed_after_research_start = listing_date is not None and listing_date > research_start
+        if listed_after_research_start:
+            classifications[symbol] = READINESS_PARTIAL_WINDOW_VALID
+        elif full_years.issubset(years):
+            classifications[symbol] = READINESS_FULL_WINDOW_ELIGIBLE
+        elif years:
+            classifications[symbol] = READINESS_PARTIAL_WINDOW_VALID
+        else:
+            classifications[symbol] = READINESS_DATA_QUALITY_BLOCKED
+    return classifications
+
+
+def _readiness_counts(readiness_by_symbol: dict[str, str]) -> dict[str, int]:
+    return {
+        READINESS_FULL_WINDOW_ELIGIBLE: sum(
+            status == READINESS_FULL_WINDOW_ELIGIBLE for status in readiness_by_symbol.values()
+        ),
+        READINESS_PARTIAL_WINDOW_VALID: sum(
+            status == READINESS_PARTIAL_WINDOW_VALID for status in readiness_by_symbol.values()
+        ),
+        READINESS_DATA_QUALITY_BLOCKED: sum(
+            status == READINESS_DATA_QUALITY_BLOCKED for status in readiness_by_symbol.values()
+        ),
+    }
+
+
+def _subset_summaries(
+    subset_name: str,
+    symbols: tuple[str, ...],
+    robustness: VolumeThresholdRobustnessResult,
+) -> tuple[UniverseSubsetThresholdSummary, ...]:
+    symbol_set = set(symbols)
+    rows = []
+    for threshold in robustness.candidate_thresholds:
+        per_symbol = [
+            row
+            for row in robustness.per_symbol_summaries
+            if row.threshold == threshold and row.symbol in symbol_set
+        ]
+        observation_count = sum(row.observation_count for row in per_symbol)
+        hit_count = sum(row.hit_count for row in per_symbol)
+        miss_count = sum(row.miss_count for row in per_symbol)
+        incomplete_count = sum(row.incomplete_count for row in per_symbol)
+        not_evaluable_count = sum(row.not_evaluable_count for row in per_symbol)
+        resolved_count = hit_count + miss_count
+        rows.append(
+            UniverseSubsetThresholdSummary(
+                subset_name=subset_name,
+                threshold=threshold,
+                symbol_count=len(symbols),
+                observation_count=observation_count,
+                hit_count=hit_count,
+                miss_count=miss_count,
+                incomplete_count=incomplete_count,
+                not_evaluable_count=not_evaluable_count,
+                resolved_count=resolved_count,
+                historical_hit_rate=None if resolved_count == 0 else hit_count / resolved_count,
+            )
+        )
+    return tuple(rows)
+
+
+def _year_consistency_by_threshold(
+    rows: tuple[ThresholdYearRobustnessSummary, ...],
+) -> dict[float, dict[str, int]]:
+    by_threshold_year = {(row.threshold, row.year): row for row in rows}
+    result = {}
+    for threshold in (1.00, 1.10):
+        positive = negative = same = unavailable = 0
+        for year in range(2018, 2026):
+            candidate = by_threshold_year[(threshold, year)]
+            baseline = by_threshold_year[(1.20, year)]
+            if candidate.historical_hit_rate is None or baseline.historical_hit_rate is None:
+                unavailable += 1
+            elif candidate.historical_hit_rate > baseline.historical_hit_rate:
+                positive += 1
+            elif candidate.historical_hit_rate < baseline.historical_hit_rate:
+                negative += 1
+            else:
+                same += 1
+        result[threshold] = {
+            "positive_years": positive,
+            "negative_years": negative,
+            "same_years": same,
+            "unavailable_years": unavailable,
+        }
+    return result
 
 
 def _effective_years_by_threshold(
@@ -764,6 +1270,7 @@ def _candidate_classifications(
     overlap: tuple[ExpandedThresholdOverlapSummary, ...],
     concentration: tuple[ThresholdConcentrationMetric, ...],
     effective_years: dict[float, int],
+    year_consistency: dict[float, dict[str, int]],
 ) -> tuple[CandidateRobustnessClassification, ...]:
     aggregate = {row.threshold: row for row in robustness.daily_summaries}
     overlap_rows = {row.threshold: row for row in overlap}
@@ -776,6 +1283,7 @@ def _candidate_classifications(
                 threshold=threshold,
                 aggregate=_classify_delta(aggregate[threshold].delta_hit_rate_vs_1_20_pp),
                 symbol_breadth=_classify_breadth(breadth_rows[threshold]),
+                year_consistency=_classify_year_consistency(year_consistency[threshold]),
                 year_coverage=_classify_year_coverage(
                     effective_years[threshold],
                     effective_years[1.20],
@@ -811,6 +1319,17 @@ def _classify_year_coverage(candidate_years: int, baseline_years: int) -> str:
     if candidate_years > baseline_years:
         return "SUPPORTED"
     if candidate_years == baseline_years:
+        return "MIXED"
+    return "WEAK"
+
+
+def _classify_year_consistency(row: dict[str, int]) -> str:
+    available = row["positive_years"] + row["negative_years"] + row["same_years"]
+    if available == 0:
+        return "UNAVAILABLE"
+    if row["negative_years"] == 0:
+        return "SUPPORTED"
+    if row["positive_years"] > 0 or row["same_years"] > 0:
         return "MIXED"
     return "WEAK"
 
