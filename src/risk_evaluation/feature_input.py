@@ -8,6 +8,10 @@ from risk_evaluation.validation import require_non_empty_text
 from risk_evaluation.validation import require_numeric_value
 
 
+TECH_AS_OF_CLOSE_FEATURE_ID = "TECH_AS_OF_CLOSE_V1"
+TECH_AS_OF_CLOSE_FEATURE_VERSION = "v1"
+
+
 @dataclass(frozen=True)
 class RiskFeatureInput:
     """Frozen feature value consumed by production risk signal producers."""
@@ -38,7 +42,17 @@ class RiskFeatureInput:
         require_non_empty_text(self.calculation_id, "calculation_id", RiskFeatureInputError)
         if self.feature_date > self.as_of_date:
             raise RiskFeatureInputError("feature_date cannot be after as_of_date.")
+        if self.feature_id == TECH_AS_OF_CLOSE_FEATURE_ID:
+            self._validate_as_of_close()
 
     @property
     def identity(self) -> tuple[str, str]:
         return self.feature_id, self.feature_version
+
+    def _validate_as_of_close(self) -> None:
+        if self.feature_version != TECH_AS_OF_CLOSE_FEATURE_VERSION:
+            raise RiskFeatureInputError("TECH_AS_OF_CLOSE_V1 feature_version must be v1.")
+        if self.feature_date != self.as_of_date:
+            raise RiskFeatureInputError("TECH_AS_OF_CLOSE_V1 feature_date must equal as_of_date.")
+        if self.value <= 0:
+            raise RiskFeatureInputError("TECH_AS_OF_CLOSE_V1 value must be positive.")

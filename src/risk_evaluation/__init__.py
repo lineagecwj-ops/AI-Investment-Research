@@ -2,6 +2,8 @@
 
 from risk_evaluation.evaluation_input import MetadataValue
 from risk_evaluation.evaluation_input import RiskSignalProductionInput
+from risk_evaluation.feature_input import TECH_AS_OF_CLOSE_FEATURE_ID
+from risk_evaluation.feature_input import TECH_AS_OF_CLOSE_FEATURE_VERSION
 from risk_evaluation.feature_input import RiskFeatureInput
 from risk_evaluation.policy import MissingDataPolicy
 from risk_evaluation.policy import RiskEvaluationPolicy
@@ -29,5 +31,7 @@ __all__ = [
     "RiskSignalProducerError",
     "RiskSignalProductionInput",
     "RiskSignalProductionInputError",
+    "TECH_AS_OF_CLOSE_FEATURE_ID",
+    "TECH_AS_OF_CLOSE_FEATURE_VERSION",
     "validate_producer_created_at",
 ]

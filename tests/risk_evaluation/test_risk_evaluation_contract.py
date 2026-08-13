@@ -28,6 +28,8 @@ from risk_evaluation import RiskSignalProducer
 from risk_evaluation import RiskSignalProducerError
 from risk_evaluation import RiskSignalProductionInput
 from risk_evaluation import RiskSignalProductionInputError
+from risk_evaluation import TECH_AS_OF_CLOSE_FEATURE_ID
+from risk_evaluation import TECH_AS_OF_CLOSE_FEATURE_VERSION
 from risk_evaluation import validate_producer_created_at
 
 
@@ -88,6 +90,18 @@ class RiskEvaluationContractTestCase(unittest.TestCase):
             source_checksum=source_checksum,
             calculation_id=calculation_id,
         )
+
+    def as_of_close(self, value=Decimal("100.25"), **overrides):
+        params = {
+            "feature_id": TECH_AS_OF_CLOSE_FEATURE_ID,
+            "value": value,
+            "feature_version": TECH_AS_OF_CLOSE_FEATURE_VERSION,
+            "source_artifact_id": "feature_artifact_as_of_close",
+            "source_checksum": "checksum_as_of_close",
+            "feature_date": date(2026, 3, 31),
+        }
+        params.update(overrides)
+        return self.feature(**params)
 
     def production_input(self, *, features=None, **overrides):
         active_features = features if features is not None else (
@@ -150,6 +164,75 @@ class RiskEvaluationContractTestCase(unittest.TestCase):
     def test_feature_date_cannot_exceed_as_of_date(self):
         with self.assertRaisesRegex(RiskFeatureInputError, "feature_date"):
             self.feature(feature_date=date(2026, 4, 1))
+
+    def test_valid_tech_as_of_close_v1(self):
+        close = self.as_of_close()
+
+        self.assertEqual(close.feature_id, TECH_AS_OF_CLOSE_FEATURE_ID)
+        self.assertEqual(close.feature_version, "v1")
+        self.assertEqual(close.feature_date, close.as_of_date)
+        self.assertEqual(close.value, Decimal("100.25"))
+        self.assertEqual(close.source_artifact_id, "feature_artifact_as_of_close")
+        self.assertEqual(close.source_checksum, "checksum_as_of_close")
+
+    def test_as_of_close_feature_date_must_equal_as_of_date(self):
+        with self.assertRaisesRegex(RiskFeatureInputError, "feature_date must equal as_of_date"):
+            self.as_of_close(feature_date=date(2026, 3, 30))
+        with self.assertRaisesRegex(RiskFeatureInputError, "feature_date"):
+            self.as_of_close(feature_date=date(2026, 4, 1))
+
+    def test_as_of_close_numeric_types_and_positive_value(self):
+        decimal_close = self.as_of_close(Decimal("100.25"))
+        int_close = self.as_of_close(100)
+        float_close = self.as_of_close(100.25)
+
+        self.assertEqual(decimal_close.value, Decimal("100.25"))
+        self.assertEqual(int_close.value, 100)
+        self.assertEqual(float_close.value, 100.25)
+        with self.assertRaisesRegex(RiskFeatureInputError, "numeric"):
+            self.as_of_close(True)
+        with self.assertRaisesRegex(RiskFeatureInputError, "positive"):
+            self.as_of_close(0)
+        with self.assertRaisesRegex(RiskFeatureInputError, "positive"):
+            self.as_of_close(Decimal("-1.0"))
+
+    def test_as_of_close_lineage_and_version_validation(self):
+        close = self.as_of_close()
+
+        self.assertEqual(close.calculation_id, "risk_calc_contract_001")
+        with self.assertRaisesRegex(RiskFeatureInputError, "source_artifact_id"):
+            self.as_of_close(source_artifact_id="")
+        with self.assertRaisesRegex(RiskFeatureInputError, "source_checksum"):
+            self.as_of_close(source_checksum="")
+        with self.assertRaisesRegex(RiskFeatureInputError, "calculation_id"):
+            self.as_of_close(calculation_id="")
+        with self.assertRaisesRegex(RiskFeatureInputError, "feature_version"):
+            self.as_of_close(feature_version="v2")
+
+    def test_as_of_close_production_input_compatibility_and_ordering(self):
+        features = (
+            self.feature("TECH_RSI14_V1", 82.35, source_artifact_id="artifact_rsi", source_checksum="checksum_rsi"),
+            self.as_of_close(),
+            self.feature("TECH_SMA60_V1", 50.5, source_artifact_id="artifact_sma60", source_checksum="checksum_sma60"),
+            self.feature("TECH_SMA20_V1", 70.5, source_artifact_id="artifact_sma20", source_checksum="checksum_sma20"),
+        )
+        production_input = self.production_input(features=features)
+
+        self.assertEqual(
+            production_input.feature_ids,
+            ("TECH_AS_OF_CLOSE_V1", "TECH_RSI14_V1", "TECH_SMA20_V1", "TECH_SMA60_V1"),
+        )
+        self.assertIn("checksum_as_of_close", production_input.source_checksums)
+
+    def test_as_of_close_deterministic_equality(self):
+        self.assertEqual(self.as_of_close(), self.as_of_close())
+
+    def test_non_close_features_are_not_subject_to_as_of_close_rules(self):
+        older_sma = self.feature("TECH_SMA20_V1", feature_date=date(2026, 3, 30))
+        zero_volume_ratio = self.feature("TECH_VOLUME_RATIO_V1", value=0)
+
+        self.assertEqual(older_sma.feature_date, date(2026, 3, 30))
+        self.assertEqual(zero_volume_ratio.value, 0)
 
     def test_signal_production_input_creation_and_deterministic_feature_ordering(self):
         production_input = self.production_input()
