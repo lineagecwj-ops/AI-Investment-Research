@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from typing import Mapping
 
 import streamlit as st
 
@@ -19,9 +20,11 @@ READ_ONLY_CAPTION = (
 def render_portfolio_risk_dashboard(
     projection: PortfolioRiskDashboardProjection | None = None,
     validation_error: Exception | str | None = None,
+    warning_metadata: Mapping[str, object] | None = None,
 ) -> None:
     st.header("Portfolio Risk（風險檢視）")
     st.caption(READ_ONLY_CAPTION)
+    render_warning_metadata(warning_metadata)
 
     if validation_error is not None:
         render_validation_error_state(validation_error)
@@ -44,6 +47,19 @@ def render_empty_state() -> None:
 def render_validation_error_state(error: Exception | str) -> None:
     st.error(VALIDATION_ERROR_TITLE)
     st.caption(str(error))
+
+
+def render_warning_metadata(warning_metadata: Mapping[str, object] | None) -> None:
+    if not warning_metadata:
+        return
+    if warning_metadata.get("stale_warning"):
+        st.warning("Portfolio Risk artifact metadata requires review.")
+    with st.expander("Artifact input metadata", expanded=False):
+        rows = [
+            {"Name": key, "Value": _format_warning_value(value)}
+            for key, value in sorted(warning_metadata.items())
+        ]
+        st.dataframe(rows, width="stretch", hide_index=True)
 
 
 def render_overview(projection: PortfolioRiskDashboardProjection) -> None:
@@ -129,3 +145,9 @@ def _render_table_or_empty(rows: list[dict[str, object]], empty_message: str) ->
         st.dataframe(rows, width="stretch", hide_index=True)
     else:
         st.info(empty_message)
+
+
+def _format_warning_value(value: object) -> object:
+    if isinstance(value, tuple):
+        return ", ".join(str(item) for item in value)
+    return value

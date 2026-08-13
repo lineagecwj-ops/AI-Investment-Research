@@ -21,6 +21,7 @@ from portfolio_dashboard.streamlit_view import build_artifact_lineage_table_rows
 from portfolio_dashboard.streamlit_view import build_overview_metric_rows
 from portfolio_dashboard.streamlit_view import build_position_table_rows
 from portfolio_dashboard.streamlit_view import build_risk_event_table_rows
+from portfolio_dashboard.streamlit_view import render_warning_metadata
 from portfolio_dashboard.streamlit_view import render_empty_state
 from portfolio_dashboard.streamlit_view import render_portfolio_risk_dashboard
 from portfolio_dashboard.streamlit_view import render_validation_error_state
@@ -125,6 +126,20 @@ class PortfolioDashboardStreamlitViewTestCase(unittest.TestCase):
         streamlit_mock.header.assert_called_once_with("Portfolio Risk（風險檢視）")
         self.assertTrue(streamlit_mock.dataframe.called)
 
+    def test_renderer_accepts_projection_with_warning_metadata(self):
+        projection = self.projection()
+        warning_metadata = {"artifact_count": 1, "stale_warning": False}
+
+        with patch("portfolio_dashboard.streamlit_view.st") as streamlit_mock:
+            streamlit_mock.columns.return_value = [streamlit_mock, streamlit_mock, streamlit_mock, streamlit_mock]
+            streamlit_mock.expander.return_value.__enter__.return_value = streamlit_mock
+            streamlit_mock.expander.return_value.__exit__.return_value = False
+
+            render_portfolio_risk_dashboard(projection, warning_metadata=warning_metadata)
+
+        streamlit_mock.header.assert_called_once_with("Portfolio Risk（風險檢視）")
+        self.assertTrue(streamlit_mock.dataframe.called)
+
     def test_empty_state(self):
         with patch("portfolio_dashboard.streamlit_view.st") as streamlit_mock:
             render_empty_state()
@@ -137,6 +152,29 @@ class PortfolioDashboardStreamlitViewTestCase(unittest.TestCase):
 
         streamlit_mock.error.assert_called_once_with(VALIDATION_ERROR_TITLE)
         streamlit_mock.caption.assert_called_once_with("synthetic validation error")
+
+    def test_repository_error_rendering(self):
+        with patch("portfolio_dashboard.streamlit_view.st") as streamlit_mock:
+            render_portfolio_risk_dashboard(validation_error="synthetic repository error")
+
+        streamlit_mock.error.assert_called_once_with(VALIDATION_ERROR_TITLE)
+        streamlit_mock.caption.assert_any_call("synthetic repository error")
+
+    def test_warning_metadata_rendering(self):
+        warning_metadata = {
+            "artifact_count": 1,
+            "stale_warning": True,
+            "stale_artifact_ids": ("artifact_a", "artifact_b"),
+        }
+
+        with patch("portfolio_dashboard.streamlit_view.st") as streamlit_mock:
+            streamlit_mock.expander.return_value.__enter__.return_value = streamlit_mock
+            streamlit_mock.expander.return_value.__exit__.return_value = False
+
+            render_warning_metadata(warning_metadata)
+
+        streamlit_mock.warning.assert_called_once_with("Portfolio Risk artifact metadata requires review.")
+        self.assertTrue(streamlit_mock.dataframe.called)
 
     def test_table_rendering_helpers(self):
         projection = self.projection()
@@ -158,6 +196,8 @@ class PortfolioDashboardStreamlitViewTestCase(unittest.TestCase):
             EMPTY_STATE_MESSAGE,
             VALIDATION_ERROR_TITLE,
             READ_ONLY_CAPTION,
+            "Artifact input metadata",
+            "Portfolio Risk artifact metadata requires review.",
             "Portfolio Risk（風險檢視）",
             "Position Risk",
             "Risk Events",

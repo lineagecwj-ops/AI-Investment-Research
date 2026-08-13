@@ -1,5 +1,8 @@
 """Read-only Portfolio Risk Dashboard projection foundation."""
 
+from portfolio_dashboard.artifact_provider import DEFAULT_RISK_MONITORING_ARTIFACT_ROOT
+from portfolio_dashboard.artifact_provider import PortfolioDashboardProviderResult
+from portfolio_dashboard.artifact_provider import load_portfolio_risk_dashboard
 from portfolio_dashboard.artifact_input import PortfolioArtifactInputRequest
 from portfolio_dashboard.artifact_input import PortfolioArtifactInputResult
 from portfolio_dashboard.artifact_input import PortfolioArtifactInputErrorCode
@@ -23,10 +26,12 @@ from portfolio_dashboard.view_model import RiskEventRow
 __all__ = [
     "AlertCandidateRow",
     "ArtifactLineageRow",
+    "DEFAULT_RISK_MONITORING_ARTIFACT_ROOT",
     "DashboardCount",
     "PortfolioArtifactInputErrorCode",
     "PortfolioArtifactInputRequest",
     "PortfolioArtifactInputResult",
+    "PortfolioDashboardProviderResult",
     "PortfolioDashboardValidationError",
     "PortfolioDashboardValidator",
     "PortfolioOverviewProjection",
@@ -40,4 +45,5 @@ __all__ = [
     "build_portfolio_risk_dashboard_projection",
     "build_position_risk_projections",
     "build_risk_event_rows",
+    "load_portfolio_risk_dashboard",
 ]

@@ -190,6 +190,7 @@ from walk_forward_replay_service import WalkForwardReplayConfig
 from walk_forward_replay_service import WalkForwardReplayFrequency
 from walk_forward_replay_service import WalkForwardReplayService
 import oos_validation_dashboard as oos_dashboard
+from portfolio_dashboard.artifact_provider import load_portfolio_risk_dashboard
 from portfolio_dashboard.streamlit_view import render_portfolio_risk_dashboard
 import swing_research_dashboard as swing_dashboard
 import universe_dashboard as universe_ui
@@ -3874,7 +3875,12 @@ def main() -> None:
         render_swing_research()
 
     with portfolio_risk_tab:
-        render_portfolio_risk_dashboard()
+        portfolio_risk_result = load_portfolio_risk_dashboard()
+        render_portfolio_risk_dashboard(
+            projection=portfolio_risk_result.projection,
+            validation_error=portfolio_risk_result.error,
+            warning_metadata=portfolio_risk_result.warning_metadata,
+        )
 
     with universe_tab:
         render_universe_management()
