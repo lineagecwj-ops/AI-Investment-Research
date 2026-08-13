@@ -210,7 +210,7 @@ class StockServiceCacheTestCase(unittest.TestCase):
     def test_cache_read_failure_falls_back_to_yahoo(self):
         yahoo_stock = self.sample_stock(price=220.0)
 
-        with patch("stock_service.get_cached_stock", side_effect=OSError("cache read failed")):
+        with patch("live_data_store.LiveDataStore.get_cached_stock", side_effect=OSError("cache read failed")):
             with patch("stock_service.fetch_stock_from_yahoo", return_value=yahoo_stock):
                 with self.assertLogs(level="WARNING"):
                     stock = get_stock("NVDA", db_path=self.db_path)
@@ -221,7 +221,7 @@ class StockServiceCacheTestCase(unittest.TestCase):
         yahoo_stock = self.sample_stock(price=225.0)
 
         with patch("stock_service.fetch_stock_from_yahoo", return_value=yahoo_stock):
-            with patch("stock_service.save_stock", side_effect=OSError("cache write failed")):
+            with patch("live_data_store.LiveDataStore.save_stock", side_effect=OSError("cache write failed")):
                 with self.assertLogs(level="WARNING"):
                     stock = get_stock("NVDA", db_path=self.db_path)
 

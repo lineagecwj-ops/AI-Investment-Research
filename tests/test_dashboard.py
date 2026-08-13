@@ -5,6 +5,7 @@ from datetime import UTC
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -180,6 +181,13 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn('if submitted:', app_source)
         self.assertIn('if st.button("清除掃描結果"):', app_source)
         self.assertIn("build_swing_research_scan_result(", app_source)
+        scan_builder_source = app_source[
+            app_source.index("def build_swing_research_scan_result("):
+            app_source.index("def load_historical_price_series_from_cache_read_only(")
+        ]
+        self.assertIn("live_data_store = LiveDataStore()", scan_builder_source)
+        self.assertIn("live_store=live_data_store", scan_builder_source)
+        self.assertIn("SwingScannerService(live_data_store=live_data_store", scan_builder_source)
         self.assertIn("build_swing_research_replay_result(", app_source)
         self.assertIn("build_swing_research_walk_forward_result(", app_source)
         self.assertIn('st.session_state.setdefault("swing_research_result_mode", None)', app_source)
@@ -196,6 +204,46 @@ class DashboardFormattingTestCase(unittest.TestCase):
         self.assertIn("回放頻率", app_source)
         self.assertIn("手動輸入", (SRC_PATH / "ui_terminology.py").read_text(encoding="utf-8"))
         self.assertIn("已儲存股票池", (SRC_PATH / "ui_terminology.py").read_text(encoding="utf-8"))
+
+    def test_current_scan_builder_injects_live_store_without_real_scanner_workflow(self):
+        import app as app_module
+        from database_config import DEFAULT_DATABASE_PATH_CONFIG
+
+        live_store = object()
+        scanner = patch("app.SwingScannerService").start()
+        self.addCleanup(patch.stopall)
+        scanner.return_value.scan.return_value = SimpleNamespace(normalized_symbols=("NVDA",))
+
+        with patch("app.LiveDataStore", return_value=live_store) as live_store_factory:
+            with patch("app.get_historical_prices") as price_loader:
+                with patch("app.swing_dashboard.fingerprint_from_config", return_value="fingerprint"):
+                    payload = app_module.build_swing_research_scan_result(
+                        symbols=("NVDA",),
+                        config=object(),
+                        source_type="Manual Input",
+                    )
+
+        live_store_factory.assert_called_once_with()
+        scanner.assert_called_once()
+        self.assertIs(scanner.call_args.kwargs["live_data_store"], live_store)
+        self.assertEqual(payload["fingerprint"], "fingerprint")
+        price_loader.assert_not_called()
+
+        self.assertEqual(
+            app_module.LiveDataStore().resolved_db_path,
+            DEFAULT_DATABASE_PATH_CONFIG.live_db_path.resolve(),
+        )
+
+    def test_research_evidence_helper_uses_released_research_store_resolution(self):
+        app_source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+        helper_source = app_source[
+            app_source.index("def load_historical_price_series_from_cache_read_only("):
+            app_source.index("def build_swing_research_replay_result(")
+        ]
+
+        self.assertIn("store = ResearchDataStore()", helper_source)
+        self.assertIn("connection = store.connect_read_only()", helper_source)
+        self.assertNotIn("DEFAULT_DB_PATH", helper_source)
 
     def test_app_import_recovers_stale_ui_terminology_module(self):
         script = """

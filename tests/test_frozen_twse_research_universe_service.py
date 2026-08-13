@@ -9,7 +9,6 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from database import DEFAULT_DB_PATH
 from etf_constituent_universe_service import UNIVERSE_VERSION
 from frozen_twse_research_universe_service import FROZEN_TPEX_EXCLUDED_COUNT
 from frozen_twse_research_universe_service import FROZEN_TAIWAN_TOTAL_COUNT
@@ -22,7 +21,7 @@ from frozen_twse_research_universe_service import load_frozen_twse_research_univ
 class FrozenTWSEResearchUniverseServiceTestCase(unittest.TestCase):
 
     def test_repository_loader_returns_valid_frozen_twse_symbols(self):
-        universe = load_frozen_twse_research_universe(db_path=DEFAULT_DB_PATH)
+        universe = load_frozen_twse_research_universe()
 
         self.assertEqual(universe.universe_version, UNIVERSE_VERSION)
         self.assertEqual(universe.frozen_total_count, FROZEN_TAIWAN_TOTAL_COUNT)
@@ -39,8 +38,8 @@ class FrozenTWSEResearchUniverseServiceTestCase(unittest.TestCase):
 
     def test_symbol_loader_returns_canonical_symbol_tuple(self):
         self.assertEqual(
-            load_frozen_twse_research_symbols(db_path=DEFAULT_DB_PATH),
-            load_frozen_twse_research_universe(db_path=DEFAULT_DB_PATH).symbols,
+            load_frozen_twse_research_symbols(),
+            load_frozen_twse_research_universe().symbols,
         )
 
     def test_wrong_count_fails_deterministically(self):

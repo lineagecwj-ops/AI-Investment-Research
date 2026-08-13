@@ -261,7 +261,7 @@ class CandidateDisplayResearchServiceTestCase(unittest.TestCase):
 
     def test_payload_records_safety_boundaries(self):
         summary = self.summary((self.signal_match(symbol="1001.TW"),), matched_symbols=("1001.TW",))
-        db_audit = database_safety_audit(PROJECT_ROOT / "data" / "stocks.db")
+        db_audit = database_safety_audit()
 
         payload = build_candidate_display_phase3_payload(
             summary,

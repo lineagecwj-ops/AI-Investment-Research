@@ -5,6 +5,7 @@ from datetime import UTC
 from datetime import date
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,8 @@ from models import TechnicalIndicatorSeries
 from models import TechnicalIndicatorSnapshot
 from models import TechnicalSignalCondition
 from signal_outcome_service import evaluate_signal_conditions
+from database_config import DEFAULT_DATABASE_PATH_CONFIG
+from live_data_store import LiveDataStore
 from swing_scanner_service import LATEST_BAR_PROVISIONAL_LIMITATION
 from swing_scanner_service import SWING_RESEARCH_RANK_POLICY_V1
 from swing_scanner_service import SampleSizeStatus
@@ -36,6 +39,7 @@ from swing_scanner_service import SwingScannerService
 from swing_scanner_service import build_swing_candidate
 from swing_scanner_service import get_candidate_rank_components
 from swing_scanner_service import get_sample_size_status
+from swing_scanner_service import live_data_store_price_loader
 from swing_scanner_service import rank_swing_candidates
 
 
@@ -253,6 +257,41 @@ class SwingScannerServiceTestCase(unittest.TestCase):
         self.assertEqual(result.normalized_symbols, tuple())
         self.assertEqual(result.matched_candidates, tuple())
         self.assertEqual(runner.calls, [])
+
+    def test_default_scanner_receives_live_data_store(self):
+        live_store = LiveDataStore()
+
+        service = SwingScannerService(live_data_store=live_store)
+
+        self.assertIs(service.live_data_store, live_store)
+
+    def test_default_price_loader_uses_live_data_store_boundary(self):
+        live_store = LiveDataStore()
+        series = self.price_series("NVDA")
+
+        with patch("swing_scanner_service.get_historical_prices", return_value=series) as loader:
+            price_loader = live_data_store_price_loader(live_store)
+            loaded = price_loader("NVDA", force_refresh=True)
+
+        self.assertIs(loaded, series)
+        loader.assert_called_once_with("NVDA", force_refresh=True, live_store=live_store)
+
+    def test_default_scanner_uses_formal_live_store_after_cutover(self):
+        service = SwingScannerService()
+
+        self.assertEqual(
+            service.live_data_store.resolved_db_path,
+            DEFAULT_DATABASE_PATH_CONFIG.live_db_path.resolve(),
+        )
+        self.assertNotEqual(
+            service.live_data_store.resolved_db_path,
+            DEFAULT_DATABASE_PATH_CONFIG.legacy_db_path.resolve(),
+        )
+
+    def test_scanner_module_does_not_import_research_data_store(self):
+        import swing_scanner_service as module
+
+        self.assertFalse(hasattr(module, "ResearchDataStore"))
 
     def test_duplicate_symbols_are_normalized_and_scanned_once(self):
         price = {"2330.TW": self.price_series("2330.TW")}

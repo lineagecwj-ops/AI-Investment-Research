@@ -269,7 +269,7 @@ class ExpandedVolumeThresholdValidationServiceTestCase(unittest.TestCase):
 
     def test_repository_official_snapshot_covers_materialized_twse_universe(self):
         snapshot_path = PROJECT_ROOT / "docs" / "research_inputs" / "twse_listing_dates_2026_08_09.json"
-        symbols = _materialized_twse_common_stock_symbols(DEFAULT_DB_PATH)
+        symbols = _materialized_twse_common_stock_symbols(None)
 
         snapshot = load_twse_listing_date_snapshot(snapshot_path, required_symbols=symbols)
 
