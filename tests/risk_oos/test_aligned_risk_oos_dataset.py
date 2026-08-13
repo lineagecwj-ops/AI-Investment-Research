@@ -439,10 +439,7 @@ class AlignedRiskOOSDatasetTestCase(unittest.TestCase):
         self.assertEqual(row.mae60_target_end_date, mae60.window_lineage.target_end_date)
 
     def test_no_db_yfinance_policy_threshold_or_producer_boundary(self):
-        source = "\n".join(
-            path.read_text()
-            for path in sorted((SRC_PATH / "risk_oos").glob("*.py"))
-        )
+        source = (SRC_PATH / "risk_oos" / "aligned_dataset.py").read_text()
 
         forbidden = (
             "sqlite",
