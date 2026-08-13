@@ -190,6 +190,7 @@ from walk_forward_replay_service import WalkForwardReplayConfig
 from walk_forward_replay_service import WalkForwardReplayFrequency
 from walk_forward_replay_service import WalkForwardReplayService
 import oos_validation_dashboard as oos_dashboard
+from portfolio_dashboard.streamlit_view import render_portfolio_risk_dashboard
 import swing_research_dashboard as swing_dashboard
 import universe_dashboard as universe_ui
 
@@ -3842,13 +3843,14 @@ def main() -> None:
     st.title("AI Investment Research")
     st.info("資料可能使用 24 小時內的本地快取；若快取不存在或過期，系統會查詢 Yahoo Finance 並更新 SQLite cache。")
 
-    dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, universe_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
+    dashboard_tab, research_tab, historical_tab, ai_research_tab, swing_research_tab, portfolio_risk_tab, universe_tab, historical_cases_tab, watchlist_tab, comparison_tab = st.tabs(
         [
             "Dashboard",
             "Research",
             "Historical Trends",
             "AI Research",
             "Swing Research（波段研究）",
+            "Portfolio Risk（風險檢視）",
             "研究股票池",
             "歷史案例",
             "觀察清單",
@@ -3870,6 +3872,9 @@ def main() -> None:
 
     with swing_research_tab:
         render_swing_research()
+
+    with portfolio_risk_tab:
+        render_portfolio_risk_dashboard()
 
     with universe_tab:
         render_universe_management()
