@@ -10,3 +10,14 @@ data/watchlist.json
 data/taiwan_company_names.json
 data/taiwan_company_summaries.json
 /dist/
+
+# Runtime SQLite artifacts
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+data/live/
+data/research/snapshots/
