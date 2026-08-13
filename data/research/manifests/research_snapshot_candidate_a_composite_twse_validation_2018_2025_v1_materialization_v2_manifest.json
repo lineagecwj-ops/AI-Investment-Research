@@ -1,0 +1,153 @@
+{
+  "correction": {
+    "affected_symbols": [
+      "0050.TW",
+      "2330.TW",
+      "2337.TW",
+      "2404.TW",
+      "2454.TW"
+    ],
+    "materialization_implementation_version": "phase_6e_c_adjusted_close_recovery_v2",
+    "parent_faulty_materialization": {
+      "path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/snapshots/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1.db",
+      "preservation_policy": "Do not overwrite; retained as correction provenance evidence.",
+      "sha256": "6b2fffdd2a6cda3cf750756417b3854548792199010db57775b39e383099c073"
+    },
+    "reason": "Phase 6E-B confirmed adjusted_close recovery materialization mismatch.",
+    "root_cause_reference": "Database Architecture Separation Phase 6E-B"
+  },
+  "database": {
+    "duplicate_count": 0,
+    "integrity_check": "ok",
+    "logical_key_count": 473481,
+    "path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/snapshots/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_materialization_v2.db",
+    "price_data_end": "2026-08-07",
+    "price_data_start": "1980-12-12",
+    "sha256": "3417b34a11660e672d75c5879d0d8f9e177c574b603b540274bad7acb2215de0",
+    "symbol_count": 222
+  },
+  "datasets": {
+    "excluded": [
+      "stocks",
+      "historical_financials",
+      "historical_price_fetch_state",
+      "features",
+      "targets",
+      "outcomes",
+      "scanner outputs",
+      "PDF exports",
+      "AI model artifacts"
+    ],
+    "excluded_tables_present": [],
+    "included": [
+      "historical_prices",
+      "research_universes",
+      "research_universe_symbols",
+      "snapshot_metadata"
+    ]
+  },
+  "identity": {
+    "created_at": "2026-08-11T18:05:13Z",
+    "created_by_process": "database_architecture_separation_phase_6a_manifest_creation",
+    "materialization_version": "v2",
+    "materialized_at": "2026-08-13T00:00:00+00:00",
+    "materialized_status": "CORRECTED_CANDIDATE",
+    "snapshot_id": "research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1",
+    "snapshot_role": "research_validation_reference",
+    "snapshot_version": "v1",
+    "status": "RELEASED"
+  },
+  "immutability": {
+    "intended_access": "mode=ro plus PRAGMA query_only=ON through ResearchDataStore",
+    "live_writes_forbidden": true
+  },
+  "limitations": {
+    "future_artifact_lineage_limitation": "Downstream backtest, replay, OOS, and AI artifacts must carry their own snapshot references, checksums, and validation evidence.",
+    "point_in_time_universe_limitation": "Frozen TWSE 218 is a 2026 current ETF constituent-derived research universe, not a 2018 to 2025 point-in-time universe.",
+    "provider_vintage_limitation": "Yahoo provider-side release identity is not fully reconstructable.",
+    "survivorship_bias": "Candidate A and Frozen TWSE 218 are not a historical point-in-time membership reconstruction."
+  },
+  "price_basis": {
+    "adjusted_close_policy": "stored historical_prices.adjusted_close after five-symbol recovery semantics",
+    "analysis_close_policy": "adjusted_close if available else close",
+    "close_basis": "stored historical_prices.close from Candidate A logical reconstruction",
+    "high_basis": "stored historical_prices.high from Candidate A logical reconstruction",
+    "low_basis": "stored historical_prices.low from Candidate A logical reconstruction",
+    "open_basis": "stored historical_prices.open from Candidate A logical reconstruction",
+    "price_basis_version": "price_basis_candidate_a_adjusted_close_recovery_v1"
+  },
+  "provider": {
+    "ingestion_process_version": "phase_6b_adjusted_close_recovery_semantics_v1",
+    "loader_version": "repository baseline 766571828b730faf8ee5ede8f22e37b9177598bf historical price pipeline semantics",
+    "provider_data_vintage": "composite Candidate A vintage: base backup captured before adjusted-close recovery on 2026-08-10T05:48:45Z, recovery source captured before Phase 6B bulk work on 2026-08-09T15:04:44Z, and five-symbol adjusted_close recovery semantics applied from recovery source",
+    "provider_name": "Yahoo Finance via existing project historical price pipeline"
+  },
+  "semantic_checksum": {
+    "expected": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "materialized": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "recomputed": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "result": "MATCH"
+  },
+  "source_lineage": {
+    "reconstruction_method": [
+      "base backup",
+      "Phase 6B recovery semantics",
+      "five-symbol adjusted_close recovery",
+      "validation checks"
+    ],
+    "source_components": [
+      {
+        "component_id": "stocks_before_adjusted_close_recovery_20260810T054845Z",
+        "path": "data/backups/stocks_before_adjusted_close_recovery_20260810T054845Z.db",
+        "role": "base_backup",
+        "sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470"
+      },
+      {
+        "component_id": "stocks_before_phase_6b_bulk_20260809T150444Z",
+        "path": "data/backups/stocks_before_phase_6b_bulk_20260809T150444Z.db",
+        "role": "recovery_source",
+        "sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be"
+      }
+    ],
+    "source_database_checksums": {
+      "base_backup_sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470",
+      "recovery_source_sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be"
+    }
+  },
+  "source_manifest": {
+    "path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/docs/research_snapshots/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_manifest.json",
+    "semantic_checksum": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "snapshot_id": "research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1"
+  },
+  "source_validation": {
+    "base_backup_sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470",
+    "recovery_source_sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be"
+  },
+  "universe": {
+    "binding_policy": "The price universe and research universe are linked but not identical.",
+    "price_universe_id": "candidate_a_price_universe_222_v1",
+    "price_universe_scope": "222 symbols present in Candidate A historical_prices",
+    "price_universe_version": "candidate_a_composite_price_universe_2026_08_07_v1",
+    "research_universe_id": "frozen_twse_research_universe_2026_08_09",
+    "research_universe_scope": "218 TWSE common-stock symbols, excluding 0050.TW and TPEx symbols",
+    "research_universe_version": "2026-08-current-etf-constituent-v1"
+  },
+  "usage_rules": {
+    "allowed": [
+      "Phase 7",
+      "Phase 3",
+      "Phase 4",
+      "Backtest",
+      "Replay",
+      "OOS",
+      "AI future datasets"
+    ],
+    "forbidden": [
+      "Live refresh",
+      "Yahoo overwrite",
+      "silent mutation",
+      "implicit promotion of data/stocks.db",
+      "direct PDF Export DB reads"
+    ]
+  }
+}

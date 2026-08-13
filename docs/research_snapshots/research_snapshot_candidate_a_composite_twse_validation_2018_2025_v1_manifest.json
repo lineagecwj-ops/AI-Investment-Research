@@ -1,0 +1,165 @@
+{
+  "identity": {
+    "snapshot_id": "research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1",
+    "snapshot_version": "v1",
+    "snapshot_role": "research_validation_reference",
+    "status": "RELEASED",
+    "created_at": "2026-08-11T18:05:13Z",
+    "created_by_process": "database_architecture_separation_phase_6a_manifest_creation"
+  },
+  "source_lineage": {
+    "source_components": [
+      {
+        "component_id": "stocks_before_adjusted_close_recovery_20260810T054845Z",
+        "path": "data/backups/stocks_before_adjusted_close_recovery_20260810T054845Z.db",
+        "role": "base_backup",
+        "sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470"
+      },
+      {
+        "component_id": "stocks_before_phase_6b_bulk_20260809T150444Z",
+        "path": "data/backups/stocks_before_phase_6b_bulk_20260809T150444Z.db",
+        "role": "recovery_source",
+        "sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be"
+      }
+    ],
+    "source_database_checksums": {
+      "base_backup_sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470",
+      "recovery_source_sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be"
+    },
+    "reconstruction_method": [
+      "base backup",
+      "Phase 6B recovery semantics",
+      "five-symbol adjusted_close recovery",
+      "validation checks"
+    ]
+  },
+  "database": {
+    "logical_key_count": 473481,
+    "symbol_count": 222,
+    "duplicate_count": 0,
+    "integrity_check": "ok",
+    "database_checksum_reference": {
+      "type": "source_component_sha256_references",
+      "base_backup_sha256": "f70943ecbf132f0d1bd192e9d2811b31d3976b6c35bb8764cbabfe2124514470",
+      "recovery_source_sha256": "1626dbd604927f2f00b1c7e5b6e1de621c7bf0008c05012c5654b77d0302c0be",
+      "note": "Candidate A is a logical reconstruction, not a newly materialized database in Phase 6A."
+    }
+  },
+  "universe": {
+    "price_universe_id": "candidate_a_price_universe_222_v1",
+    "price_universe_version": "candidate_a_composite_price_universe_2026_08_07_v1",
+    "price_universe_scope": "222 symbols present in Candidate A historical_prices",
+    "research_universe_id": "frozen_twse_research_universe_2026_08_09",
+    "research_universe_version": "2026-08-current-etf-constituent-v1",
+    "research_universe_scope": "218 TWSE common-stock symbols, excluding 0050.TW and TPEx symbols",
+    "binding_policy": "The price universe and research universe are linked but not identical."
+  },
+  "price_semantics": {
+    "price_basis_version": "price_basis_candidate_a_adjusted_close_recovery_v1",
+    "analysis_close_policy": "adjusted_close if available else close",
+    "adjusted_close_policy": "stored historical_prices.adjusted_close after five-symbol recovery semantics",
+    "open_basis": "stored historical_prices.open from Candidate A logical reconstruction",
+    "high_basis": "stored historical_prices.high from Candidate A logical reconstruction",
+    "low_basis": "stored historical_prices.low from Candidate A logical reconstruction",
+    "close_basis": "stored historical_prices.close from Candidate A logical reconstruction"
+  },
+  "provider": {
+    "provider_name": "Yahoo Finance via existing project historical price pipeline",
+    "provider_data_vintage": "composite Candidate A vintage: base backup captured before adjusted-close recovery on 2026-08-10T05:48:45Z, recovery source captured before Phase 6B bulk work on 2026-08-09T15:04:44Z, and five-symbol adjusted_close recovery semantics applied from recovery source",
+    "loader_version": "repository baseline 766571828b730faf8ee5ede8f22e37b9177598bf historical price pipeline semantics",
+    "ingestion_process_version": "phase_6b_adjusted_close_recovery_semantics_v1"
+  },
+  "coverage": {
+    "price_data_start": "1980-12-12",
+    "price_data_end": "2026-08-07",
+    "research_window_start": "2018-01-01",
+    "research_window_end": "2025-12-31"
+  },
+  "datasets": {
+    "included_datasets": [
+      "historical_prices",
+      "Candidate A price universe metadata",
+      "Frozen TWSE 218 research universe metadata reference"
+    ],
+    "excluded_datasets": [
+      "stocks",
+      "historical_financials",
+      "historical_price_fetch_state",
+      "features",
+      "targets",
+      "outcomes",
+      "scanner outputs",
+      "PDF exports",
+      "AI model artifacts"
+    ]
+  },
+  "validation": {
+    "phase7_validation_reference": {
+      "result": "PASS",
+      "source": "/tmp/phase5e1_candidate_a_reproduction_validation.json",
+      "differences": []
+    },
+    "phase3_validation_reference": {
+      "result": "PASS",
+      "source": "/tmp/phase5e1_candidate_a_reproduction_validation.json",
+      "differences": [],
+      "semantic_checksum": "79f641199e31166b6c2e13782766fa0b404058b06bb99fdd4a91e7c37be41736"
+    },
+    "phase4_validation_reference": {
+      "result": "PASS",
+      "source": "/tmp/phase5e1_candidate_a_reproduction_validation.json",
+      "differences": []
+    },
+    "semantic_checksum": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "semantic_checksum_meaning": "Normalized research meaning across keys, price fields, price basis, provider vintage statement, coverage, research window, and reconstruction method."
+  },
+  "artifact_checksums": {
+    "phase5e1_reproduction_validation_artifact": {
+      "path": "/tmp/phase5e1_candidate_a_reproduction_validation.json",
+      "sha256": "fd2ab85001ccbe25d856634a49db14488ff06fa70516cf35087c225a129a2064"
+    },
+    "manifest_self_checksum_policy": "Compute externally after file creation. Do not embed a mutable self-checksum inside this JSON payload."
+  },
+  "limitations": {
+    "provider_vintage_limitation": "Yahoo provider-side release identity is not fully reconstructable.",
+    "survivorship_bias": "Candidate A and Frozen TWSE 218 are not a historical point-in-time membership reconstruction.",
+    "point_in_time_universe_limitation": "Frozen TWSE 218 is a 2026 current ETF constituent-derived research universe, not a 2018 to 2025 point-in-time universe.",
+    "future_artifact_lineage_limitation": "Downstream backtest, replay, OOS, and AI artifacts must carry their own snapshot references, checksums, and validation evidence."
+  },
+  "lineage": {
+    "parent_snapshot_id": null,
+    "derived_artifacts": [
+      "Phase 7 reproduction evidence",
+      "Phase 3 reproduction evidence",
+      "Phase 4 reproduction evidence",
+      "future backtest artifacts",
+      "future replay artifacts",
+      "future OOS artifacts",
+      "future AI feature, target, and model artifacts"
+    ]
+  },
+  "live_database_policy": {
+    "current_live_db_path": "data/stocks.db",
+    "current_live_db_sha256_reference": "69694f98e8694da509b5dc0b6a99fe55b64dacbace8475f66aa92c29192f85c7",
+    "status": "LiveDataStore candidate",
+    "policy": "Do not treat the current live DB as this Research Snapshot and do not auto-promote it."
+  },
+  "usage_rules": {
+    "allowed": [
+      "Phase 7",
+      "Phase 3",
+      "Phase 4",
+      "Backtest",
+      "Replay",
+      "OOS",
+      "AI future datasets"
+    ],
+    "forbidden": [
+      "Live refresh",
+      "Yahoo overwrite",
+      "silent mutation",
+      "implicit promotion of data/stocks.db",
+      "direct PDF Export DB reads"
+    ]
+  }
+}
