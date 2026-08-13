@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-13, after Long-Term Growth Phase 7K.
+Last updated: 2026-08-13, after Long-Term Growth Phase 7L.
 
 ## Project Purpose
 
@@ -18,32 +18,36 @@ This status document is based on:
 - `git branch -vv`
 - `git log --oneline --decorate -n 12`
 - repository structure under `docs/`, `src/`, and `tests/`
-- existing validation evidence from the Long-Term Growth Phase 7A-7K working state
+- existing validation evidence from the Long-Term Growth Phase 7A-7L pushed state
 
 No network fetch, DB migration, DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- HEAD: `677fc52c6de0373f47fe26cfdbb24257742bf25d`
-- Latest pushed commit: `677fc52 feat: add swing scanner PDF export`
-- Remote tracking: `main` is aligned with `origin/main` at `677fc52`
-- Working tree: not clean
-- Current Phase 7A-7K Long-Term Growth files are present as untracked working-tree files and have not been committed or pushed.
+- HEAD: `f834e400eb5624455596510d0a79aca10f2fd7bd`
+- Latest pushed commit: `f834e40 feat: add risk monitoring integration framework`
+- Remote tracking: `main` is aligned with `origin/main` at `f834e40`
+- Working tree: clean
+- Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 
-Important: do not assume Long-Term Growth Phase 7A-7K is already in Git history. The pushed project state currently ends at Swing Scanner PDF Export.
+Important: Long-Term Growth Phase 7A-7L is now part of Git history at `f834e40`.
 
 ## Recent Pushed History
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `f834e40 feat: add risk monitoring integration framework`
+- `3a5f92f docs: update project status master`
+- `31c567c feat: add portfolio risk engine framework`
+- `f5f3581 feat: add model and oos evaluation framework`
+- `384b22b feat: add training dataset framework`
+- `9fcd50a feat: add feature and target framework`
+- `e15cede docs: add long-term growth architecture documentation`
 - `677fc52 feat: add swing scanner PDF export`
 - `432db3a test: make live cache isolation tests time deterministic`
 - `752fd23 docs: document database architecture separation`
 - `54132a9 docs: add research snapshot release manifests`
-- `61aa5ac test: add database separation and cutover coverage`
-- `ff823a6 feat: separate research and live data stores`
-- `8a751e8 chore: protect runtime database artifacts`
 
 ## Major Milestone Summary
 
@@ -65,7 +69,7 @@ Current interpretation:
 
 - Research and Live data stores are separated by architecture and tests.
 - Production scanner and research snapshot workflows must remain isolated.
-- Database separation is not part of the current uncommitted Long-Term Growth work.
+- Database separation is preserved by the committed Long-Term Growth work.
 
 ### PDF Export: Swing Scanner PDF Export
 
@@ -79,42 +83,32 @@ Architecture boundary:
 
 ## Long-Term Growth Status
 
-The following phases are present in the current working tree and validation evidence. They are not committed or pushed at the time of this document.
+The following phases are committed and pushed through `f834e40`.
 
 | Phase | Name | Status |
 |---|---|---|
-| 7A | AI Architecture Design | PASS |
-| 7B | Feature Engineering Framework | PASS |
-| 7C | Feature Calculation Engine | PASS |
-| 7D | Feature Pipeline | PASS |
-| 7E | Training Dataset Framework | PASS |
-| 7F | Target Generation Framework | PASS |
-| 7G | Target Generator | PASS |
-| 7H | Training Dataset Builder | PASS |
-| 7I | Baseline Model Framework | PASS |
-| 7J | OOS Evaluation Framework | PASS |
-| 7K | Portfolio Risk Engine Framework | PASS |
-| 7L | Risk Monitoring Integration | Pending |
+| 7A | AI Architecture Design | Complete / committed / pushed |
+| 7B | Feature Engineering Framework | Complete / committed / pushed |
+| 7C | Feature Calculation Engine | Complete / committed / pushed |
+| 7D | Feature Pipeline | Complete / committed / pushed |
+| 7E | Training Dataset Framework | Complete / committed / pushed |
+| 7F | Target Generation Framework | Complete / committed / pushed |
+| 7G | Target Generator | Complete / committed / pushed |
+| 7H | Training Dataset Builder | Complete / committed / pushed |
+| 7I | Baseline Model Framework | Complete / committed / pushed |
+| 7J | OOS Evaluation Framework | Complete / committed / pushed |
+| 7K | Portfolio Risk Engine Framework | Complete / committed / pushed |
+| 7L | Risk Monitoring Integration | Complete / PASS |
 
 ## Current AI Platform Architecture
 
-Current intended architecture after Phase 7K:
+Current intended architecture after Phase 7L:
 
 ```text
 Research Snapshot
     |
     v
-Feature Pipeline
-    |
-    v
-Feature Artifact
-
-Target Pipeline
-    |
-    v
-Target Artifact
-
-Feature Artifact + Target Artifact
+Feature / Target Pipeline
     |
     v
 Training Dataset Framework
@@ -130,13 +124,16 @@ Portfolio Risk Engine
     |
     v
 Risk Assessment Artifact
+    |
+    v
+Risk Monitoring Framework
 ```
 
 The platform is research-oriented and artifact-oriented. It is not a trading system.
 
 ## Feature Platform Status
 
-Current uncommitted feature framework modules are under `src/features/` and tests under `tests/features/`.
+Committed feature framework modules are under `src/features/` and tests under `tests/features/`.
 
 Included components:
 
@@ -162,7 +159,7 @@ Design boundary:
 
 ## Target Platform Status
 
-Current uncommitted target framework modules are under `src/targets/` and tests under `tests/targets/`.
+Committed target framework modules are under `src/targets/` and tests under `tests/targets/`.
 
 Included components:
 
@@ -188,7 +185,7 @@ Design boundary:
 
 ## Dataset Platform Status
 
-Current uncommitted dataset framework modules are under `src/datasets/` and tests under `tests/datasets/`.
+Committed dataset framework modules are under `src/datasets/` and tests under `tests/datasets/`.
 
 Included components:
 
@@ -208,7 +205,7 @@ Design boundary:
 
 ## Model Platform Status
 
-Current uncommitted model framework modules are under `src/model_framework/` and tests under `tests/model_framework/`.
+Committed model framework modules are under `src/model_framework/` and tests under `tests/model_framework/`.
 
 Included components:
 
@@ -230,7 +227,7 @@ Current status:
 
 ## OOS Evaluation Status
 
-Current uncommitted OOS evaluation modules are under `src/evaluation/` and tests under `tests/evaluation/`.
+Committed OOS evaluation modules are under `src/evaluation/` and tests under `tests/evaluation/`.
 
 Included components:
 
@@ -255,7 +252,7 @@ Design boundary:
 
 ## Portfolio Risk Engine Status
 
-Current uncommitted risk framework modules are under `src/risk/` and tests under `tests/risk/`.
+Committed risk framework modules are under `src/risk/` and tests under `tests/risk/`.
 
 Included components:
 
@@ -301,6 +298,50 @@ Design boundary:
 - Portfolio Risk Engine must not generate investment advice.
 - Portfolio Risk Engine must not directly read LiveDataStore raw database, sqlite database, Scanner output, or PDF output.
 
+## Risk Monitoring Framework Status
+
+Committed risk monitoring framework modules are under `src/risk_monitoring/` and tests under `tests/risk_monitoring/`.
+
+Included components:
+
+- RiskMonitoringContext
+- MonitoringPolicy
+- RiskMonitoringEngine
+- RiskMonitoringEvent
+- AlertCandidate
+- RiskMonitoringArtifact
+- RiskMonitoringArtifactGenerator
+- RiskMonitoringChecksumGenerator
+- RiskMonitoringValidator
+- MonitoringState
+- AlertLevel
+- AlertType
+
+Risk Monitoring data flow:
+
+```text
+RiskArtifact
+    |
+    v
+RiskMonitoringEngine
+    |
+    +--> RiskMonitoringEvent
+    |
+    +--> AlertCandidate metadata
+    |
+    v
+RiskMonitoringArtifact
+```
+
+Design boundary:
+
+- Risk Monitoring Framework is metadata-only.
+- Risk Monitoring Framework has no dashboard.
+- Risk Monitoring Framework has no notification delivery.
+- Risk Monitoring Framework does not persist monitoring records to a DB.
+- Risk Monitoring Framework does not produce buy/sell/hold/entry/exit semantics.
+- Risk Monitoring Framework must not directly read LiveDataStore, ResearchDataStore, sqlite database, Scanner output, or PDF output.
+
 ## Database Architecture Status
 
 Known database layers:
@@ -313,7 +354,7 @@ Known database layers:
 Current architecture interpretation:
 
 - Research and Live separation is complete in pushed history.
-- Long-Term Growth Phase 7A-7K should consume reproducible artifacts and metadata boundaries.
+- Long-Term Growth Phase 7A-7L should consume reproducible artifacts and metadata boundaries.
 - Risk Engine must not create a Risk DB in Phase 7K.
 - This master document intentionally does not list full DB SHA values.
 
@@ -340,6 +381,7 @@ AI Research Platform:
 - builds Dataset Artifact
 - supports Model Framework and OOS Evaluation
 - now includes Portfolio Risk Engine framework metadata
+- now includes Risk Monitoring Framework metadata
 
 Risk Engine:
 
@@ -349,6 +391,16 @@ Risk Engine:
 - does not trade
 - does not produce buy/sell signals
 - does not produce investment recommendations
+
+Risk Monitoring Framework:
+
+- consumes RiskArtifact metadata
+- emits RiskMonitoringArtifact metadata
+- can emit AlertCandidate metadata for review workflows
+- does not select stocks
+- does not trade
+- does not deliver notifications
+- does not produce buy/sell/hold/entry/exit semantics
 
 ## Validation Evidence
 
@@ -361,6 +413,14 @@ Latest observed validation evidence after Phase 7K:
 - `git diff --check`: PASS
 - Risk module isolation scan: no `LiveDataStore`, `ResearchDataStore`, scanner service, PDF export service, `sqlite3`, or `yfinance` import in `src/risk`
 - DB SHA before / after checks during Phase 7K: unchanged
+
+Latest observed validation evidence after Phase 7L:
+
+- Risk monitoring tests: `15 tests OK`
+- Full unittest: `1207 tests OK`
+- `compileall app.py src tests`: PASS
+- `git diff --check`: PASS
+- Risk monitoring module isolation scan: no `LiveDataStore`, `ResearchDataStore`, scanner service, PDF export service, `sqlite3`, or `yfinance` import in `src/risk_monitoring`
 
 Existing pushed validation evidence includes:
 
@@ -381,10 +441,10 @@ Current state:
 
 - Database Separation: complete and pushed
 - PDF Export: complete and pushed
-- Long-Term Growth: Phase 7K complete in working tree
-- Next planned phase: Phase 7L Risk Monitoring Integration
+- Long-Term Growth: Phase 7L complete, committed, and pushed
+- Next planned phase: not assigned in this document
 
-Current uncommitted Long-Term Growth directories include:
+Current committed Long-Term Growth directories include:
 
 - `src/features/`
 - `src/targets/`
@@ -392,22 +452,19 @@ Current uncommitted Long-Term Growth directories include:
 - `src/model_framework/`
 - `src/evaluation/`
 - `src/risk/`
+- `src/risk_monitoring/`
 - corresponding tests under `tests/`
 - Phase 7 architecture / framework docs under `docs/`
 
-Important: because these files are untracked, a future session must inspect the live working tree before editing or committing. Do not infer that these files are already part of Git history.
+Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L is now committed and pushed.
 
 ## Future Roadmap
 
-Next:
-
-- Phase 7L: Risk Monitoring Integration
-
 Future directions, not yet implemented in this status document:
 
-- AI Model Improvement
-- Portfolio Dashboard
-- Alert Framework
+- Portfolio Dashboard: Future scope
+- Alert Framework: Future scope
+- AI Model Improvement: Future scope
 
 These future items require explicit scope before implementation.
 
@@ -433,8 +490,8 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `677fc52c6de0373f47fe26cfdbb24257742bf25d` or inspect any newer commits.
-3. Confirm whether Phase 7A-7K files are still untracked, staged, committed, or changed.
+2. Confirm HEAD is still `f834e400eb5624455596510d0a79aca10f2fd7bd` or inspect any newer commits.
+3. Confirm whether Phase 7A-7L files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, and V1.1 boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
