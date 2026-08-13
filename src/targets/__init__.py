@@ -7,6 +7,8 @@ from targets.checksum import TargetChecksumMismatchError
 from targets.generators import FutureReturn20DRegressionGenerator
 from targets.generators import FutureReturn60DClassificationGenerator
 from targets.generators import FutureReturn60DRegressionGenerator
+from targets.generators import MaximumAdverseExcursion20DRegressionGenerator
+from targets.generators import MaximumAdverseExcursion60DRegressionGenerator
 from targets.generators import TargetPricePoint
 from targets.target_artifact import TargetArtifact
 from targets.target_context import TargetCalculationContext
@@ -22,6 +24,8 @@ __all__ = [
     "FutureReturn20DRegressionGenerator",
     "FutureReturn60DClassificationGenerator",
     "FutureReturn60DRegressionGenerator",
+    "MaximumAdverseExcursion20DRegressionGenerator",
+    "MaximumAdverseExcursion60DRegressionGenerator",
     "TargetArtifact",
     "TargetArtifactGenerationError",
     "TargetArtifactGenerator",
