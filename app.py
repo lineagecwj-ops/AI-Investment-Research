@@ -172,6 +172,8 @@ from out_of_sample_validation_service import ValidationPeriod
 from out_of_sample_validation_service import ValidationPeriodRole
 from swing_scanner_service import SwingScannerConfig
 from swing_scanner_service import SwingScannerService
+from swing_scanner_pdf_export_service import SwingScannerPdfExportError
+from swing_scanner_pdf_export_service import export_swing_scanner_pdf
 import swing_scanner_service as swing_scanner_module
 from ui_terminology import format_condition_labels
 from ui_terminology import get_diagnostic_label
@@ -2582,6 +2584,21 @@ def render_scanner_condition_coverage(result) -> None:
     st.markdown("### 今日股票掃描")
     st.caption("條件覆蓋只顯示本次 Scanner 已計算的 V1 五項條件，不是分數、勝率、推薦或強弱排名。")
     view = swing_dashboard.build_scanner_condition_coverage_view(result)
+    source_context = st.session_state.get("swing_research_source_context")
+    try:
+        pdf_export = export_swing_scanner_pdf(
+            scanner_result=result,
+            coverage_view=view,
+            source_context=source_context,
+        )
+        st.download_button(
+            "下載掃描結果 PDF",
+            data=pdf_export.pdf_bytes,
+            file_name=pdf_export.filename,
+            mime="application/pdf",
+        )
+    except SwingScannerPdfExportError as error:
+        st.warning(str(error))
     summary_cols = st.columns(5)
     for col, row in zip(summary_cols, view.summary_rows):
         col.metric(row["分類"], row["數量"])
