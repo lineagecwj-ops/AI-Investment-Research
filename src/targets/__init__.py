@@ -10,7 +10,10 @@ from targets.generators import FutureReturn60DRegressionGenerator
 from targets.generators import MaximumAdverseExcursion20DRegressionGenerator
 from targets.generators import MaximumAdverseExcursion60DRegressionGenerator
 from targets.generators import TargetPricePoint
+from targets.target_artifact import TARGET_ARTIFACT_SCHEMA_VERSION
+from targets.target_artifact import TARGET_CHECKSUM_CONTRACT_VERSION
 from targets.target_artifact import TargetArtifact
+from targets.target_artifact import TargetWindowLineage
 from targets.target_context import TargetCalculationContext
 from targets.target_definition import TargetDefinition
 from targets.target_generator import TargetGenerationOutput
@@ -26,6 +29,8 @@ __all__ = [
     "FutureReturn60DRegressionGenerator",
     "MaximumAdverseExcursion20DRegressionGenerator",
     "MaximumAdverseExcursion60DRegressionGenerator",
+    "TARGET_ARTIFACT_SCHEMA_VERSION",
+    "TARGET_CHECKSUM_CONTRACT_VERSION",
     "TargetArtifact",
     "TargetArtifactGenerationError",
     "TargetArtifactGenerator",
@@ -40,4 +45,5 @@ __all__ = [
     "TargetRegistryError",
     "TargetValidationError",
     "TargetValidator",
+    "TargetWindowLineage",
 ]

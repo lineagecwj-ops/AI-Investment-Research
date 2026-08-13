@@ -6,6 +6,7 @@ from datetime import time
 from targets.checksum import TargetChecksumGenerator
 from targets.target_artifact import TargetArtifact
 from targets.target_context import TargetCalculationContext
+from targets.target_definition import TargetDefinition
 from targets.target_generator import TargetGenerationOutput
 from targets.validation import TargetValidationError
 from targets.validation import TargetValidator
@@ -26,9 +27,14 @@ class TargetArtifactGenerator:
         self.validator = validator or TargetValidator()
         self.checksum_generator = checksum_generator or TargetChecksumGenerator()
 
-    def generate(self, output: TargetGenerationOutput, context: TargetCalculationContext) -> TargetArtifact:
+    def generate(
+        self,
+        output: TargetGenerationOutput,
+        context: TargetCalculationContext,
+        definition: TargetDefinition | None = None,
+    ) -> TargetArtifact:
         try:
-            self.validator.validate(output, context)
+            self.validator.validate(output, context, definition)
         except TargetValidationError as exc:
             raise TargetArtifactGenerationError(f"Target output validation failed: {exc}") from exc
 
@@ -46,4 +52,5 @@ class TargetArtifactGenerator:
             created_at=created_at,
             checksum=checksum,
             validation_status="PASS",
+            window_lineage=output.window_lineage,
         )

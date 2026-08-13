@@ -12,6 +12,7 @@ class TargetDefinition:
     calculation_window: int
     formula_version: str
     description: str
+    requires_window_lineage: bool = False
 
     def __post_init__(self):
         required = {

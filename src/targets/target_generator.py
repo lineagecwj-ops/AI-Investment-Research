@@ -4,6 +4,7 @@ from typing import Mapping
 from typing import Protocol
 
 from targets.target_artifact import TargetArtifact
+from targets.target_artifact import TargetWindowLineage
 from targets.target_context import TargetCalculationContext
 from targets.target_definition import TargetDefinition
 
@@ -19,6 +20,9 @@ class TargetGenerationOutput:
     target_value: float | str | None
     metadata: Mapping[str, Any] | None = None
     artifact: TargetArtifact | None = None
+    window_lineage: TargetWindowLineage | None = None
+    requires_window_lineage: bool = False
+    definition: TargetDefinition | None = None
 
 
 class TargetGenerator(Protocol):

@@ -7,6 +7,7 @@ from numbers import Real
 from typing import Iterable
 
 from targets.target_artifact import TargetArtifact
+from targets.target_artifact import TargetWindowLineage
 from targets.target_context import TargetCalculationContext
 from targets.target_definition import TargetDefinition
 from targets.target_generator import TargetGenerationOutput
@@ -31,6 +32,7 @@ class _FutureReturnBase:
     calculation_window: int
     formula_version: str
     description: str
+    requires_window_lineage = True
 
     def __init__(self, price_series: Iterable[TargetPricePoint]):
         self._price_series = tuple(sorted(price_series, key=lambda point: (point.symbol, point.trading_date)))
@@ -44,6 +46,7 @@ class _FutureReturnBase:
             calculation_window=self.calculation_window,
             formula_version=self.formula_version,
             description=self.description,
+            requires_window_lineage=self.requires_window_lineage,
         )
 
     def calculate(self, context: TargetCalculationContext) -> TargetGenerationOutput:
@@ -60,6 +63,8 @@ class _FutureReturnBase:
         future = symbol_prices[future_index]
         if reference.price is None or future.price is None or reference.price <= 0 or future.price < 0:
             return self._output(context, None, VALIDATION_INVALID_PRICE, {"reason": "invalid price"})
+        future_window = symbol_prices[reference_index + 1:future_index + 1]
+        window_lineage = self._window_lineage(future_window)
         return_value = (future.price - reference.price) / reference.price
         target_value = self._target_value(return_value)
         return self._output(
@@ -70,8 +75,12 @@ class _FutureReturnBase:
                 "reference_price": reference.price,
                 "future_price": future.price,
                 "future_date": future.trading_date.isoformat(),
+                "future_window_start": window_lineage.target_start_date.isoformat(),
+                "future_window_end": window_lineage.target_end_date.isoformat(),
+                "window_observations": window_lineage.observations_used,
                 "return_value": return_value,
             },
+            window_lineage=window_lineage,
         )
 
     def validate(self, output: TargetGenerationOutput) -> bool:
@@ -91,6 +100,7 @@ class _FutureReturnBase:
         context: TargetCalculationContext,
         target_value: float | str | None,
         validation_status: str,
+        window_lineage: TargetWindowLineage | None = None,
     ) -> TargetArtifact | None:
         if target_value is None:
             return None
@@ -104,6 +114,7 @@ class _FutureReturnBase:
             created_at=datetime.combine(context.reference_date, time.min, tzinfo=UTC),
             checksum=None,
             validation_status=validation_status,
+            window_lineage=window_lineage,
         )
 
     def _output(
@@ -112,7 +123,9 @@ class _FutureReturnBase:
         target_value: float | str | None,
         validation_status: str,
         metadata: dict[str, object] | None = None,
+        window_lineage: TargetWindowLineage | None = None,
     ) -> TargetGenerationOutput:
+        definition = self.get_definition()
         output_metadata = {
             "snapshot_id": context.snapshot_id,
             "reference_date": context.reference_date.isoformat(),
@@ -128,7 +141,17 @@ class _FutureReturnBase:
             reference_date=context.reference_date,
             target_value=target_value,
             metadata=output_metadata,
-            artifact=self._artifact(context, target_value, validation_status),
+            artifact=self._artifact(context, target_value, validation_status, window_lineage),
+            window_lineage=window_lineage,
+            requires_window_lineage=definition.requires_window_lineage,
+            definition=definition,
+        )
+
+    def _window_lineage(self, future_window: tuple[TargetPricePoint, ...]) -> TargetWindowLineage:
+        return TargetWindowLineage(
+            target_start_date=future_window[0].trading_date,
+            target_end_date=future_window[-1].trading_date,
+            observations_used=len(future_window),
         )
 
 
@@ -205,6 +228,7 @@ class _MaximumAdverseExcursionBase(_FutureReturnBase):
         target_value = min(0.0, raw_min_return)
         worst_index = future_returns.index(raw_min_return)
         worst_point = future_window[worst_index]
+        window_lineage = self._window_lineage(future_window)
         return self._output(
             context,
             target_value,
@@ -213,12 +237,13 @@ class _MaximumAdverseExcursionBase(_FutureReturnBase):
                 "reference_price": reference.price,
                 "worst_future_price": worst_point.price,
                 "worst_future_date": worst_point.trading_date.isoformat(),
-                "future_window_start": future_window[0].trading_date.isoformat(),
-                "future_window_end": future_window[-1].trading_date.isoformat(),
-                "window_observations": len(future_window),
+                "future_window_start": window_lineage.target_start_date.isoformat(),
+                "future_window_end": window_lineage.target_end_date.isoformat(),
+                "window_observations": window_lineage.observations_used,
                 "raw_min_return": raw_min_return,
                 "formula": "min(0, min(future_close / reference_close - 1))",
             },
+            window_lineage=window_lineage,
         )
 
     def _duplicate_date(self, prices: tuple[TargetPricePoint, ...]) -> date | None:
