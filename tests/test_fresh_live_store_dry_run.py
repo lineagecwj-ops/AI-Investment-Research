@@ -108,7 +108,7 @@ class FreshLiveStoreDryRunTestCase(unittest.TestCase):
         series = _mock_price_series("3333.TW")
 
         store.save_historical_prices(series, fetched_at=series.fetched_at, full_history_fetched=True)
-        cached = store.get_cached_historical_prices("3333.TW", require_full_history=True)
+        cached = store.get_cached_historical_prices("3333.TW", require_full_history=True, now=series.fetched_at)
         state = store.get_historical_price_fetch_state("3333.TW")
 
         after = _production_fingerprint()

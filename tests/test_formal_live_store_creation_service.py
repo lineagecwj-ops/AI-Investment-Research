@@ -80,7 +80,7 @@ class FormalLiveStoreCreationServiceTestCase(unittest.TestCase):
 
         store.save_historical_prices(first, fetched_at=now, full_history_fetched=True)
         store.save_historical_prices(second, fetched_at=now, full_history_fetched=True)
-        cached = store.get_cached_historical_prices("LIVE_VALIDATION.TW", require_full_history=True)
+        cached = store.get_cached_historical_prices("LIVE_VALIDATION.TW", require_full_history=True, now=now)
         state = store.get_historical_price_fetch_state("LIVE_VALIDATION.TW")
 
         after = _production_fingerprint()
