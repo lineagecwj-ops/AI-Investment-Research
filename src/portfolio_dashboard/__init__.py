@@ -1,5 +1,9 @@
 """Read-only Portfolio Risk Dashboard projection foundation."""
 
+from portfolio_dashboard.artifact_input import PortfolioArtifactInputRequest
+from portfolio_dashboard.artifact_input import PortfolioArtifactInputResult
+from portfolio_dashboard.artifact_input import PortfolioArtifactInputErrorCode
+from portfolio_dashboard.artifact_input import build_portfolio_dashboard_input
 from portfolio_dashboard.projection import build_alert_candidate_rows
 from portfolio_dashboard.projection import build_artifact_lineage_rows
 from portfolio_dashboard.projection import build_portfolio_overview_projection
@@ -20,12 +24,16 @@ __all__ = [
     "AlertCandidateRow",
     "ArtifactLineageRow",
     "DashboardCount",
+    "PortfolioArtifactInputErrorCode",
+    "PortfolioArtifactInputRequest",
+    "PortfolioArtifactInputResult",
     "PortfolioDashboardValidationError",
     "PortfolioDashboardValidator",
     "PortfolioOverviewProjection",
     "PortfolioRiskDashboardProjection",
     "PositionRiskProjection",
     "RiskEventRow",
+    "build_portfolio_dashboard_input",
     "build_alert_candidate_rows",
     "build_artifact_lineage_rows",
     "build_portfolio_overview_projection",
