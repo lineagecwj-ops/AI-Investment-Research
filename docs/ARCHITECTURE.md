@@ -141,6 +141,21 @@ signal_condition_diagnostics_service.py
         ↓
         app.py Swing Research V1 歷史條件診斷 section
 
+risk/
+    └── Risk calculation framework
+        ↓
+        RiskArtifact
+        ↓
+        risk_monitoring/
+        ↓
+        RiskMonitoringArtifact
+        ↓
+        PortfolioRiskDashboardProjection
+        ↓
+        portfolio_dashboard.streamlit_view
+        ↓
+        Portfolio Risk（風險檢視）
+
 backtest_service.py
     ↓
     historical_case_service.py
@@ -203,6 +218,11 @@ ai_config.py
 
 ai_dashboard.py
     └── AI Research UI presentation helpers, question-type labels, request fingerprinting, evidence formatting, and safe error messages
+
+portfolio_dashboard/
+    └── Read-only Portfolio Risk projection / presentation helpers
+    └── Portfolio overview, position risk, event, alert candidate, and artifact lineage view models
+    └── Artifact compatibility, formatting, and forbidden wording safety
 
 ai_followup.py
     └── Grounded follow-up research turn/session models, deterministic question routing, suggestion policy, dedupe, turn IDs, and token aggregation
