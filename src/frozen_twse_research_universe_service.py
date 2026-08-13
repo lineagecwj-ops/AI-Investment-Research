@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from database import DEFAULT_DB_PATH
 from etf_constituent_universe_service import UNIVERSE_VERSION
-from expanded_volume_threshold_validation_service import _materialized_twse_common_stock_symbols
+from research_data_store import ResearchDataStore
 
 
 FROZEN_TWSE_RESEARCH_UNIVERSE_ID = "frozen_twse_research_universe_2026_08_09"
@@ -42,14 +41,16 @@ class FrozenTWSEResearchUniverse:
 
 def load_frozen_twse_research_universe(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     symbol_loader=None,
 ) -> FrozenTWSEResearchUniverse:
     try:
+        store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
         symbols = tuple(
-            symbol_loader(db_path)
+            symbol_loader(store.resolved_db_path)
             if symbol_loader is not None
-            else _materialized_twse_common_stock_symbols(db_path)
+            else store.materialized_twse_common_stock_symbols()
         )
     except FrozenTWSEResearchUniverseError:
         raise
@@ -71,11 +72,13 @@ def load_frozen_twse_research_universe(
 
 def load_frozen_twse_research_symbols(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     symbol_loader=None,
 ) -> tuple[str, ...]:
     return load_frozen_twse_research_universe(
         db_path=db_path,
+        research_store=research_store,
         symbol_loader=symbol_loader,
     ).symbols
 

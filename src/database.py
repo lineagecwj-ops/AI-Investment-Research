@@ -6,6 +6,8 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
+from database_config import DEFAULT_DATABASE_PATH_CONFIG
+from database_config import PROJECT_ROOT
 from models import HistoricalFinancialPeriod
 from models import HistoricalFinancialSeries
 from models import HistoricalPriceBar
@@ -13,8 +15,7 @@ from models import HistoricalPriceSeries
 from models import Stock
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "stocks.db"
+DEFAULT_DB_PATH = DEFAULT_DATABASE_PATH_CONFIG.legacy_db_path
 CACHE_TTL = timedelta(hours=24)
 HISTORICAL_CACHE_TTL = timedelta(days=7)
 HISTORICAL_PRICE_CACHE_TTL = timedelta(hours=12)
@@ -254,6 +255,30 @@ def initialize_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
         connection.close()
 
 
+def initialize_live_cache_tables(connection: sqlite3.Connection) -> None:
+    connection.execute(CREATE_STOCKS_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
+    connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
+    schema_changed = migrate_stocks_table(connection)
+    migrate_historical_financials_table(connection)
+    migrate_historical_prices_table(connection)
+    migrate_historical_price_fetch_state_table(connection)
+    if schema_changed:
+        invalidate_stock_cache_after_schema_migration(connection)
+
+
+def initialize_live_cache_database(db_path: Path | str = DEFAULT_DB_PATH) -> None:
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path)
+    try:
+        initialize_live_cache_tables(connection)
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def migrate_stocks_table(connection: sqlite3.Connection) -> bool:
     existing_columns = {
         row[1]
@@ -375,20 +400,7 @@ def save_stock(
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute(CREATE_STOCKS_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
-        connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
-        connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
-        schema_changed = migrate_stocks_table(connection)
-        migrate_historical_financials_table(connection)
-        migrate_historical_prices_table(connection)
-        migrate_historical_price_fetch_state_table(connection)
-        migrate_research_universes_table(connection)
-        migrate_research_universe_symbols_table(connection)
-        if schema_changed:
-            invalidate_stock_cache_after_schema_migration(connection)
+        initialize_live_cache_tables(connection)
         connection.execute(
             """
             INSERT INTO stocks (
@@ -493,7 +505,7 @@ def get_cached_stock(
     now: datetime | None = None,
     ttl: timedelta = CACHE_TTL,
 ) -> Stock | None:
-    initialize_database(db_path)
+    initialize_live_cache_database(db_path)
 
     connection = sqlite3.connect(Path(db_path))
     try:
@@ -566,20 +578,7 @@ def save_historical_financials(
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute(CREATE_STOCKS_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
-        connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
-        connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
-        connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
-        schema_changed = migrate_stocks_table(connection)
-        migrate_historical_financials_table(connection)
-        migrate_historical_prices_table(connection)
-        migrate_historical_price_fetch_state_table(connection)
-        migrate_research_universes_table(connection)
-        migrate_research_universe_symbols_table(connection)
-        if schema_changed:
-            invalidate_stock_cache_after_schema_migration(connection)
+        initialize_live_cache_tables(connection)
 
         for period in series.periods or []:
             connection.execute(
@@ -641,7 +640,7 @@ def get_cached_historical_financials(
     ttl: timedelta = HISTORICAL_CACHE_TTL,
     include_expired: bool = False,
 ) -> HistoricalFinancialSeries | None:
-    initialize_database(db_path)
+    initialize_live_cache_database(db_path)
 
     connection = sqlite3.connect(Path(db_path))
     try:
@@ -800,20 +799,7 @@ def save_historical_prices(
 
 
 def initialize_historical_price_tables(connection: sqlite3.Connection) -> None:
-    connection.execute(CREATE_STOCKS_TABLE_SQL)
-    connection.execute(CREATE_HISTORICAL_FINANCIALS_TABLE_SQL)
-    connection.execute(CREATE_HISTORICAL_PRICES_TABLE_SQL)
-    connection.execute(CREATE_HISTORICAL_PRICE_FETCH_STATE_TABLE_SQL)
-    connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
-    connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
-    schema_changed = migrate_stocks_table(connection)
-    migrate_historical_financials_table(connection)
-    migrate_historical_prices_table(connection)
-    migrate_historical_price_fetch_state_table(connection)
-    migrate_research_universes_table(connection)
-    migrate_research_universe_symbols_table(connection)
-    if schema_changed:
-        invalidate_stock_cache_after_schema_migration(connection)
+    initialize_live_cache_tables(connection)
 
 
 def upsert_historical_price_fetch_state(
@@ -881,7 +867,7 @@ def get_cached_historical_prices(
     include_expired: bool = False,
     require_full_history: bool = False,
 ) -> HistoricalPriceSeries | None:
-    initialize_database(db_path)
+    initialize_live_cache_database(db_path)
 
     if not historical_price_cache_covers_range(
         symbol,
@@ -968,7 +954,7 @@ def get_historical_price_fetch_state(
     symbol: str,
     db_path: Path | str = DEFAULT_DB_PATH,
 ) -> dict | None:
-    initialize_database(db_path)
+    initialize_live_cache_database(db_path)
 
     connection = sqlite3.connect(Path(db_path))
     try:
@@ -998,7 +984,7 @@ def get_latest_historical_price_date(
     symbol: str,
     db_path: Path | str = DEFAULT_DB_PATH,
 ) -> date | None:
-    initialize_database(db_path)
+    initialize_live_cache_database(db_path)
 
     connection = sqlite3.connect(Path(db_path))
     try:

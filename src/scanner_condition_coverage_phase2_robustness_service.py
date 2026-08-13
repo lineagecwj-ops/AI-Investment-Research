@@ -17,6 +17,7 @@ from expanded_volume_threshold_validation_service import load_twse_listing_date_
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import compare_historical_condition_outcomes
 from models import OutcomeEvaluationStatus
+from research_data_store import ResearchDataStore
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsConfig
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsService
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
@@ -72,17 +73,21 @@ class Phase2RobustnessResult:
 
 def run_final_phase2_robustness_study(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     listing_date_snapshot_path: Path | str = DEFAULT_LISTING_SNAPSHOT_PATH,
     generated_at: datetime | None = None,
 ) -> Phase2RobustnessResult:
     generated_at = generated_at or datetime.now(UTC)
-    before = database_safety_audit(db_path)
-    symbols = _materialized_twse_common_stock_symbols(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    resolved_db_path = store.resolved_db_path
+    before = database_safety_audit(resolved_db_path, research_store=store)
+    symbols = store.materialized_twse_common_stock_symbols()
     snapshot = load_twse_listing_date_snapshot(listing_date_snapshot_path, required_symbols=symbols)
     price_series_by_symbol, technical_series_by_symbol = _prepare_research_inputs(
         symbols,
-        db_path=db_path,
+        db_path=resolved_db_path,
+        research_store=store,
         official_listing_dates_by_symbol=snapshot.listing_dates_by_symbol,
     )
     diagnostics = HistoricalConditionDiagnosticsService(
@@ -118,7 +123,7 @@ def run_final_phase2_robustness_study(
     phase1_checksum = _load_phase1_checksum()
     if phase1_checksum != PHASE1_RESEARCH_CHECKSUM:
         raise ConditionCoveragePhase2RobustnessError("Phase 1 checksum input is not the locked checksum.")
-    after = database_safety_audit(db_path)
+    after = database_safety_audit(resolved_db_path, research_store=store)
     if before != after:
         raise ConditionCoveragePhase2RobustnessError("DB audit changed during Phase 2 read-only study.")
     return analyze_phase2_robustness(

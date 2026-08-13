@@ -7,10 +7,8 @@ from pathlib import Path
 
 import yfinance as yf
 
-from database import DEFAULT_DB_PATH
-from database import get_cached_stock
 from database import log_cache_warning
-from database import save_stock
+from live_data_store import LiveDataStore
 from models import Stock
 
 
@@ -92,9 +90,14 @@ def validate_stock(stock: Stock) -> None:
         raise StockDataError("Yahoo Finance 回傳資料缺少目前價格。")
 
 
-def get_stock(symbol: str, db_path: Path | str = DEFAULT_DB_PATH) -> Stock:
+def get_stock(
+    symbol: str,
+    db_path: Path | str | None = None,
+    live_store: LiveDataStore | None = None,
+) -> Stock:
+    store = live_store or LiveDataStore(db_path=db_path)
     try:
-        cached_stock = get_cached_stock(symbol, db_path=db_path)
+        cached_stock = store.get_cached_stock(symbol)
     except Exception as exc:
         log_cache_warning("SQLite cache read failed", exc)
     else:
@@ -104,7 +107,7 @@ def get_stock(symbol: str, db_path: Path | str = DEFAULT_DB_PATH) -> Stock:
     stock = fetch_stock_from_yahoo(symbol)
 
     try:
-        save_stock(stock, db_path=db_path)
+        store.save_stock(stock)
     except Exception as exc:
         log_cache_warning("SQLite cache write failed", exc)
 

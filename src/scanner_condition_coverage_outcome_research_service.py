@@ -23,6 +23,7 @@ from historical_condition_outcome_service import ConditionOutcomeObservation
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import compare_historical_condition_outcomes
 from models import OutcomeEvaluationStatus
+from research_data_store import ResearchDataStore
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsConfig
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsService
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
@@ -202,13 +203,16 @@ class ConditionCoverageOutcomeStudyResult:
 
 def run_final_condition_coverage_outcome_study(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     listing_date_snapshot_path: Path | str = DEFAULT_LISTING_SNAPSHOT_PATH,
     generated_at: datetime | None = None,
 ) -> ConditionCoverageOutcomeStudyResult:
     generated_at = generated_at or datetime.now(UTC)
-    before = database_safety_audit(db_path)
-    symbols = _materialized_twse_common_stock_symbols(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    resolved_db_path = store.resolved_db_path
+    before = database_safety_audit(resolved_db_path, research_store=store)
+    symbols = store.materialized_twse_common_stock_symbols()
     snapshot = load_twse_listing_date_snapshot(
         listing_date_snapshot_path,
         required_symbols=symbols,
@@ -219,7 +223,8 @@ def run_final_condition_coverage_outcome_study(
         )
     comparison_price_series, technical_series = _prepare_research_inputs(
         symbols,
-        db_path=db_path,
+        db_path=resolved_db_path,
+        research_store=store,
         official_listing_dates_by_symbol=snapshot.listing_dates_by_symbol,
     )
     diagnostics = HistoricalConditionDiagnosticsService(
@@ -258,7 +263,7 @@ def run_final_condition_coverage_outcome_study(
         symbols=symbols,
         price_series_by_symbol=comparison_price_series,
         db_audit_before=before,
-        db_audit_after=database_safety_audit(db_path),
+        db_audit_after=database_safety_audit(resolved_db_path, research_store=store),
         readiness_counts=_readiness_counts(readiness_by_symbol),
         universe_metadata={
             "universe_id": "frozen_twse_research_universe_2026_08_09",
@@ -569,9 +574,14 @@ def render_markdown_report(result: ConditionCoverageOutcomeStudyResult) -> str:
     return "\n".join(lines)
 
 
-def database_safety_audit(db_path: Path | str = DEFAULT_DB_PATH) -> DatabaseSafetyAudit:
-    path = Path(db_path)
-    connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+def database_safety_audit(
+    db_path: Path | str | None = None,
+    *,
+    research_store: ResearchDataStore | None = None,
+) -> DatabaseSafetyAudit:
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    path = store.resolved_db_path
+    connection = store.connect_read_only()
     try:
         connection.execute("PRAGMA query_only=ON")
         row_count = connection.execute("SELECT COUNT(*) FROM historical_prices").fetchone()[0]

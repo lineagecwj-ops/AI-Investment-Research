@@ -15,6 +15,7 @@ from expanded_volume_threshold_validation_service import _materialized_twse_comm
 from expanded_volume_threshold_validation_service import load_historical_price_series_read_only
 from models import OverlappingSignalPolicy
 from models import SignalEvaluationStatus
+from research_data_store import ResearchDataStore
 from scanner_condition_coverage_outcome_research_service import database_safety_audit
 from scanner_condition_coverage_service import ScannerConditionCoverageResult
 from scanner_condition_coverage_service import ScannerConditionCoverageSummary
@@ -194,15 +195,22 @@ def build_candidate_display_research_result(
 
 def run_live_candidate_display_research_projection(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     generated_at: datetime | None = None,
 ) -> tuple[CandidateDisplayResearchSummary, SwingScannerResult]:
-    before = database_safety_audit(db_path)
-    symbols = _materialized_twse_common_stock_symbols(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    resolved_db_path = store.resolved_db_path
+    before = database_safety_audit(resolved_db_path, research_store=store)
+    symbols = store.materialized_twse_common_stock_symbols()
     if len(symbols) != 218:
         raise CandidateDisplayResearchError(f"Frozen TWSE live projection requires 218 symbols; got {len(symbols)}.")
     service = SwingScannerService(
-        price_loader=lambda symbol, **_kwargs: load_historical_price_series_read_only(symbol, db_path=db_path),
+        price_loader=lambda symbol, **_kwargs: load_historical_price_series_read_only(
+            symbol,
+            db_path=resolved_db_path,
+            research_store=store,
+        ),
     )
     scanner_result = service.scan(
         symbols,
@@ -226,7 +234,7 @@ def run_live_candidate_display_research_projection(
         coverage_summary,
         generated_at=generated_at,
     )
-    after = database_safety_audit(db_path)
+    after = database_safety_audit(resolved_db_path, research_store=store)
     if asdict(before) != asdict(after):
         raise CandidateDisplayResearchError("Read-only live projection changed database safety audit values.")
     return summary, scanner_result

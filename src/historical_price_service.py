@@ -13,10 +13,8 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-from database import DEFAULT_DB_PATH
-from database import get_cached_historical_prices
 from database import log_cache_warning
-from database import save_historical_prices
+from live_data_store import LiveDataStore
 from database import utc_now
 from models import HistoricalPriceBar
 from models import HistoricalPriceSeries
@@ -85,15 +83,16 @@ def get_historical_prices(
     start: date | None = None,
     end: date | None = None,
     force_refresh: bool = False,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    live_store: LiveDataStore | None = None,
 ) -> HistoricalPriceSeries:
     normalized_symbol = normalize_stock_symbol(symbol)
     require_full_history = start is None
+    store = live_store or LiveDataStore(db_path=db_path)
 
     if not force_refresh:
-        cached_series = get_cached_historical_prices(
+        cached_series = store.get_cached_historical_prices(
             normalized_symbol,
-            db_path=db_path,
             start=start,
             end=end,
             require_full_history=require_full_history,
@@ -108,9 +107,8 @@ def get_historical_prices(
             end=end,
         )
     except Exception as exc:
-        stale_series = get_cached_historical_prices(
+        stale_series = store.get_cached_historical_prices(
             normalized_symbol,
-            db_path=db_path,
             start=start,
             end=end,
             include_expired=True,
@@ -133,9 +131,8 @@ def get_historical_prices(
         ) from exc
 
     try:
-        save_historical_prices(
+        store.save_historical_prices(
             series,
-            db_path=db_path,
             full_history_fetched=start is None,
         )
     except Exception as exc:

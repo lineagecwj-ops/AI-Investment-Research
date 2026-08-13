@@ -13,6 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from database import DEFAULT_DB_PATH
+from research_data_store import ResearchDataStore
 from taiwan_security_master_service import NAME_NOT_CHECKED
 from taiwan_security_master_service import RESOLUTION_RESOLVED
 from taiwan_security_master_service import SECURITY_TYPE_COMMON_STOCK
@@ -1236,7 +1237,8 @@ def build_partial_parsed_universe_audit(
 def audit_universe_local_coverage(
     universe: FrozenETFUniverse,
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     start_date: date = DEFAULT_OBSERVATION_START,
     end_date: date = DEFAULT_OBSERVATION_END,
     warmup_trading_bars: int = DEFAULT_WARMUP_TRADING_BARS,
@@ -1245,7 +1247,8 @@ def audit_universe_local_coverage(
     symbols = tuple(membership.symbol for membership in universe.memberships)
     if not symbols:
         return tuple()
-    rows = _coverage_rows(symbols, db_path=db_path, start_date=start_date, end_date=end_date)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    rows = _coverage_rows(symbols, db_path=store.resolved_db_path, research_store=store, start_date=start_date, end_date=end_date)
     audits = []
     for symbol in symbols:
         if not _is_valid_taiwan_symbol(symbol):
@@ -1282,14 +1285,16 @@ def audit_universe_local_coverage(
 def build_universe_with_coverage_audit(
     snapshots,
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
     retrieved_at: datetime | None = None,
     security_master: TaiwanSecurityMaster | None = None,
 ) -> ETFUniverseBuildResult:
-    db_before = database_file_audit(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    db_before = database_file_audit(store.resolved_db_path)
     universe = build_frozen_etf_universe(snapshots, retrieved_at=retrieved_at, security_master=security_master)
-    coverage = audit_universe_local_coverage(universe, db_path=db_path)
-    db_after = database_file_audit(db_path)
+    coverage = audit_universe_local_coverage(universe, db_path=store.resolved_db_path, research_store=store)
+    db_after = database_file_audit(store.resolved_db_path)
     return ETFUniverseBuildResult(
         universe=universe,
         coverage_audits=coverage,
@@ -1321,12 +1326,14 @@ def _validate_snapshot_sources(snapshots: tuple[ETFConstituentSnapshot, ...]) ->
 def _coverage_rows(
     symbols: tuple[str, ...],
     *,
-    db_path: Path | str,
+    db_path: Path | str | None,
+    research_store: ResearchDataStore | None = None,
     start_date: date,
     end_date: date,
 ) -> dict[str, sqlite3.Row]:
     placeholders = ",".join("?" for _ in symbols)
-    connection = _connect_read_only(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    connection = store.connect_read_only()
     try:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
@@ -1418,11 +1425,9 @@ def _invalid_symbol_audit(symbol: str) -> SymbolCoverageAudit:
     )
 
 
-def _connect_read_only(db_path: Path | str) -> sqlite3.Connection:
-    uri = Path(db_path).resolve().as_uri() + "?mode=ro"
-    connection = sqlite3.connect(uri, uri=True)
-    connection.execute("PRAGMA query_only=ON")
-    return connection
+def _connect_read_only(db_path: Path | str | None) -> sqlite3.Connection:
+    store = ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path)
+    return store.connect_read_only()
 
 
 def _fetch_official_source_strict_tls(url: str) -> dict[str, object]:

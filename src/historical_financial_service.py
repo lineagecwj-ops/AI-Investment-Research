@@ -10,10 +10,8 @@ from pathlib import Path
 
 import yfinance as yf
 
-from database import DEFAULT_DB_PATH
-from database import get_cached_historical_financials
 from database import log_cache_warning
-from database import save_historical_financials
+from live_data_store import LiveDataStore
 from models import HistoricalFinancialPeriod
 from models import HistoricalFinancialSeries
 from stock_service import optional_text
@@ -66,18 +64,19 @@ BALANCE_SHEET_FIELDS = [
 
 def get_historical_financials(
     symbol: str,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    live_store: LiveDataStore | None = None,
 ) -> HistoricalFinancialSeries:
-    cached_series = get_cached_historical_financials(symbol, db_path=db_path)
+    store = live_store or LiveDataStore(db_path=db_path)
+    cached_series = store.get_cached_historical_financials(symbol)
     if cached_series is not None:
         return cached_series
 
     try:
         series = fetch_historical_financials_from_yahoo(symbol)
     except Exception as exc:
-        stale_series = get_cached_historical_financials(
+        stale_series = store.get_cached_historical_financials(
             symbol,
-            db_path=db_path,
             include_expired=True,
         )
         if stale_series is not None:
@@ -91,7 +90,7 @@ def get_historical_financials(
         ) from exc
 
     try:
-        save_historical_financials(series, db_path=db_path)
+        store.save_historical_financials(series)
     except Exception as exc:
         log_cache_warning("SQLite historical financial cache write failed", exc)
 

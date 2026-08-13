@@ -10,12 +10,12 @@ from datetime import datetime
 from pathlib import Path
 
 from database import DEFAULT_DB_PATH
-from database import historical_price_bar_from_row
-from database import parse_cache_datetime
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import compare_historical_condition_outcomes
 from historical_condition_outcome_service import prepare_diagnostic_research_series
 from models import HistoricalPriceSeries
+from research_data_store import ResearchDataStore
+from research_data_store import ResearchDataStoreError
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsConfig
 from signal_condition_diagnostics_service import HistoricalConditionDiagnosticsService
 from signal_outcome_service import RAW_HIGH_BREAKOUT_60D_WITHIN_20D_V1
@@ -389,7 +389,7 @@ class ExpandedVolumeThresholdValidationResult:
 
 def run_expanded_volume_threshold_validation(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
     official_listing_dates_by_symbol: dict[str, date] | None = None,
     generated_at: datetime | None = None,
 ) -> ExpandedVolumeThresholdValidationResult:
@@ -562,7 +562,7 @@ def run_expanded_volume_threshold_validation(
 def run_final_expanded_volume_threshold_validation(
     *,
     listing_date_snapshot_path: Path | str,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
     generated_at: datetime | None = None,
 ) -> ExpandedVolumeThresholdValidationResult:
     symbols = _materialized_twse_common_stock_symbols(db_path)
@@ -658,7 +658,7 @@ def _parse_snapshot_retrieved_at(value: str) -> datetime:
 
 def audit_expanded_symbol_universe(
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
     official_listing_dates_by_symbol: dict[str, date] | None = None,
     start_date: date = DEFAULT_OBSERVATION_START,
     end_date: date = DEFAULT_OBSERVATION_END,
@@ -713,48 +713,30 @@ def audit_expanded_symbol_universe(
 def load_historical_price_series_read_only(
     symbol: str,
     *,
-    db_path: Path | str = DEFAULT_DB_PATH,
+    db_path: Path | str | None = None,
+    research_store: ResearchDataStore | None = None,
 ) -> HistoricalPriceSeries:
-    connection = _connect_read_only(db_path)
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
     try:
-        connection.row_factory = sqlite3.Row
-        rows = connection.execute(
-            """
-            SELECT symbol, trading_date, open, high, low, close, adjusted_close,
-                   volume, dividends, stock_splits, currency, fetched_at
-            FROM historical_prices
-            WHERE symbol = ?
-            ORDER BY trading_date ASC
-            """,
-            (symbol,),
-        ).fetchall()
-    finally:
-        connection.close()
-    if not rows:
-        raise ExpandedVolumeThresholdValidationError(f"No historical prices found for {symbol}.")
-    fetched_at_values = tuple(parse_cache_datetime(row["fetched_at"]) for row in rows if row["fetched_at"])
-    fetched_at = min(fetched_at_values) if fetched_at_values else datetime.now(UTC)
-    currency = next((row["currency"] for row in rows if row["currency"]), None)
-    return HistoricalPriceSeries(
-        symbol=symbol,
-        currency=currency,
-        bars=tuple(historical_price_bar_from_row(row) for row in rows),
-        fetched_at=fetched_at,
-        is_stale=False,
-    )
+        return store.load_historical_price_series(symbol)
+    except ResearchDataStoreError as exc:
+        raise ExpandedVolumeThresholdValidationError(str(exc)) from exc
 
 
 def _prepare_research_inputs(
     symbols: tuple[str, ...],
     *,
-    db_path: Path | str,
+    db_path: Path | str | None,
     official_listing_dates_by_symbol: dict[str, date] | None = None,
+    research_store: ResearchDataStore | None = None,
 ) -> tuple[dict[str, HistoricalPriceSeries], dict[str, object]]:
     official_listing_dates_by_symbol = official_listing_dates_by_symbol or {}
+    store = research_store or (ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path))
+    resolved_db_path = store.resolved_db_path
     price_series_by_symbol = {}
     technical_series_by_symbol = {}
     for symbol in symbols:
-        raw = load_historical_price_series_read_only(symbol, db_path=db_path)
+        raw = load_historical_price_series_read_only(symbol, db_path=resolved_db_path, research_store=store)
         raw = _trim_before_official_listing(raw, official_listing_dates_by_symbol.get(symbol))
         prepared = prepare_diagnostic_research_series(
             raw,
@@ -768,7 +750,7 @@ def _prepare_research_inputs(
     return price_series_by_symbol, technical_series_by_symbol
 
 
-def _coverage_rows(db_path: Path | str, *, start_date: date, end_date: date) -> tuple[sqlite3.Row, ...]:
+def _coverage_rows(db_path: Path | str | None, *, start_date: date, end_date: date) -> tuple[sqlite3.Row, ...]:
     connection = _connect_read_only(db_path)
     try:
         connection.row_factory = sqlite3.Row
@@ -817,26 +799,14 @@ def _coverage_rows(db_path: Path | str, *, start_date: date, end_date: date) -> 
     return tuple(hydrated)
 
 
-def _materialized_twse_common_stock_symbols(db_path: Path | str) -> tuple[str, ...]:
-    connection = _connect_read_only(db_path)
-    try:
-        rows = connection.execute(
-            """
-            SELECT DISTINCT symbol
-            FROM historical_prices
-            WHERE symbol GLOB '[0-9][0-9][0-9][0-9].TW'
-              AND symbol != '0050.TW'
-            ORDER BY symbol ASC
-            """
-        ).fetchall()
-    finally:
-        connection.close()
-    return tuple(row[0] for row in rows)
+def _materialized_twse_common_stock_symbols(db_path: Path | str | None) -> tuple[str, ...]:
+    store = ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path)
+    return store.materialized_twse_common_stock_symbols()
 
 
-def _connect_read_only(db_path: Path | str) -> sqlite3.Connection:
-    uri = Path(db_path).resolve().as_uri() + "?mode=ro"
-    return sqlite3.connect(uri, uri=True)
+def _connect_read_only(db_path: Path | str | None):
+    store = ResearchDataStore() if db_path is None else ResearchDataStore(db_path=db_path)
+    return store.connect_read_only()
 
 
 def _is_taiwan_symbol(symbol: str) -> bool:

@@ -6,10 +6,14 @@ from datetime import datetime
 from pathlib import Path
 
 from database import DEFAULT_DB_PATH
+from database import CREATE_RESEARCH_UNIVERSES_TABLE_SQL
+from database import CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL
 from database import datetime_to_cache_value
-from database import initialize_database
+from database import migrate_research_universes_table
+from database import migrate_research_universe_symbols_table
 from database import parse_cache_datetime
 from database import utc_now
+from live_data_store import LiveDataStore
 from models import ResearchUniverse
 from symbol_utils import normalize_stock_symbol
 
@@ -44,18 +48,21 @@ def create_universe(
     symbols=tuple(),
     description: str | None = None,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
     now: datetime | None = None,
     id_factory: Callable[[], str] | None = None,
 ) -> ResearchUniverse:
+    store = live_store or LiveDataStore(db_path=db_path)
     timestamp = _normalized_now(now)
     universe_id = (id_factory or _generate_universe_id)()
     normalized_name = _validate_name(name)
     normalized_description = _validate_description(description)
     normalized_symbols = normalize_universe_symbols(symbols)
 
-    initialize_database(db_path)
-    connection = sqlite3.connect(Path(db_path))
+    store.initialize()
+    connection = store.connect_writable()
     try:
+        _initialize_universe_tables(connection)
         connection.execute("BEGIN")
         _ensure_name_available(connection, normalized_name)
         connection.execute(
@@ -85,17 +92,20 @@ def create_universe(
     finally:
         connection.close()
 
-    return get_universe(universe_id, db_path=db_path)
+    return get_universe(universe_id, db_path=db_path, live_store=store)
 
 
 def get_universe(
     universe_id: str,
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
 ) -> ResearchUniverse:
-    initialize_database(db_path)
-    connection = sqlite3.connect(Path(db_path))
+    store = live_store or LiveDataStore(db_path=db_path)
+    store.initialize()
+    connection = store.connect_writable()
     try:
+        _initialize_universe_tables(connection)
         connection.row_factory = sqlite3.Row
         row = connection.execute(
             """
@@ -117,10 +127,13 @@ def get_universe(
 def list_universes(
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
 ) -> list[ResearchUniverse]:
-    initialize_database(db_path)
-    connection = sqlite3.connect(Path(db_path))
+    store = live_store or LiveDataStore(db_path=db_path)
+    store.initialize()
+    connection = store.connect_writable()
     try:
+        _initialize_universe_tables(connection)
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
             """
@@ -146,12 +159,15 @@ def update_universe(
     description: str | None = None,
     symbols=None,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
     now: datetime | None = None,
 ) -> ResearchUniverse:
     timestamp = _normalized_now(now)
-    initialize_database(db_path)
-    connection = sqlite3.connect(Path(db_path))
+    store = live_store or LiveDataStore(db_path=db_path)
+    store.initialize()
+    connection = store.connect_writable()
     try:
+        _initialize_universe_tables(connection)
         connection.row_factory = sqlite3.Row
         connection.execute("BEGIN")
         existing = connection.execute(
@@ -201,7 +217,7 @@ def update_universe(
     finally:
         connection.close()
 
-    return get_universe(universe_id, db_path=db_path)
+    return get_universe(universe_id, db_path=db_path, live_store=store)
 
 
 def replace_symbols(
@@ -209,12 +225,14 @@ def replace_symbols(
     symbols,
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
     now: datetime | None = None,
 ) -> ResearchUniverse:
     return update_universe(
         universe_id,
         symbols=symbols,
         db_path=db_path,
+        live_store=live_store,
         now=now,
     )
 
@@ -224,9 +242,10 @@ def add_symbols(
     symbols,
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
     now: datetime | None = None,
 ) -> ResearchUniverse:
-    universe = get_universe(universe_id, db_path=db_path)
+    universe = get_universe(universe_id, db_path=db_path, live_store=live_store)
     merged = list(universe.symbols)
     seen = set(merged)
     for symbol in normalize_universe_symbols(symbols):
@@ -234,7 +253,7 @@ def add_symbols(
             continue
         merged.append(symbol)
         seen.add(symbol)
-    return replace_symbols(universe_id, merged, db_path=db_path, now=now)
+    return replace_symbols(universe_id, merged, db_path=db_path, live_store=live_store, now=now)
 
 
 def remove_symbols(
@@ -242,22 +261,26 @@ def remove_symbols(
     symbols,
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
     now: datetime | None = None,
 ) -> ResearchUniverse:
-    universe = get_universe(universe_id, db_path=db_path)
+    universe = get_universe(universe_id, db_path=db_path, live_store=live_store)
     to_remove = set(normalize_universe_symbols(symbols))
     remaining = [symbol for symbol in universe.symbols if symbol not in to_remove]
-    return replace_symbols(universe_id, remaining, db_path=db_path, now=now)
+    return replace_symbols(universe_id, remaining, db_path=db_path, live_store=live_store, now=now)
 
 
 def delete_universe(
     universe_id: str,
     *,
     db_path: Path | str = DEFAULT_DB_PATH,
+    live_store: LiveDataStore | None = None,
 ) -> None:
-    initialize_database(db_path)
-    connection = sqlite3.connect(Path(db_path))
+    store = live_store or LiveDataStore(db_path=db_path)
+    store.initialize()
+    connection = store.connect_writable()
     try:
+        _initialize_universe_tables(connection)
         connection.execute("BEGIN")
         existing = connection.execute(
             "SELECT id FROM research_universes WHERE id = ?",
@@ -306,6 +329,14 @@ def _fetch_symbol_rows(
         """,
         (universe_id,),
     ).fetchall()
+
+
+def _initialize_universe_tables(connection: sqlite3.Connection) -> None:
+    connection.execute(CREATE_RESEARCH_UNIVERSES_TABLE_SQL)
+    connection.execute(CREATE_RESEARCH_UNIVERSE_SYMBOLS_TABLE_SQL)
+    migrate_research_universes_table(connection)
+    migrate_research_universe_symbols_table(connection)
+    connection.commit()
 
 
 def _replace_symbol_rows(

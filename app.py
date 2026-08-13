@@ -64,7 +64,6 @@ from dashboard import historical_metric_help
 from dashboard import query_stock_batch
 from dashboard import StockQueryFailure
 from dashboard import stock_display_data
-from database import DEFAULT_DB_PATH
 from database import HISTORICAL_PRICE_COLUMNS
 from database import historical_price_bar_from_row
 from database import parse_cache_datetime
@@ -105,6 +104,8 @@ from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
 from historical_price_service import get_historical_prices
 from frozen_twse_research_universe_service import FrozenTWSEResearchUniverseError
+from live_data_store import LiveDataStore
+from research_data_store import ResearchDataStore
 from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import build_diagnostic_technical_series
@@ -1401,13 +1402,18 @@ def build_swing_research_scan_result(
 ) -> dict:
     ensure_swing_scanner_result_contract()
     price_series_by_symbol = {}
+    live_data_store = LiveDataStore()
 
     def recording_price_loader(symbol: str, *, force_refresh: bool = False):
-        price_series = get_historical_prices(symbol, force_refresh=force_refresh)
+        price_series = get_historical_prices(
+            symbol,
+            force_refresh=force_refresh,
+            live_store=live_data_store,
+        )
         price_series_by_symbol[price_series.symbol] = price_series
         return price_series
 
-    scanner = SwingScannerService(price_loader=recording_price_loader)
+    scanner = SwingScannerService(live_data_store=live_data_store, price_loader=recording_price_loader)
     result = scanner.scan(symbols, config)
     fingerprint = swing_dashboard.fingerprint_from_config(
         result.normalized_symbols,
@@ -1423,8 +1429,8 @@ def build_swing_research_scan_result(
 
 def load_historical_price_series_from_cache_read_only(symbol: str) -> HistoricalPriceSeries:
     normalized_symbol = normalize_stock_symbol(symbol)
-    db_path = Path(DEFAULT_DB_PATH).resolve()
-    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    store = ResearchDataStore()
+    connection = store.connect_read_only()
     try:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(

@@ -11,6 +11,7 @@ from backtest_service import BacktestConfig
 from backtest_service import HistoricalBacktestReport
 from backtest_service import run_historical_backtest
 from historical_price_service import get_historical_prices
+from live_data_store import LiveDataStore
 from models import OutcomeDefinition
 from models import OverlappingSignalPolicy
 from models import SignalDefinition
@@ -259,11 +260,13 @@ class SwingScannerService:
     def __init__(
         self,
         *,
-        price_loader=get_historical_prices,
+        live_data_store: LiveDataStore | None = None,
+        price_loader=None,
         technical_builder=build_technical_indicator_series,
         backtest_runner=run_historical_backtest,
     ):
-        self.price_loader = price_loader
+        self.live_data_store = live_data_store or LiveDataStore()
+        self.price_loader = price_loader or live_data_store_price_loader(self.live_data_store)
         self.technical_builder = technical_builder
         self.backtest_runner = backtest_runner
 
@@ -370,6 +373,17 @@ class _SymbolScanResult:
 
 def scan_swing_opportunities(symbols, config: SwingScannerConfig) -> SwingScannerResult:
     return SwingScannerService().scan(symbols, config)
+
+
+def live_data_store_price_loader(live_data_store: LiveDataStore):
+    def load_price_series(symbol: str, *, force_refresh: bool = False):
+        return get_historical_prices(
+            symbol,
+            force_refresh=force_refresh,
+            live_store=live_data_store,
+        )
+
+    return load_price_series
 
 
 def build_swing_candidate(
