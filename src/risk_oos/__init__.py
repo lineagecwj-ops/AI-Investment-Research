@@ -15,6 +15,19 @@ from risk_oos.aligned_dataset import TechnicalRiskOOSExclusionReason
 from risk_oos.aligned_dataset import TechnicalRiskOOSExclusionRecord
 from risk_oos.aligned_dataset import TechnicalRiskOOSSplitRole
 from risk_oos.aligned_dataset import TechnicalRiskOOSSplitSpec
+from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATION_INPUT_V1
+from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATOR_V1
+from risk_oos.candidate_evaluator import TECH_RISK_CONTINUOUS_MAE_METRIC_V1
+from risk_oos.candidate_evaluator import TECH_RISK_LOW_REASON_V1
+from risk_oos.candidate_evaluator import TECH_RISK_QUANTILE_NEAREST_RANK_V1
+from risk_oos.candidate_evaluator import TechnicalRiskCandidateEvaluationError
+from risk_oos.candidate_evaluator import TechnicalRiskCandidateEvaluationInput
+from risk_oos.candidate_evaluator import TechnicalRiskCandidateEvaluationResult
+from risk_oos.candidate_evaluator import TechnicalRiskCandidateEvaluator
+from risk_oos.candidate_evaluator import TechnicalRiskCandidateRowEvaluation
+from risk_oos.candidate_evaluator import TechnicalRiskMonotonicityResult
+from risk_oos.candidate_evaluator import TechnicalRiskMonotonicityStatus
+from risk_oos.candidate_evaluator import TechnicalRiskSeverityMAEMetrics
 from risk_oos.historical_features import EXCLUSION_FEATURE_CALCULATION_FAILED
 from risk_oos.historical_features import EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY
 from risk_oos.historical_features import EXCLUSION_INVALID_PRICE
@@ -29,7 +42,11 @@ from risk_oos.historical_features import HistoricalRiskFeatureObservation
 from risk_oos.historical_features import HistoricalRiskFeatureStatus
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
+from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
 from risk_oos.rule_candidates import REQUIRED_THRESHOLD_DIMENSIONS_V1
+from risk_oos.rule_candidates import TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1
+from risk_oos.rule_candidates import TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1
+from risk_oos.rule_candidates import TECH_RISK_DECIMAL_CONTEXT_V1
 from risk_oos.rule_candidates import TECH_RISK_DERIVED_EVIDENCE_V1
 from risk_oos.rule_candidates import TECH_RISK_EVIDENCE_VOCABULARY_V1
 from risk_oos.rule_candidates import TECH_RISK_NUMERIC_REPRESENTATION_V1
@@ -62,6 +79,7 @@ __all__ = [
     "EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY",
     "EXCLUSION_INVALID_PRICE",
     "EXCLUSION_MISSING_AS_OF_CLOSE",
+    "FIXED_TECH_RISK_DECIMAL_CONTEXT",
     "HISTORICAL_RISK_FEATURE_SET_V1",
     "HistoricalRiskFeatureExclusion",
     "HistoricalRiskFeatureMaterializationContext",
@@ -73,18 +91,33 @@ __all__ = [
     "REQUIRED_THRESHOLD_DIMENSIONS_V1",
     "TARGET_MAE20",
     "TARGET_MAE60",
+    "TECH_RISK_CANDIDATE_EVALUATION_INPUT_V1",
+    "TECH_RISK_CANDIDATE_EVALUATOR_V1",
+    "TECH_RISK_CONTINUOUS_MAE_METRIC_V1",
+    "TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1",
+    "TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1",
+    "TECH_RISK_DECIMAL_CONTEXT_V1",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_FEATURE_SET_ID",
     "TECHNICAL_RISK_V1_TARGET_IDENTITIES",
     "TECH_RISK_DERIVED_EVIDENCE_V1",
     "TECH_RISK_EVIDENCE_VOCABULARY_V1",
+    "TECH_RISK_LOW_REASON_V1",
     "TECH_RISK_NUMERIC_REPRESENTATION_V1",
+    "TECH_RISK_QUANTILE_NEAREST_RANK_V1",
     "TECH_RISK_TRIGGER_VOCABULARY_V1",
     "TechnicalRiskCandidateFamily",
+    "TechnicalRiskCandidateEvaluationError",
+    "TechnicalRiskCandidateEvaluationInput",
+    "TechnicalRiskCandidateEvaluationResult",
+    "TechnicalRiskCandidateEvaluator",
     "TechnicalRiskCandidateRule",
+    "TechnicalRiskCandidateRowEvaluation",
     "TechnicalRiskCandidateSeverity",
     "TechnicalRiskDerivedEvidence",
+    "TechnicalRiskMonotonicityResult",
+    "TechnicalRiskMonotonicityStatus",
     "TechnicalRiskOOSDatasetBuilder",
     "TechnicalRiskOOSDatasetError",
     "TechnicalRiskOOSDatasetResult",
@@ -98,6 +131,7 @@ __all__ = [
     "TechnicalRiskReasonCode",
     "TechnicalRiskRuleCandidateError",
     "TechnicalRiskRuleCandidateSpec",
+    "TechnicalRiskSeverityMAEMetrics",
     "TechnicalRiskThresholdDimension",
     "TechnicalRiskThresholdDimensionId",
     "TechnicalRiskThresholdOperator",

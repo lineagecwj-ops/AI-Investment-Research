@@ -1,6 +1,9 @@
 from dataclasses import dataclass
+from decimal import Context
 from decimal import Decimal
 from decimal import InvalidOperation
+from decimal import ROUND_HALF_EVEN
+from decimal import localcontext
 from enum import StrEnum
 import hashlib
 import json
@@ -15,8 +18,16 @@ from risk_oos.historical_features import HISTORICAL_RISK_FEATURE_SET_V1
 
 TECH_RISK_DERIVED_EVIDENCE_V1 = "TECH_RISK_DERIVED_EVIDENCE_V1"
 TECH_RISK_NUMERIC_REPRESENTATION_V1 = "TECH_RISK_DECIMAL_CANONICAL_V1"
+TECH_RISK_DECIMAL_CONTEXT_V1 = "TECH_RISK_DECIMAL_CONTEXT_V1"
+TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1 = 34
+TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1 = ROUND_HALF_EVEN
 TECH_RISK_TRIGGER_VOCABULARY_V1 = "TECH_RISK_TRIGGER_VOCABULARY_V1"
 TECH_RISK_EVIDENCE_VOCABULARY_V1 = "TECH_RISK_EVIDENCE_VOCABULARY_V1"
+
+FIXED_TECH_RISK_DECIMAL_CONTEXT = Context(
+    prec=TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1,
+    rounding=TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1,
+)
 
 
 class TechnicalRiskRuleCandidateError(Exception):
@@ -252,11 +263,15 @@ def derive_technical_risk_evidence(row: AlignedTechnicalRiskOOSRow) -> Technical
         raise TechnicalRiskRuleCandidateError("sma20 must be positive for derived evidence.")
     if sma60 <= 0:
         raise TechnicalRiskRuleCandidateError("sma60 must be positive for derived evidence.")
+    with localcontext(FIXED_TECH_RISK_DECIMAL_CONTEXT):
+        close_vs_sma20 = (as_of_close - sma20) / sma20
+        close_vs_sma60 = (as_of_close - sma60) / sma60
+        relative_sma_spread = (sma20 - sma60) / sma60
     return TechnicalRiskDerivedEvidence(
         derived_evidence_version=TECH_RISK_DERIVED_EVIDENCE_V1,
-        close_vs_sma20=(as_of_close - sma20) / sma20,
-        close_vs_sma60=(as_of_close - sma60) / sma60,
-        relative_sma_spread=(sma20 - sma60) / sma60,
+        close_vs_sma20=close_vs_sma20,
+        close_vs_sma60=close_vs_sma60,
+        relative_sma_spread=relative_sma_spread,
     )
 
 
@@ -635,7 +650,7 @@ def _canonical_decimal_string(value: object) -> str:
         raise TechnicalRiskRuleCandidateError("Decimal value must be finite.")
     if decimal_value == 0:
         return "0"
-    formatted = format(decimal_value.normalize(), "f")
+    formatted = format(decimal_value, "f")
     if "." in formatted:
         formatted = formatted.rstrip("0").rstrip(".")
     if formatted == "-0":

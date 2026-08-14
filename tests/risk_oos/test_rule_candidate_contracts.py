@@ -2,7 +2,10 @@ import sys
 import unittest
 from dataclasses import replace
 from datetime import date
+from decimal import ROUND_DOWN
+from decimal import ROUND_UP
 from decimal import Decimal
+from decimal import getcontext
 from pathlib import Path
 
 
@@ -15,6 +18,9 @@ if str(SRC_PATH) not in sys.path:
 from risk_oos import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos import HISTORICAL_RISK_FEATURE_SET_V1
 from risk_oos import REQUIRED_THRESHOLD_DIMENSIONS_V1
+from risk_oos import TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1
+from risk_oos import TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1
+from risk_oos import TECH_RISK_DECIMAL_CONTEXT_V1
 from risk_oos import TECH_RISK_DERIVED_EVIDENCE_V1
 from risk_oos import TECH_RISK_NUMERIC_REPRESENTATION_V1
 from risk_oos import TECHNICAL_RISK_V1_FEATURE_SET_ID
@@ -97,8 +103,30 @@ class TechnicalRiskRuleCandidateContractTestCase(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first.derived_evidence_version, TECH_RISK_DERIVED_EVIDENCE_V1)
         self.assertEqual(first.close_vs_sma20, Decimal("-0.05"))
-        self.assertEqual(first.close_vs_sma60, Decimal("-0.1363636363636363636363636364"))
-        self.assertEqual(first.relative_sma_spread, Decimal("-0.09090909090909090909090909091"))
+        self.assertEqual(first.close_vs_sma60, Decimal("-0.1363636363636363636363636363636364"))
+        self.assertEqual(first.relative_sma_spread, Decimal("-0.09090909090909090909090909090909091"))
+
+    def test_derived_evidence_uses_fixed_decimal_context(self):
+        self.assertEqual(TECH_RISK_DECIMAL_CONTEXT_V1, "TECH_RISK_DECIMAL_CONTEXT_V1")
+        self.assertEqual(TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1, 34)
+        self.assertEqual(TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1, "ROUND_HALF_EVEN")
+        baseline = derive_technical_risk_evidence(self.row())
+        context = getcontext()
+        original_precision = context.prec
+        original_rounding = context.rounding
+        try:
+            context.prec = 12
+            context.rounding = ROUND_DOWN
+            low_precision = derive_technical_risk_evidence(self.row())
+            context.prec = 50
+            context.rounding = ROUND_UP
+            high_precision = derive_technical_risk_evidence(self.row())
+        finally:
+            context.prec = original_precision
+            context.rounding = original_rounding
+
+        self.assertEqual(baseline, low_precision)
+        self.assertEqual(baseline, high_precision)
 
     def test_input_float_representation_canonicalization_deterministic(self):
         float_row = self.row(sma20=100.0, sma60=110.0)

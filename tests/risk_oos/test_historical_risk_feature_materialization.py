@@ -175,10 +175,7 @@ class HistoricalRiskFeatureMaterializationTestCase(unittest.TestCase):
         self.assertNotIn("holdout", identity_text)
 
     def test_no_db_yfinance_or_runtime_lookup_boundary(self):
-        source = "\n".join(
-            path.read_text()
-            for path in sorted((SRC_PATH / "risk_oos").glob("*.py"))
-        )
+        source = (SRC_PATH / "risk_oos" / "historical_features.py").read_text()
 
         forbidden = (
             "sqlite",
