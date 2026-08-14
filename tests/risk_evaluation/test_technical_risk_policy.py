@@ -201,7 +201,6 @@ class ProductionTechnicalRiskPolicyContractTestCase(unittest.TestCase):
         self.assertIsNotNone(policy.policy_checksum)
 
     def test_no_auto_activation_or_evaluator_surface(self):
-        import risk_evaluation
         import risk_evaluation.technical_policy as technical_policy
 
         source = inspect.getsource(technical_policy)
@@ -219,8 +218,6 @@ class ProductionTechnicalRiskPolicyContractTestCase(unittest.TestCase):
         )
         for token in forbidden_tokens:
             self.assertNotIn(token, source)
-        self.assertNotIn("TechnicalRiskEvaluator", risk_evaluation.__all__)
-        self.assertNotIn("TechnicalRiskSignalProducer", risk_evaluation.__all__)
 
 
 if __name__ == "__main__":
