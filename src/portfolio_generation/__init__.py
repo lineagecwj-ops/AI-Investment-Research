@@ -21,6 +21,9 @@ from portfolio_generation.position_adapter import resolve_active_position
 from portfolio_generation.risk_context_builder import build_risk_context
 from portfolio_generation.technical_risk_artifact_adapter import TechnicalRiskArtifactAdapter
 from portfolio_generation.technical_risk_artifact_adapter import TechnicalRiskArtifactAdapterError
+from portfolio_generation.technical_risk_portfolio_evaluator import TechnicalRiskPortfolioEvaluator
+from portfolio_generation.technical_risk_portfolio_evaluator import TechnicalRiskPortfolioEvaluatorError
+from portfolio_generation.technical_risk_portfolio_evaluator import TechnicalRiskProductionInputProvider
 from portfolio_generation.validation import MonitoringContextBuilderError
 from portfolio_generation.validation import PolicyResolverError
 from portfolio_generation.validation import PortfolioGenerationValidationError
@@ -47,6 +50,9 @@ __all__ = [
     "RiskContextBuilderError",
     "TechnicalRiskArtifactAdapter",
     "TechnicalRiskArtifactAdapterError",
+    "TechnicalRiskPortfolioEvaluator",
+    "TechnicalRiskPortfolioEvaluatorError",
+    "TechnicalRiskProductionInputProvider",
     "adapt_position_state",
     "build_monitoring_artifact_id",
     "build_monitoring_context",
