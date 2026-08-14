@@ -37,6 +37,20 @@ from risk_oos.development_exploration import TechnicalRiskCandidateSet
 from risk_oos.development_exploration import TechnicalRiskDevelopmentExplorationError
 from risk_oos.development_exploration import TechnicalRiskThresholdIdentity
 from risk_oos.development_exploration import ThresholdCandidateGenerationContract
+from risk_oos.holdout_confirmation import TECH_RISK_HOLDOUT_CONFIRMATION_ARTIFACT_V1
+from risk_oos.holdout_confirmation import TECH_RISK_HOLDOUT_CONFIRMATION_CRITERIA_V1
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationArtifact
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationCriteria
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationDecision
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationError
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationReasonCode
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConfirmationStatus
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutConsistencyRequirement
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutContaminationPolicy
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutCoverageHandling
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutEvaluationReference
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutMonotonicityHandling
+from risk_oos.holdout_confirmation import TechnicalRiskHoldoutWarningHandling
 from risk_oos.historical_features import EXCLUSION_FEATURE_CALCULATION_FAILED
 from risk_oos.historical_features import EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY
 from risk_oos.historical_features import EXCLUSION_INVALID_PRICE
@@ -134,6 +148,8 @@ __all__ = [
     "TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1",
     "TECH_RISK_DECIMAL_CONTEXT_V1",
     "TECH_RISK_DEVELOPMENT_EVALUATION_CONTEXT_V1",
+    "TECH_RISK_HOLDOUT_CONFIRMATION_ARTIFACT_V1",
+    "TECH_RISK_HOLDOUT_CONFIRMATION_CRITERIA_V1",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_FEATURE_SET_ID",
@@ -162,6 +178,18 @@ __all__ = [
     "TechnicalRiskDevelopmentExplorationError",
     "TechnicalRiskDerivedEvidence",
     "TechnicalRiskEmptyBucketPolicy",
+    "TechnicalRiskHoldoutConfirmationArtifact",
+    "TechnicalRiskHoldoutConfirmationCriteria",
+    "TechnicalRiskHoldoutConfirmationDecision",
+    "TechnicalRiskHoldoutConfirmationError",
+    "TechnicalRiskHoldoutConfirmationReasonCode",
+    "TechnicalRiskHoldoutConfirmationStatus",
+    "TechnicalRiskHoldoutConsistencyRequirement",
+    "TechnicalRiskHoldoutContaminationPolicy",
+    "TechnicalRiskHoldoutCoverageHandling",
+    "TechnicalRiskHoldoutEvaluationReference",
+    "TechnicalRiskHoldoutMonotonicityHandling",
+    "TechnicalRiskHoldoutWarningHandling",
     "TechnicalRiskMedianSeparationPreference",
     "TechnicalRiskMethodologyWarningPolicy",
     "TechnicalRiskMonotonicityResult",
