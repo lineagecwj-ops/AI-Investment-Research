@@ -5,6 +5,10 @@ from risk.checksum import RiskChecksumMismatchError
 from risk.portfolio_position import HoldingType
 from risk.portfolio_position import PortfolioPosition
 from risk.portfolio_position import PortfolioPositionError
+from risk.risk_artifact_codec import RISK_ARTIFACT_CODEC_VERSION_V1
+from risk.risk_artifact_codec import RISK_ARTIFACT_SCHEMA_VERSION_V1
+from risk.risk_artifact_codec import RiskArtifactCodec
+from risk.risk_artifact_codec import RiskArtifactCodecError
 from risk.risk_artifact import RiskArtifact
 from risk.risk_artifact import RiskArtifactGenerator
 from risk.risk_assessment import InvalidSeverityError
@@ -28,7 +32,11 @@ __all__ = [
     "MissingFeatureError",
     "PortfolioPosition",
     "PortfolioPositionError",
+    "RISK_ARTIFACT_CODEC_VERSION_V1",
+    "RISK_ARTIFACT_SCHEMA_VERSION_V1",
     "RiskArtifact",
+    "RiskArtifactCodec",
+    "RiskArtifactCodecError",
     "RiskArtifactGenerator",
     "RiskAssessment",
     "RiskAssessmentError",
