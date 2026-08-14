@@ -42,6 +42,9 @@ from risk_evaluation.technical_policy import ProductionTechnicalRiskRule
 from risk_evaluation.technical_policy import ProductionTechnicalRiskThresholdDimension
 from risk_evaluation.technical_policy import ProductionTechnicalRiskThresholdDimensionId
 from risk_evaluation.technical_policy import ProductionTechnicalRiskThresholdOperator
+from risk_evaluation.technical_signal_producer import TECHNICAL_RISK_SIGNAL_PRODUCER_VERSION_V1
+from risk_evaluation.technical_signal_producer import TECHNICAL_RISK_SIGNAL_RISK_ID_V1
+from risk_evaluation.technical_signal_producer import TechnicalRiskSignalProducer
 from risk_evaluation.validation import RiskEvaluationContractError
 from risk_evaluation.validation import RiskEvaluationPolicyError
 from risk_evaluation.validation import RiskFeatureInputError
@@ -74,6 +77,8 @@ __all__ = [
     "TECH_AS_OF_CLOSE_FEATURE_ID",
     "TECH_AS_OF_CLOSE_FEATURE_VERSION",
     "TECHNICAL_RISK_EVALUATOR_VERSION_V1",
+    "TECHNICAL_RISK_SIGNAL_PRODUCER_VERSION_V1",
+    "TECHNICAL_RISK_SIGNAL_RISK_ID_V1",
     "TECH_RISK_DECIMAL_CONTEXT_PRECISION_V1",
     "TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1",
     "TECH_RISK_DECIMAL_CONTEXT_V1",
@@ -95,5 +100,6 @@ __all__ = [
     "TechnicalRiskEvaluatorError",
     "TechnicalRiskFeatureReference",
     "TechnicalRiskPredicateState",
+    "TechnicalRiskSignalProducer",
     "validate_producer_created_at",
 ]

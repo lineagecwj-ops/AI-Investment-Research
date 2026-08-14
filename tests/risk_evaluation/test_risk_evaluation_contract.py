@@ -318,6 +318,13 @@ class RiskEvaluationContractTestCase(unittest.TestCase):
         self.assertEqual(produced[0].policy_version, "v1")
         self.assertEqual(produced[0].producer_version, "technical_contract_v1")
         self.assertEqual(produced[0].source_feature_ids, production_input.feature_ids)
+        self.assertIsNone(produced[0].policy_checksum)
+        self.assertIsNone(produced[0].evaluation_id)
+        self.assertIsNone(produced[0].evaluation_checksum)
+        self.assertIsNone(produced[0].portfolio_id)
+        self.assertIsNone(produced[0].position_id)
+        self.assertIsNone(produced[0].as_of_date)
+        self.assertIsNone(produced[0].valuation_date)
         self.assertFalse(hasattr(produced[0].signal, "policy_version"))
         self.assertFalse(hasattr(produced[0].signal, "producer_version"))
 
