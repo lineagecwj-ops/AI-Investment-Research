@@ -80,7 +80,9 @@ from risk_oos.rule_candidates import technical_risk_candidate_b_spec
 from risk_oos.rule_candidates import technical_risk_candidate_c_spec
 from risk_oos.rule_candidates import technical_risk_candidate_d_spec
 from risk_oos.validation_selection import DEVELOPMENT_SHORTLIST_ARTIFACT_V1
+from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1
 from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1
+from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_INPUT_V1
 from risk_oos.validation_selection import DevelopmentEvaluationReference
 from risk_oos.validation_selection import DevelopmentShortlistArtifact
 from risk_oos.validation_selection import DevelopmentShortlistEligiblePair
@@ -90,8 +92,15 @@ from risk_oos.validation_selection import TechnicalRiskMedianSeparationPreferenc
 from risk_oos.validation_selection import TechnicalRiskMethodologyWarningPolicy
 from risk_oos.validation_selection import TechnicalRiskMonotonicityPreference
 from risk_oos.validation_selection import TechnicalRiskTiePolicy
+from risk_oos.validation_selection import TechnicalRiskValidationCombinationOutcome
+from risk_oos.validation_selection import TechnicalRiskValidationConsideredCombination
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionArtifact
 from risk_oos.validation_selection import TechnicalRiskValidationSelectionCriteria
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionDecision
 from risk_oos.validation_selection import TechnicalRiskValidationSelectionError
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionInput
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionReasonCode
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionStatus
 
 __all__ = [
     "AlignedTechnicalRiskOOSRow",
@@ -136,7 +145,9 @@ __all__ = [
     "TECH_RISK_QUANTILE_NEAREST_RANK_V1",
     "TECH_RISK_THRESHOLD_CANDIDATE_GENERATION_CONTRACT_V1",
     "TECH_RISK_TRIGGER_VOCABULARY_V1",
+    "TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1",
     "TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1",
+    "TECH_RISK_VALIDATION_SELECTION_INPUT_V1",
     "TechnicalRiskCandidateFamily",
     "TechnicalRiskCandidateIdentity",
     "TechnicalRiskCandidateEvaluationError",
@@ -176,8 +187,15 @@ __all__ = [
     "TechnicalRiskThresholdOperator",
     "TechnicalRiskThresholdSet",
     "TechnicalRiskTiePolicy",
+    "TechnicalRiskValidationCombinationOutcome",
+    "TechnicalRiskValidationConsideredCombination",
+    "TechnicalRiskValidationSelectionArtifact",
     "TechnicalRiskValidationSelectionCriteria",
+    "TechnicalRiskValidationSelectionDecision",
     "TechnicalRiskValidationSelectionError",
+    "TechnicalRiskValidationSelectionInput",
+    "TechnicalRiskValidationSelectionReasonCode",
+    "TechnicalRiskValidationSelectionStatus",
     "ThresholdCandidateGenerationContract",
     "DevelopmentEvaluationContext",
     "derive_technical_risk_evidence",

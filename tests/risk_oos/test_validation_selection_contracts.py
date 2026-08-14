@@ -25,7 +25,9 @@ from risk_oos import TECH_RISK_DERIVED_EVIDENCE_V1
 from risk_oos import TECH_RISK_NUMERIC_REPRESENTATION_V1
 from risk_oos import TECH_RISK_QUANTILE_NEAREST_RANK_V1
 from risk_oos import TECH_RISK_THRESHOLD_CANDIDATE_GENERATION_CONTRACT_V1
+from risk_oos import TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1
 from risk_oos import TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1
+from risk_oos import TECH_RISK_VALIDATION_SELECTION_INPUT_V1
 from risk_oos import AlignedTechnicalRiskOOSRow
 from risk_oos import DevelopmentEvaluationContext
 from risk_oos import DevelopmentShortlistArtifact
@@ -48,8 +50,15 @@ from risk_oos import TechnicalRiskThresholdIdentity
 from risk_oos import TechnicalRiskThresholdOperator
 from risk_oos import TechnicalRiskThresholdSet
 from risk_oos import TechnicalRiskTiePolicy
+from risk_oos import TechnicalRiskValidationCombinationOutcome
+from risk_oos import TechnicalRiskValidationConsideredCombination
+from risk_oos import TechnicalRiskValidationSelectionArtifact
 from risk_oos import TechnicalRiskValidationSelectionCriteria
+from risk_oos import TechnicalRiskValidationSelectionDecision
 from risk_oos import TechnicalRiskValidationSelectionError
+from risk_oos import TechnicalRiskValidationSelectionInput
+from risk_oos import TechnicalRiskValidationSelectionReasonCode
+from risk_oos import TechnicalRiskValidationSelectionStatus
 from risk_oos import ThresholdCandidateGenerationContract
 from risk_oos import technical_risk_candidate_a_spec
 from risk_oos import technical_risk_candidate_b_spec
@@ -209,6 +218,20 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
             self.evaluation_input(dataset, candidate, threshold_set, roles=(split_role,), **overrides),
         )
 
+    def validation_evaluation(self, candidate=None, threshold_set=None, dataset=None, roles=(TechnicalRiskOOSSplitRole.VALIDATION,), **overrides):
+        candidate = technical_risk_candidate_a_spec() if candidate is None else candidate
+        threshold_set = self.threshold_set() if threshold_set is None else threshold_set
+        dataset = self.validation_dataset() if dataset is None else dataset
+        return TechnicalRiskCandidateEvaluator().evaluate(
+            dataset,
+            candidate,
+            threshold_set,
+            self.evaluation_input(dataset, candidate, threshold_set, roles=roles, **overrides),
+        )
+
+    def validation_dataset(self, dataset_checksum="validation_dataset_checksum_001"):
+        return self.dataset((self.row(row_id="validation_row_001", split_role=TechnicalRiskOOSSplitRole.VALIDATION),), dataset_checksum)
+
     def shortlist(self, candidates=None, thresholds=None, evaluations=None, **overrides):
         generation = self.threshold_generation()
         candidate_set = self.candidate_set(generation=generation)
@@ -253,6 +276,101 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
         }
         values.update(overrides)
         return TechnicalRiskValidationSelectionCriteria(**values)
+
+    def validation_evaluations(self, dataset=None):
+        dataset = self.validation_dataset() if dataset is None else dataset
+        return (
+            self.validation_evaluation(candidate=technical_risk_candidate_a_spec(), threshold_set=self.threshold_set("threshold_set_001"), dataset=dataset),
+            self.validation_evaluation(
+                candidate=technical_risk_candidate_b_spec(),
+                threshold_set=self.threshold_set("threshold_set_002", close_vs_sma20="-0.06"),
+                dataset=dataset,
+            ),
+        )
+
+    def selection_input(self, dataset, shortlist, criteria, evaluations, **overrides):
+        values = {
+            "selection_input_version": TECH_RISK_VALIDATION_SELECTION_INPUT_V1,
+            "validation_dataset_id": dataset.dataset_id,
+            "validation_dataset_checksum": dataset.dataset_checksum,
+            "development_shortlist_id": shortlist.shortlist_id,
+            "development_shortlist_checksum": shortlist.shortlist_checksum,
+            "selection_criteria_id": criteria.criteria_id,
+            "selection_criteria_version": criteria.criteria_version,
+            "selection_criteria_checksum": criteria.criteria_checksum,
+            "validation_evaluation_ids": tuple(evaluation.evaluation_id for evaluation in evaluations),
+            "validation_evaluation_checksums": tuple(evaluation.evaluation_checksum for evaluation in evaluations),
+            "evaluator_version": TECH_RISK_CANDIDATE_EVALUATOR_V1,
+            "metric_version": TECH_RISK_CONTINUOUS_MAE_METRIC_V1,
+            "quantile_version": TECH_RISK_QUANTILE_NEAREST_RANK_V1,
+            "numeric_context_version": TECH_RISK_DECIMAL_CONTEXT_V1,
+        }
+        values.update(overrides)
+        return TechnicalRiskValidationSelectionInput(**values)
+
+    def considered(self, evaluations, outcomes=None, reason_codes=None):
+        if outcomes is None:
+            outcomes = (
+                TechnicalRiskValidationCombinationOutcome.SELECTED,
+                TechnicalRiskValidationCombinationOutcome.NOT_SELECTED,
+            )
+        if reason_codes is None:
+            reason_codes = (
+                (TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,),
+                (TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,),
+            )
+        return tuple(
+            TechnicalRiskValidationConsideredCombination.from_evaluation(
+                evaluation=evaluation,
+                selection_outcome=outcome,
+                structured_reason_codes=reasons,
+            )
+            for evaluation, outcome, reasons in zip(evaluations, outcomes, reason_codes)
+        )
+
+    def decision(self, selected_evaluation=None, status=TechnicalRiskValidationSelectionStatus.SELECTED, **overrides):
+        if status == TechnicalRiskValidationSelectionStatus.SELECTED:
+            selected_evaluation = self.validation_evaluations()[0] if selected_evaluation is None else selected_evaluation
+            values = {
+                "selection_status": status,
+                "selected_candidate_id": selected_evaluation.candidate_id,
+                "selected_candidate_structural_checksum": selected_evaluation.candidate_structural_checksum,
+                "selected_threshold_set_id": selected_evaluation.threshold_set_id,
+                "selected_threshold_set_checksum": selected_evaluation.threshold_set_checksum,
+                "accepted_validation_evaluation_id": selected_evaluation.evaluation_id,
+                "accepted_validation_evaluation_checksum": selected_evaluation.evaluation_checksum,
+                "structured_selection_reason_codes": (TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,),
+            }
+        elif status == TechnicalRiskValidationSelectionStatus.NO_VALID_SELECTION:
+            values = {
+                "selection_status": status,
+                "structured_selection_reason_codes": (TechnicalRiskValidationSelectionReasonCode.NO_VALID_SELECTION_EVIDENCE,),
+            }
+        else:
+            values = {
+                "selection_status": status,
+                "structured_selection_reason_codes": (TechnicalRiskValidationSelectionReasonCode.TIE_REQUIRES_METHOD_DECISION,),
+            }
+        values.update(overrides)
+        return TechnicalRiskValidationSelectionDecision(**values)
+
+    def selection_artifact(self, dataset=None, shortlist=None, criteria=None, evaluations=None, decision=None, considered=None, **overrides):
+        dataset = self.validation_dataset() if dataset is None else dataset
+        shortlist = self.shortlist() if shortlist is None else shortlist
+        criteria = self.criteria() if criteria is None else criteria
+        evaluations = self.validation_evaluations(dataset) if evaluations is None else evaluations
+        decision = self.decision(selected_evaluation=evaluations[0]) if decision is None else decision
+        considered = self.considered(evaluations) if considered is None else considered
+        return TechnicalRiskValidationSelectionArtifact.from_validation_contracts(
+            validation_dataset=dataset,
+            development_shortlist=shortlist,
+            selection_criteria=criteria,
+            selection_input=self.selection_input(dataset, shortlist, criteria, evaluations),
+            validation_evaluations=tuple(evaluations),
+            selection_decision=decision,
+            considered_combinations=tuple(considered),
+            **overrides,
+        )
 
     def test_valid_development_shortlist(self):
         shortlist = self.shortlist()
@@ -500,18 +618,281 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
         self.assertEqual(first.criteria_id, second.criteria_id)
         self.assertEqual(first.criteria_checksum, second.criteria_checksum)
 
-    def test_no_numeric_cutoff_weighted_score_or_selection_artifact(self):
+    def test_valid_selected_validation_selection_artifact(self):
+        artifact = self.selection_artifact()
+
+        self.assertEqual(artifact.selection_version, TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1)
+        self.assertEqual(artifact.selection_status, TechnicalRiskValidationSelectionStatus.SELECTED)
+        self.assertTrue(artifact.selection_id.startswith("technical_risk_validation_selection_"))
+        self.assertEqual(len(artifact.considered_combinations), 2)
+        self.assertEqual(
+            tuple(combination.selection_outcome for combination in artifact.considered_combinations),
+            (
+                TechnicalRiskValidationCombinationOutcome.SELECTED,
+                TechnicalRiskValidationCombinationOutcome.NOT_SELECTED,
+            ),
+        )
+
+    def test_selected_requires_exactly_one_selected_combination(self):
+        evaluations = self.validation_evaluations()
+        selected_decision = self.decision(selected_evaluation=evaluations[0])
+        two_selected = self.considered(
+            evaluations,
+            outcomes=(TechnicalRiskValidationCombinationOutcome.SELECTED, TechnicalRiskValidationCombinationOutcome.SELECTED),
+            reason_codes=(
+                (TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,),
+                (TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,),
+            ),
+        )
+
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "exactly one selected"):
+            self.selection_artifact(evaluations=evaluations, decision=selected_decision, considered=two_selected)
+
+    def test_selected_pair_and_evaluation_must_match_considered_combination(self):
+        evaluations = self.validation_evaluations()
+        mismatch_decision = self.decision(
+            selected_evaluation=evaluations[0],
+            accepted_validation_evaluation_checksum="changed_validation_checksum",
+        )
+
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "Selected fields"):
+            self.selection_artifact(evaluations=evaluations, decision=mismatch_decision)
+
+    def test_validation_universe_requires_exact_shortlist_coverage(self):
+        evaluations = self.validation_evaluations()
+        extra = self.validation_evaluation(
+            candidate=technical_risk_candidate_a_spec(),
+            threshold_set=self.threshold_set("threshold_set_002", close_vs_sma20="-0.06"),
+        )
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "coverage"):
+            self.selection_artifact(evaluations=(evaluations[0],))
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "outside Development shortlist"):
+            self.selection_artifact(evaluations=(*evaluations, extra))
+
+    def test_duplicate_validation_evaluation_same_pair_rejected(self):
+        evaluations = self.validation_evaluations()
+        duplicate = replace(evaluations[0], evaluation_id="other_validation_evaluation")
+
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "Duplicate Validation evaluation pair"):
+            self.selection_artifact(evaluations=(evaluations[0], duplicate, evaluations[1]))
+
+    def test_validation_split_must_be_validation_only(self):
+        evaluation = self.validation_evaluations()[0]
+        development = replace(evaluation, evaluated_split_roles=(TechnicalRiskOOSSplitRole.DEVELOPMENT,))
+        holdout = replace(evaluation, evaluated_split_roles=(TechnicalRiskOOSSplitRole.HOLDOUT,))
+        validation_holdout = replace(evaluation, evaluated_split_roles=(TechnicalRiskOOSSplitRole.VALIDATION, TechnicalRiskOOSSplitRole.HOLDOUT))
+
+        for evaluation in (development, holdout, validation_holdout):
+            with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "VALIDATION only"):
+                self.selection_artifact(evaluations=(evaluation,))
+
+    def test_validation_dataset_candidate_threshold_and_version_integrity(self):
+        evaluations = self.validation_evaluations()
+        cases = (
+            (replace(evaluations[0], dataset_checksum="changed_dataset_checksum"), "dataset_checksum"),
+            (replace(evaluations[0], candidate_structural_checksum="changed_candidate_checksum"), "outside Development shortlist"),
+            (replace(evaluations[0], threshold_set_checksum="changed_threshold_checksum"), "outside Development shortlist"),
+            (replace(evaluations[0], evaluator_version="OTHER_EVALUATOR"), "evaluator_version"),
+            (replace(evaluations[0], metric_version="OTHER_METRIC"), "metric_version"),
+            (replace(evaluations[0], quantile_version="OTHER_QUANTILE"), "quantile_version"),
+            (replace(evaluations[0], numeric_context_version="OTHER_CONTEXT"), "numeric_context_version"),
+        )
+
+        for bad_evaluation, message in cases:
+            with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, message):
+                self.selection_artifact(evaluations=(bad_evaluation, evaluations[1]))
+
+    def test_no_valid_selection_semantics(self):
+        evaluations = self.validation_evaluations()
+        artifact = self.selection_artifact(
+            evaluations=evaluations,
+            decision=self.decision(status=TechnicalRiskValidationSelectionStatus.NO_VALID_SELECTION),
+            considered=self.considered(
+                evaluations,
+                outcomes=(TechnicalRiskValidationCombinationOutcome.NOT_SELECTED, TechnicalRiskValidationCombinationOutcome.NOT_SELECTED),
+                reason_codes=(
+                    (TechnicalRiskValidationSelectionReasonCode.NO_VALID_SELECTION_EVIDENCE,),
+                    (TechnicalRiskValidationSelectionReasonCode.NO_VALID_SELECTION_EVIDENCE,),
+                ),
+            ),
+        )
+
+        self.assertEqual(artifact.selection_status, TechnicalRiskValidationSelectionStatus.NO_VALID_SELECTION)
+        self.assertIsNone(artifact.selected_candidate_id)
+        self.assertTrue(all(item.selection_outcome == TechnicalRiskValidationCombinationOutcome.NOT_SELECTED for item in artifact.considered_combinations))
+
+    def test_no_valid_selection_cannot_have_selected_pair(self):
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "cannot include selected"):
+            self.decision(
+                status=TechnicalRiskValidationSelectionStatus.NO_VALID_SELECTION,
+                selected_candidate_id="TECH_POLICY_CANDIDATE_A",
+            )
+
+    def test_tie_requires_at_least_two_unresolved_combinations_and_no_selected_pair(self):
+        evaluations = self.validation_evaluations()
+        tie_artifact = self.selection_artifact(
+            evaluations=evaluations,
+            decision=self.decision(status=TechnicalRiskValidationSelectionStatus.TIE_REQUIRES_METHOD_DECISION),
+            considered=self.considered(
+                evaluations,
+                outcomes=(TechnicalRiskValidationCombinationOutcome.UNRESOLVED_TIE, TechnicalRiskValidationCombinationOutcome.UNRESOLVED_TIE),
+                reason_codes=(
+                    (TechnicalRiskValidationSelectionReasonCode.TIE_REQUIRES_METHOD_DECISION,),
+                    (TechnicalRiskValidationSelectionReasonCode.TIE_REQUIRES_METHOD_DECISION,),
+                ),
+            ),
+        )
+
+        self.assertEqual(tie_artifact.selection_status, TechnicalRiskValidationSelectionStatus.TIE_REQUIRES_METHOD_DECISION)
+        self.assertIsNone(tie_artifact.selected_candidate_id)
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "at least two"):
+            self.selection_artifact(
+                evaluations=evaluations,
+                decision=self.decision(status=TechnicalRiskValidationSelectionStatus.TIE_REQUIRES_METHOD_DECISION),
+                considered=self.considered(
+                    evaluations,
+                    outcomes=(TechnicalRiskValidationCombinationOutcome.UNRESOLVED_TIE, TechnicalRiskValidationCombinationOutcome.NOT_SELECTED),
+                    reason_codes=(
+                        (TechnicalRiskValidationSelectionReasonCode.TIE_REQUIRES_METHOD_DECISION,),
+                        (TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,),
+                    ),
+                ),
+            )
+
+    def test_considered_combinations_retain_every_validation_evaluation(self):
+        evaluations = self.validation_evaluations()
+        omitted = (self.considered(evaluations)[0],)
+        changed = (
+            replace(self.considered(evaluations)[0], validation_evaluation_checksum="changed_checksum"),
+            self.considered(evaluations)[1],
+        )
+
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "retain every Validation evaluation"):
+            self.selection_artifact(evaluations=evaluations, considered=omitted)
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "retain every Validation evaluation"):
+            self.selection_artifact(evaluations=evaluations, considered=changed)
+
+    def test_selection_input_echo_mismatch_rejected(self):
+        dataset = self.validation_dataset()
+        shortlist = self.shortlist()
+        criteria = self.criteria()
+        evaluations = self.validation_evaluations(dataset)
+        base_input = self.selection_input(dataset, shortlist, criteria, evaluations)
+        cases = (
+            replace(base_input, validation_dataset_checksum="changed_dataset_checksum"),
+            replace(base_input, development_shortlist_checksum="changed_shortlist_checksum"),
+            replace(base_input, selection_criteria_checksum="changed_criteria_checksum"),
+            replace(base_input, validation_evaluation_checksums=("changed", evaluations[1].evaluation_checksum)),
+        )
+
+        for selection_input in cases:
+            with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "echo mismatch"):
+                TechnicalRiskValidationSelectionArtifact.from_validation_contracts(
+                    validation_dataset=dataset,
+                    development_shortlist=shortlist,
+                    selection_criteria=criteria,
+                    selection_input=selection_input,
+                    validation_evaluations=evaluations,
+                    selection_decision=self.decision(selected_evaluation=evaluations[0]),
+                    considered_combinations=self.considered(evaluations),
+                )
+
+    def test_selection_artifact_determinism_reorder_and_audit_metadata(self):
+        evaluations = self.validation_evaluations()
+        first = self.selection_artifact(
+            evaluations=evaluations,
+            decision=self.decision(
+                selected_evaluation=evaluations[0],
+                approved_by="Alice",
+                approved_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                human_rationale="first rationale.",
+            ),
+        )
+        second = self.selection_artifact(
+            evaluations=tuple(reversed(evaluations)),
+            considered=tuple(reversed(self.considered(evaluations))),
+            decision=self.decision(
+                selected_evaluation=evaluations[0],
+                structured_selection_reason_codes=tuple(reversed((TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,))),
+                approved_by="Bob",
+                approved_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+                human_rationale="second rationale!",
+            ),
+        )
+
+        self.assertEqual(first.selection_id, second.selection_id)
+        self.assertEqual(first.selection_checksum, second.selection_checksum)
+
+    def test_selection_semantic_changes_change_checksum(self):
+        evaluations = self.validation_evaluations()
+        first = self.selection_artifact(evaluations=evaluations)
+        second = self.selection_artifact(
+            evaluations=evaluations,
+            decision=self.decision(selected_evaluation=evaluations[1]),
+            considered=self.considered(
+                evaluations,
+                outcomes=(TechnicalRiskValidationCombinationOutcome.NOT_SELECTED, TechnicalRiskValidationCombinationOutcome.SELECTED),
+                reason_codes=(
+                    (TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,),
+                    (TechnicalRiskValidationSelectionReasonCode.SELECTED_METHOD_REVIEW,),
+                ),
+            ),
+        )
+        criteria_changed = self.selection_artifact(
+            evaluations=evaluations,
+            criteria=self.criteria(monotonicity_preference=TechnicalRiskMonotonicityPreference.REQUIRE_EVALUABLE),
+        )
+
+        self.assertNotEqual(first.selection_checksum, second.selection_checksum)
+        self.assertNotEqual(first.selection_checksum, criteria_changed.selection_checksum)
+
+    def test_reason_codes_are_controlled_non_duplicate_and_canonical(self):
+        combination = TechnicalRiskValidationConsideredCombination.from_evaluation(
+            evaluation=self.validation_evaluations()[0],
+            selection_outcome=TechnicalRiskValidationCombinationOutcome.NOT_SELECTED,
+            structured_reason_codes=(
+                TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_SEPARATION_CONCERN,
+                TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,
+            ),
+        )
+
+        self.assertEqual(
+            combination.structured_reason_codes,
+            (
+                TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,
+                TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_SEPARATION_CONCERN,
+            ),
+        )
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "Duplicate structured reason"):
+            replace(
+                combination,
+                structured_reason_codes=(
+                    TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,
+                    TechnicalRiskValidationSelectionReasonCode.NOT_SELECTED_METHOD_PREFERENCE,
+                ),
+            )
+        with self.assertRaisesRegex(TechnicalRiskValidationSelectionError, "Unsupported structured reason code"):
+            replace(combination, structured_reason_codes=("BEST_PROFIT",))
+
+    def test_no_threshold_search_automatic_ranking_or_production_boundary(self):
         source = inspect.getsource(__import__("risk_oos.validation_selection", fromlist=[""]))
         forbidden_tokens = (
             "weighted",
-            "score",
             "cutoff",
-            "selected_candidate",
-            "selected_threshold",
-            "accepted_evaluation",
-            "rejected_combinations",
-            "selection_status",
-            "TechnicalRiskValidationSelectionArtifact",
+            "profit",
+            "def search",
+            "def optimize",
+            "def grid_search",
+            "def find_best",
+            "def evaluate_best",
+            "select_best",
+            "rank(",
+            "generate_thresholds",
+            "holdout_dataset_id",
+            "holdout_evaluation_id",
+            "RiskEvaluationPolicy",
+            "RiskSignal",
+            "TechnicalRiskSignalProducer",
         )
         for token in forbidden_tokens:
             self.assertNotIn(token, source)
@@ -542,16 +923,34 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
         for token in forbidden_tokens:
             self.assertNotIn(token, source)
 
-    def test_no_b2_public_api_exported(self):
+    def test_no_holdout_or_freeze_public_api_exported(self):
         import risk_oos
 
         forbidden = {
-            "TechnicalRiskValidationSelectionArtifact",
             "HoldoutConfirmationArtifact",
             "TechnicalRiskPolicyFreezeArtifact",
         }
         self.assertTrue(forbidden.isdisjoint(set(risk_oos.__all__)))
         self.assertTrue(forbidden.isdisjoint({field.name for field in fields(DevelopmentShortlistArtifact)}))
+
+    def test_b2_public_api_exports_only_selection_artifact_not_holdout_or_freeze(self):
+        import risk_oos
+
+        required = {
+            "TechnicalRiskValidationSelectionInput",
+            "TechnicalRiskValidationSelectionDecision",
+            "TechnicalRiskValidationSelectionArtifact",
+            "TechnicalRiskValidationSelectionStatus",
+            "TechnicalRiskValidationCombinationOutcome",
+            "TechnicalRiskValidationConsideredCombination",
+            "TechnicalRiskValidationSelectionReasonCode",
+        }
+        forbidden = {
+            "HoldoutConfirmationArtifact",
+            "TechnicalRiskPolicyFreezeArtifact",
+        }
+        self.assertTrue(required.issubset(set(risk_oos.__all__)))
+        self.assertTrue(forbidden.isdisjoint(set(risk_oos.__all__)))
 
 
 if __name__ == "__main__":
