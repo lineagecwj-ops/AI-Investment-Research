@@ -79,11 +79,28 @@ from risk_oos.rule_candidates import technical_risk_candidate_a_spec
 from risk_oos.rule_candidates import technical_risk_candidate_b_spec
 from risk_oos.rule_candidates import technical_risk_candidate_c_spec
 from risk_oos.rule_candidates import technical_risk_candidate_d_spec
+from risk_oos.validation_selection import DEVELOPMENT_SHORTLIST_ARTIFACT_V1
+from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1
+from risk_oos.validation_selection import DevelopmentEvaluationReference
+from risk_oos.validation_selection import DevelopmentShortlistArtifact
+from risk_oos.validation_selection import DevelopmentShortlistEligiblePair
+from risk_oos.validation_selection import TechnicalRiskCoveragePreference
+from risk_oos.validation_selection import TechnicalRiskEmptyBucketPolicy
+from risk_oos.validation_selection import TechnicalRiskMedianSeparationPreference
+from risk_oos.validation_selection import TechnicalRiskMethodologyWarningPolicy
+from risk_oos.validation_selection import TechnicalRiskMonotonicityPreference
+from risk_oos.validation_selection import TechnicalRiskTiePolicy
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionCriteria
+from risk_oos.validation_selection import TechnicalRiskValidationSelectionError
 
 __all__ = [
     "AlignedTechnicalRiskOOSRow",
     "ALLOWED_CANDIDATE_SEVERITIES_V1",
     "ALLOWED_PREDICATES_V1",
+    "DEVELOPMENT_SHORTLIST_ARTIFACT_V1",
+    "DevelopmentEvaluationReference",
+    "DevelopmentShortlistArtifact",
+    "DevelopmentShortlistEligiblePair",
     "EXCLUSION_FEATURE_CALCULATION_FAILED",
     "EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY",
     "EXCLUSION_INVALID_PRICE",
@@ -119,6 +136,7 @@ __all__ = [
     "TECH_RISK_QUANTILE_NEAREST_RANK_V1",
     "TECH_RISK_THRESHOLD_CANDIDATE_GENERATION_CONTRACT_V1",
     "TECH_RISK_TRIGGER_VOCABULARY_V1",
+    "TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1",
     "TechnicalRiskCandidateFamily",
     "TechnicalRiskCandidateIdentity",
     "TechnicalRiskCandidateEvaluationError",
@@ -129,10 +147,15 @@ __all__ = [
     "TechnicalRiskCandidateRowEvaluation",
     "TechnicalRiskCandidateSeverity",
     "TechnicalRiskCandidateSet",
+    "TechnicalRiskCoveragePreference",
     "TechnicalRiskDevelopmentExplorationError",
     "TechnicalRiskDerivedEvidence",
+    "TechnicalRiskEmptyBucketPolicy",
+    "TechnicalRiskMedianSeparationPreference",
+    "TechnicalRiskMethodologyWarningPolicy",
     "TechnicalRiskMonotonicityResult",
     "TechnicalRiskMonotonicityStatus",
+    "TechnicalRiskMonotonicityPreference",
     "TechnicalRiskOOSDatasetBuilder",
     "TechnicalRiskOOSDatasetError",
     "TechnicalRiskOOSDatasetResult",
@@ -152,6 +175,9 @@ __all__ = [
     "TechnicalRiskThresholdIdentity",
     "TechnicalRiskThresholdOperator",
     "TechnicalRiskThresholdSet",
+    "TechnicalRiskTiePolicy",
+    "TechnicalRiskValidationSelectionCriteria",
+    "TechnicalRiskValidationSelectionError",
     "ThresholdCandidateGenerationContract",
     "DevelopmentEvaluationContext",
     "derive_technical_risk_evidence",
