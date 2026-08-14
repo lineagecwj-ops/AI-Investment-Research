@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-14, after Technical Risk v1 Sprint 4C TechnicalRiskSignalProducer Integration.
+Last updated: 2026-08-14, after Technical Risk v1 Sprint 4D End-to-End Production Integration / Orchestration.
 
 ## Project Purpose
 
@@ -24,16 +24,17 @@ This status document is based on:
 - Sprint 4A Production Technical Risk Policy release validation evidence
 - Sprint 4B Deterministic Technical Risk Evaluator release validation evidence
 - Sprint 4C TechnicalRiskSignalProducer release validation evidence
+- Sprint 4D TechnicalRiskProductionService release validation evidence
 
 No network fetch, DB migration, DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `ed37aea feat: add technical risk signal producer`
-- Current full HEAD: `ed37aeaaf326a73f31c36850313a2d5c11d4ff58`
-- Remote baseline at synchronization time: `origin/main` points to `ed37aeaaf326a73f31c36850313a2d5c11d4ff58`
-- Documentation status: this file is being synchronized after Sprint 4B and Sprint 4C release pushes.
+- Implementation baseline: `52e0b39 feat: add technical risk production orchestration`
+- Current full HEAD: `52e0b397652cb6c6030ecf57fa66946996c83da2`
+- Remote baseline at synchronization time: `origin/main` points to `52e0b397652cb6c6030ecf57fa66946996c83da2`
+- Documentation status: this file is being synchronized after Sprint 4D release push.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -41,6 +42,7 @@ No network fetch, DB migration, DB schema inspection, or production data query w
 - Technical Risk v1 Production Technical Risk Policy Promotion is committed and pushed at `3fa2682`.
 - Technical Risk v1 Deterministic Technical Risk Evaluator is committed and pushed at `3deb445`.
 - Technical Risk v1 TechnicalRiskSignalProducer Integration is committed and pushed at `ed37aea`.
+- Technical Risk v1 End-to-End Production Integration / Orchestration is committed and pushed at `52e0b39`.
 
 Repository state verification:
 
@@ -57,6 +59,8 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `52e0b39 feat: add technical risk production orchestration`
+- `8cf8751 docs: sync project master status through sprint 4c`
 - `ed37aea feat: add technical risk signal producer`
 - `3deb445 feat: add deterministic technical risk evaluator`
 - `dac77f2 docs: sync project master status through sprint 4a`
@@ -178,10 +182,11 @@ The following phases are committed and pushed through `f834e40`.
 | Sprint 4A | Production Technical Risk Policy Contract and Controlled Promotion Boundary | Complete / committed / pushed |
 | Sprint 4B | Deterministic Technical Risk Evaluator and Evaluation Result | Complete / committed / pushed |
 | Sprint 4C | TechnicalRiskSignalProducer Integration and RiskSignal Projection | Complete / committed / pushed |
+| Sprint 4D | End-to-End Production Integration / Orchestration | Complete / committed / pushed |
 
 ## Current AI Platform Architecture
 
-Current intended architecture after Sprint 4C:
+Current intended architecture after Sprint 4D:
 
 ```text
 Research Snapshot
@@ -251,19 +256,25 @@ Controlled Production Policy Promotion
 ProductionTechnicalRiskPolicy
     |
     v
+TechnicalRiskProductionService
+    |
+    v
+TechnicalRiskSignalProducer
+    |
+    v
 TechnicalRiskEvaluator
     |
     v
 TechnicalRiskEvaluationResult
     |
     v
-TechnicalRiskSignalProducer
+ProducedRiskSignal / RiskSignal
     |
     v
-ProducedRiskSignal
+RiskAssessment
     |
     v
-RiskSignal
+TechnicalRiskProductionResult
 ```
 
 The platform is research-oriented and artifact-oriented. It is not a trading system.
@@ -478,6 +489,8 @@ Included components:
 - `TechnicalRiskEvaluationResult`
 - `TechnicalRiskEvaluator`
 - `TechnicalRiskSignalProducer`
+- `TechnicalRiskProductionService`
+- `TechnicalRiskProductionResult`
 
 Production technical feature vocabulary:
 
@@ -810,33 +823,101 @@ LOW and failure semantics:
 - evaluation failure fails closed with producer error
 - failure must not become silent `LOW`, empty tuple, or failed signal artifact
 
+Sprint 4D TechnicalRiskProductionService:
+
+- `TechnicalRiskProductionService` consumes one caller-supplied `RiskSignalProductionInput`
+- `ProductionTechnicalRiskPolicy` must be caller supplied explicitly
+- `created_at` is caller supplied and is passed through to the producer timestamp contract
+- service invokes `TechnicalRiskSignalProducer.produce(...)` exactly once per `run(...)`
+- service requires exactly one `ProducedRiskSignal`
+- zero produced signals fail closed
+- multiple produced signals fail closed
+- service validates observable produced-signal lineage against input and policy
+- service constructs a `RiskAssessment` view using existing `RiskAssessment.from_signals(...)`
+- `TechnicalRiskProductionResult` is a frozen immutable contract
+- `TechnicalRiskProductionResult` stores only `produced_signal` and `risk_assessment`
+- `ProducedRiskSignal` remains the production lineage source of truth
+- `RiskAssessment` is an aggregation / operational view, not a complete production-lineage source
+- `TechnicalRiskProductionResult` validates that `RiskAssessment.signals` contains exactly `ProducedRiskSignal.signal` once
+
+TechnicalRiskProductionResult lineage:
+
+- full lineage is retained through `TechnicalRiskProductionResult.produced_signal`
+- traceable fields include `policy_id`, `policy_version`, and `policy_checksum`
+- traceable fields include `evaluation_id` and `evaluation_checksum`
+- traceable fields include `portfolio_id`, `position_id`, `as_of_date`, and `valuation_date`
+- traceable fields include `source_feature_ids`, `source_checksums`, `calculation_id`, and `producer_version`
+- these fields are not duplicated at the result top level
+
+Sprint 4D responsibility boundary:
+
+- service does not directly invoke `TechnicalRiskEvaluator`
+- service does not compute derived evidence
+- service does not evaluate predicates
+- service does not compare thresholds
+- service does not apply rule hierarchy
+- service does not remap severity
+- service does not search, activate, persist, or load policy
+- service does not create `RiskArtifact`
+- service does not modify `RiskContext` or `RiskSignal` schema
+- service does not implement DB persistence, scheduler, live execution, alert delivery, dashboard, or deployment
+- service does not support batch input, portfolio batch, multi-position batch, or multi-category orchestration
+- higher-level callers may iterate one-input / one-result orchestration in future scoped work
+
+Sprint 4D severity and determinism:
+
+- `LOW`, `MEDIUM`, and `HIGH` preserve upstream Technical Risk semantics
+- `LOW` is retained end-to-end: `LOW TechnicalRiskEvaluationResult` -> `LOW RiskSignal` -> `ProducedRiskSignal` -> `TechnicalRiskProductionResult` -> `RiskAssessment`
+- `CRITICAL` has no legal Technical Risk v1 production result path and fails closed
+- shares, quantity, position size, and exposure do not adjust Technical Risk severity
+- same `RiskSignalProductionInput`, `ProductionTechnicalRiskPolicy`, `created_at`, producer version, and evaluator version produce deterministic `ProducedRiskSignal`, `RiskSignal`, `RiskAssessment`, and `TechnicalRiskProductionResult`
+- deterministic replay does not imply distributed exactly-once processing, job deduplication, or concurrency locking
+
+Sprint 4D error semantics:
+
+- wrong policy type fails closed
+- producer error fails closed and preserves the cause chain when wrapped
+- zero or multiple produced signals fail closed
+- invalid category fails closed
+- `CRITICAL` fails closed
+- assessment construction failure fails closed
+- observable lineage inconsistency fails closed
+- service must not produce silent `LOW`, partial success, picked-first signal, or empty result
+
 Current production runtime status:
 
-- Technical Risk v1 production core evaluation plus signal generation pipeline is complete through Sprint 4C
+- Technical Risk v1 production core evaluation, signal generation, single-position orchestration, and RiskAssessment view are complete through Sprint 4D
 - production deployment is not complete
-- still not implemented: policy activation, policy persistence, runtime orchestration, scheduler, live execution, DB persistence for Technical Risk outputs, alert delivery, dashboard integration, and end-to-end deployment
+- still not implemented: RiskArtifact integration, portfolio generation adapter, policy activation, policy persistence, DB persistence for Technical Risk outputs, signal persistence, scheduler, live execution, live market fetch, alert delivery, dashboard integration, and end-to-end deployment
 
 Production runtime chain:
 
 ```text
+caller
++
 RiskSignalProductionInput
 +
 ProductionTechnicalRiskPolicy
++
+caller supplied created_at
         |
         v
-TechnicalRiskEvaluator
-        |
-        v
-TechnicalRiskEvaluationResult
+TechnicalRiskProductionService
         |
         v
 TechnicalRiskSignalProducer
         |
         v
-ProducedRiskSignal
+TechnicalRiskEvaluator
         |
         v
-RiskSignal
+ProducedRiskSignal / RiskSignal
+        |
+        v
+RiskAssessment
+        |
+        v
+TechnicalRiskProductionResult
 ```
 
 ## Risk Monitoring Framework Status
@@ -1035,15 +1116,19 @@ Technical Risk v1 Production Runtime:
 
 - Sprint 4B deterministic Technical Risk Evaluator / Evaluation Result scope is complete
 - Sprint 4C TechnicalRiskSignalProducer integration is complete
+- Sprint 4D TechnicalRiskProductionService / TechnicalRiskProductionResult orchestration scope is complete
 - input is caller-supplied frozen `RiskFeatureInput` through `RiskSignalProductionInput` plus `ProductionTechnicalRiskPolicy`
 - evaluator output is `TechnicalRiskEvaluationResult`
 - signal producer output is `ProducedRiskSignal` wrapping Phase 7K `RiskSignal`
+- production service output is `TechnicalRiskProductionResult`
+- production service creates a `RiskAssessment` aggregation view from the produced `RiskSignal`
+- `ProducedRiskSignal` remains the lineage source of truth
 - evaluator uses deterministic Decimal context, derived evidence calculation, predicate evaluation, rule hierarchy, and LOW / MEDIUM / HIGH only
 - evaluator and signal producer must never emit `CRITICAL` in v1
-- evaluator and signal producer must not query DB, yfinance, historical materializer, or OOS dataset
+- evaluator, signal producer, and production service must not query DB, yfinance, historical materializer, or OOS dataset
 - technical severity is symbol-level technical condition and must not change because of portfolio quantity, whole shares, or fractional shares
 - portfolio exposure / quantity belongs to later portfolio aggregation or context, not Technical Risk v1 severity calculation
-- Sprint 4D is planned for end-to-end production integration / orchestration specification
+- RiskArtifact / Portfolio Generation Adapter integration remains planned future scope
 
 ## Validation Evidence
 
@@ -1117,7 +1202,7 @@ Latest observed validation evidence after Sprint 4B:
 - `git diff --check`: PASS
 - source boundary scan: PASS
 
-Current official validation evidence after Sprint 4C:
+Latest observed validation evidence after Sprint 4C:
 
 - Risk evaluation tests: `65 tests OK`
 - Risk integration tests: `33 tests OK`
@@ -1128,6 +1213,23 @@ Current official validation evidence after Sprint 4C:
 - Datasets tests: `16 tests OK`
 - Portfolio generation tests: `44 tests OK`
 - Full unittest: `1716 tests OK`
+- official full-suite command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -t .`
+- `compileall app.py src tests`: PASS
+- `git diff --check`: PASS
+- source boundary scan: PASS
+- non-blocking warnings were observed for TWSE / TPEx offline refresh, Yahoo stale cache, and Streamlit bare-mode execution
+
+Current official validation evidence after Sprint 4D:
+
+- Risk evaluation tests: `78 tests OK`
+- Risk integration tests: `33 tests OK`
+- Risk OOS tests: `231 tests OK`
+- Risk tests: `16 tests OK`
+- Features tests: `31 tests OK`
+- Targets tests: `42 tests OK`
+- Datasets tests: `16 tests OK`
+- Portfolio generation tests: `44 tests OK`
+- Full unittest: `1729 tests OK`
 - official full-suite command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -t .`
 - `compileall app.py src tests`: PASS
 - `git diff --check`: PASS
@@ -1153,8 +1255,8 @@ Current state:
 - Portfolio Artifact Input / Repository / Dashboard Artifact Provider framework: complete, committed, and pushed
 - Portfolio State / Portfolio Generation Service Framework: complete, committed, and pushed
 - Risk Evaluation Production Contract: complete, committed, and pushed
-- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, and signal producer integration: complete, committed, and pushed through Sprint 4C
-- Next planned Technical Risk phase: Sprint 4D End-to-End Production Integration / Orchestration Specification Review, only after this document synchronization is reviewed
+- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, and single-position production orchestration: complete, committed, and pushed through Sprint 4D
+- Next planned Technical Risk phase: RiskArtifact / Portfolio Generation Adapter Contract Specification Review, only after this document synchronization is reviewed
 
 Current committed Long-Term Growth directories include:
 
@@ -1175,7 +1277,7 @@ Current committed Long-Term Growth directories include:
 - corresponding tests under `tests/`
 - Phase 7 architecture / framework docs under `docs/`
 
-Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Sprint 4C are now committed and pushed.
+Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Sprint 4D are now committed and pushed.
 
 ## Future Roadmap
 
@@ -1203,13 +1305,15 @@ Completed:
 - Production Technical Risk Policy Promotion
 - Deterministic Technical Risk Evaluator / Evaluation Result
 - TechnicalRiskSignalProducer integration and RiskSignal projection
+- TechnicalRiskProductionService orchestration and TechnicalRiskProductionResult
 
 Next planning candidate:
 
-- Technical Risk v1 Sprint 4D: End-to-End Production Integration / Orchestration Specification Review
+- Technical Risk v1 RiskArtifact / Portfolio Generation Adapter Contract Specification Review
 
 Future:
 
+- Technical Risk v1 RiskArtifact integration and Portfolio Generation adapter, only after explicit approval
 - Technical Risk v1 production activation / registry / runtime wiring, only after explicit approval
 - Technical Risk v1 scheduler, DB persistence, alert delivery, and dashboard integration, only after explicit scope
 - Phase 8 Alert Lifecycle Framework
@@ -1227,13 +1331,16 @@ Current non-blocking gaps:
 - `severity_mapping_version` and `reason_mapping_version` currently only allow v1; if a valid v2 is introduced later, add checksum-delta tests for legal mapping-version changes.
 - `ProducedRiskSignal.source_feature_ids` and `ProducedRiskSignal.source_checksums` remain parallel tuple representations; full feature-pair fidelity is protected primarily by `TechnicalRiskEvaluationResult.feature_references` plus `evaluation_checksum`.
 - `ProducedRiskSignal` Sprint 4C lineage fields are optional for legacy compatibility; `TechnicalRiskSignalProducer` fills them completely.
+- `RiskAssessment` is an aggregation / operational view and does not preserve complete `ProducedRiskSignal` lineage.
+- `RiskArtifact` does not yet receive Technical Risk production lineage.
+- `RiskContext` still does not contain `position_id` or `valuation_date`; Sprint 4D did not change Phase 7K core schemas.
 - Production policy has no activation registry, persistence, or deployment workflow yet.
-- Technical Risk v1 has no runtime orchestration yet.
+- Technical Risk v1 has single-position production orchestration, but no RiskArtifact / Portfolio Generation adapter yet.
 - Technical Risk v1 has no scheduler or live execution yet.
-- Technical Risk v1 output is not persisted to DB yet.
+- Technical Risk v1 output is not persisted to DB or signal storage yet.
 - Technical Risk v1 output is not integrated into dashboard or alert delivery yet.
 
-These gaps are not current blockers for the Sprint 4C synchronized state, but they must not be misrepresented as completed production deployment capability.
+These gaps are not current blockers for the Sprint 4D synchronized state, but they must not be misrepresented as completed production deployment capability.
 
 ## Important Design Rules
 
@@ -1258,8 +1365,10 @@ Hard rules to preserve:
 - Research policy freeze artifacts are research artifacts, not production policies.
 - Controlled promotion may create a production policy contract, but it must not imply activation or deployment.
 - `TechnicalRiskEvaluator` and `TechnicalRiskSignalProducer` exist, but they must not imply activation, scheduling, DB persistence, dashboard integration, or deployment.
+- `TechnicalRiskProductionService` exists for single-position orchestration, but it must not imply RiskArtifact integration, portfolio generation adapter completion, activation, scheduling, DB persistence, dashboard integration, or deployment.
 - Technical Risk v1 `LOW` is a real evaluated low-severity signal, not an evaluation failure.
 - Technical Risk v1 evaluation / producer failures must fail closed and must not become silent `LOW`, empty tuples, or failed signal artifacts.
+- Technical Risk v1 service failures must fail closed and must not become silent `LOW`, partial success, picked-first signal, or empty result.
 - Do not convert MAE targets into live prediction, recommendation, or trading logic.
 - Do not create BUY, SELL, HOLD, ENTRY, EXIT, TARGET PRICE, STOP LOSS, or TRADING SCORE semantics from Technical Risk v1.
 - Technical Risk v1 may express technical downside-risk evidence and severity only.
@@ -1269,10 +1378,10 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `ed37aeaaf326a73f31c36850313a2d5c11d4ff58` or inspect any newer commits.
-3. Confirm whether Technical Risk v1 Sprint 4A, Sprint 4B, and Sprint 4C files are still committed and whether new worktree changes exist.
+2. Confirm HEAD is still `52e0b397652cb6c6030ecf57fa66946996c83da2` or inspect any newer commits.
+3. Confirm whether Technical Risk v1 Sprint 4A, Sprint 4B, Sprint 4C, and Sprint 4D files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. If starting Technical Risk v1 Sprint 4D, verify it is end-to-end production integration / orchestration specification first, not dashboard, scheduler, DB persistence, deployment, or threshold research unless explicitly scoped.
+8. If starting the next Technical Risk v1 sprint, verify it is RiskArtifact / Portfolio Generation Adapter Contract Specification Review first, not policy activation, scheduler, DB persistence, dashboard, deployment, or threshold research unless explicitly scoped.
