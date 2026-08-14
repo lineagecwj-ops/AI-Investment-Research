@@ -485,7 +485,7 @@ class TechnicalRiskHoldoutConfirmationContractTestCase(unittest.TestCase):
         )
         for token in forbidden_tokens:
             self.assertNotIn(token, source)
-        self.assertNotIn("TechnicalRiskPolicyFreezeArtifact", risk_oos.__all__)
+        self.assertIn("TechnicalRiskHoldoutConfirmationArtifact", risk_oos.__all__)
         self.assertTrue({"confirmation_id", "confirmation_checksum"}.issubset({field.name for field in fields(TechnicalRiskHoldoutConfirmationArtifact)}))
 
 

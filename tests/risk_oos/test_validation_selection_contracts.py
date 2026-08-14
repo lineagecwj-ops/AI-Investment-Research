@@ -923,17 +923,17 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
         for token in forbidden_tokens:
             self.assertNotIn(token, source)
 
-    def test_no_holdout_or_freeze_public_api_exported(self):
+    def test_validation_selection_does_not_embed_holdout_or_freeze_fields(self):
         import risk_oos
 
         forbidden = {
             "HoldoutConfirmationArtifact",
             "TechnicalRiskPolicyFreezeArtifact",
         }
-        self.assertTrue(forbidden.isdisjoint(set(risk_oos.__all__)))
         self.assertTrue(forbidden.isdisjoint({field.name for field in fields(DevelopmentShortlistArtifact)}))
+        self.assertIn("TechnicalRiskValidationSelectionArtifact", risk_oos.__all__)
 
-    def test_b2_public_api_exports_only_selection_artifact_not_holdout_or_freeze(self):
+    def test_b2_public_api_exports_selection_artifact_without_production_apis(self):
         import risk_oos
 
         required = {
@@ -946,8 +946,10 @@ class TechnicalRiskValidationSelectionContractTestCase(unittest.TestCase):
             "TechnicalRiskValidationSelectionReasonCode",
         }
         forbidden = {
-            "HoldoutConfirmationArtifact",
-            "TechnicalRiskPolicyFreezeArtifact",
+            "TechnicalRiskSignalProducer",
+            "RiskEvaluationPolicy",
+            "RiskSignal",
+            "to_production_policy",
         }
         self.assertTrue(required.issubset(set(risk_oos.__all__)))
         self.assertTrue(forbidden.isdisjoint(set(risk_oos.__all__)))

@@ -63,6 +63,11 @@ from risk_oos.historical_features import HistoricalRiskFeatureMaterializationRes
 from risk_oos.historical_features import HistoricalRiskFeatureMaterializer
 from risk_oos.historical_features import HistoricalRiskFeatureObservation
 from risk_oos.historical_features import HistoricalRiskFeatureStatus
+from risk_oos.research_policy_freeze import TECH_RISK_POLICY_FREEZE_ARTIFACT_V1
+from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeArtifact
+from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeError
+from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeReasonCode
+from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeStatus
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
 from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
@@ -158,6 +163,7 @@ __all__ = [
     "TECH_RISK_EVIDENCE_VOCABULARY_V1",
     "TECH_RISK_LOW_REASON_V1",
     "TECH_RISK_NUMERIC_REPRESENTATION_V1",
+    "TECH_RISK_POLICY_FREEZE_ARTIFACT_V1",
     "TECH_RISK_QUANTILE_NEAREST_RANK_V1",
     "TECH_RISK_THRESHOLD_CANDIDATE_GENERATION_CONTRACT_V1",
     "TECH_RISK_TRIGGER_VOCABULARY_V1",
@@ -205,6 +211,10 @@ __all__ = [
     "TechnicalRiskOOSSplitSpec",
     "TechnicalRiskPredicateId",
     "TechnicalRiskPredicateState",
+    "TechnicalRiskPolicyFreezeArtifact",
+    "TechnicalRiskPolicyFreezeError",
+    "TechnicalRiskPolicyFreezeReasonCode",
+    "TechnicalRiskPolicyFreezeStatus",
     "TechnicalRiskReasonCode",
     "TechnicalRiskRuleCandidateError",
     "TechnicalRiskRuleCandidateSpec",
