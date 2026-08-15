@@ -143,6 +143,14 @@ def verify_schema_v2(connection: sqlite3.Connection) -> None:
     _verify_required_checks(connection)
 
 
+def validate_schema_v2_readonly(connection: sqlite3.Connection) -> None:
+    if _pragma_int(connection, "application_id") != APPLICATION_ID:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
+    if _pragma_int(connection, "user_version") != SCHEMA_VERSION:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
+    verify_schema_v2(connection)
+
+
 def ensure_wal(connection: sqlite3.Connection) -> None:
     journal_mode = connection.execute("PRAGMA journal_mode=WAL").fetchone()[0]
     if str(journal_mode).lower() != "wal":
