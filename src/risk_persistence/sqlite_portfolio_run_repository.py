@@ -24,6 +24,12 @@ _DEFAULT_BUSY_TIMEOUT_MS = 5000
 
 
 @dataclass(frozen=True)
+class _PreparedPortfolioRunRecordForPersistence:
+    record: PortfolioRiskGenerationRunRecord
+    payload_json: str
+
+
+@dataclass(frozen=True)
 class SQLitePortfolioRiskGenerationRunRepository(PortfolioRiskGenerationRunRepository):
     """SQLite implementation of the append-only portfolio generation run repository."""
 
@@ -41,48 +47,14 @@ class SQLitePortfolioRiskGenerationRunRepository(PortfolioRiskGenerationRunRepos
         self._with_connection(lambda connection: None)
 
     def save(self, record: PortfolioRiskGenerationRunRecord) -> PortfolioRiskGenerationRunSaveResult:
-        if not isinstance(record, PortfolioRiskGenerationRunRecord):
-            raise PortfolioRiskGenerationRunPersistenceError(
-                "SQLitePortfolioRiskGenerationRunRepository.save requires PortfolioRiskGenerationRunRecord."
-            )
-        payload_json = _encode_and_self_validate_run_record(record)
+        prepared_record = prepare_portfolio_run_record_for_persistence(record)
 
         def operation(connection: sqlite3.Connection) -> PortfolioRiskGenerationRunSaveResult:
             try:
                 connection.execute("BEGIN IMMEDIATE")
-                row = _load_run_record_row(connection, record.calculation_id)
-                if row is None:
-                    connection.execute(
-                        f"""
-                        INSERT INTO {PORTFOLIO_RISK_GENERATION_RUNS_TABLE} (
-                            calculation_id,
-                            record_checksum,
-                            payload_json
-                        )
-                        VALUES (?, ?, ?)
-                        """,
-                        (record.calculation_id, record.record_checksum, payload_json),
-                    )
-                    connection.commit()
-                    return PortfolioRiskGenerationRunSaveResult(
-                        calculation_id=record.calculation_id,
-                        record_checksum=record.record_checksum or "",
-                        status=PortfolioRiskGenerationRunSaveStatus.INSERTED,
-                    )
-
-                existing = _decode_run_record_row(row)
-                if existing.record_checksum == record.record_checksum:
-                    connection.commit()
-                    return PortfolioRiskGenerationRunSaveResult(
-                        calculation_id=record.calculation_id,
-                        record_checksum=record.record_checksum or "",
-                        status=PortfolioRiskGenerationRunSaveStatus.IDEMPOTENT,
-                    )
-                raise PortfolioRiskGenerationRunConflictError(
-                    calculation_id=record.calculation_id,
-                    existing_checksum=existing.record_checksum or "",
-                    incoming_checksum=record.record_checksum or "",
-                )
+                result = persist_portfolio_run_record_in_connection(connection, prepared_record)
+                connection.commit()
+                return result
             except (
                 PortfolioRiskGenerationRunConflictError,
                 PortfolioRiskGenerationRunCorruptionError,
@@ -135,7 +107,13 @@ class SQLitePortfolioRiskGenerationRunRepository(PortfolioRiskGenerationRunRepos
             ) from exc
 
 
-def _encode_and_self_validate_run_record(record: PortfolioRiskGenerationRunRecord) -> str:
+def prepare_portfolio_run_record_for_persistence(
+    record: PortfolioRiskGenerationRunRecord,
+) -> _PreparedPortfolioRunRecordForPersistence:
+    if not isinstance(record, PortfolioRiskGenerationRunRecord):
+        raise PortfolioRiskGenerationRunPersistenceError(
+            "SQLitePortfolioRiskGenerationRunRepository.save requires PortfolioRiskGenerationRunRecord."
+        )
     try:
         payload_json = PortfolioRiskGenerationRunRecordCodec().encode(record)
         decoded = PortfolioRiskGenerationRunRecordCodec().decode(payload_json)
@@ -143,7 +121,9 @@ def _encode_and_self_validate_run_record(record: PortfolioRiskGenerationRunRecor
         raise PortfolioRiskGenerationRunPersistenceError("Run record codec validation failed.") from exc
     if decoded != record:
         raise PortfolioRiskGenerationRunPersistenceError("Run record codec round trip mismatch.")
-    return payload_json
+    if decoded.record_checksum != record.record_checksum:
+        raise PortfolioRiskGenerationRunPersistenceError("Run record checksum round trip mismatch.")
+    return _PreparedPortfolioRunRecordForPersistence(record=record, payload_json=payload_json)
 
 
 def _load_run_record_row(
@@ -182,3 +162,54 @@ def _decode_run_record_row(row: sqlite3.Row | tuple) -> PortfolioRiskGenerationR
     if record.record_checksum != record_checksum:
         raise PortfolioRiskGenerationRunCorruptionError(calculation_id)
     return record
+
+
+def load_portfolio_run_record_in_connection(
+    connection: sqlite3.Connection,
+    calculation_id: str,
+) -> PortfolioRiskGenerationRunRecord | None:
+    row = _load_run_record_row(connection, calculation_id)
+    if row is None:
+        return None
+    return _decode_run_record_row(row)
+
+
+def persist_portfolio_run_record_in_connection(
+    connection: sqlite3.Connection,
+    prepared_record: _PreparedPortfolioRunRecordForPersistence,
+) -> PortfolioRiskGenerationRunSaveResult:
+    if not isinstance(prepared_record, _PreparedPortfolioRunRecordForPersistence):
+        raise PortfolioRiskGenerationRunPersistenceError("prepared run record is required.")
+    record = prepared_record.record
+    payload_json = prepared_record.payload_json
+    row = _load_run_record_row(connection, record.calculation_id)
+    if row is None:
+        connection.execute(
+            f"""
+            INSERT INTO {PORTFOLIO_RISK_GENERATION_RUNS_TABLE} (
+                calculation_id,
+                record_checksum,
+                payload_json
+            )
+            VALUES (?, ?, ?)
+            """,
+            (record.calculation_id, record.record_checksum, payload_json),
+        )
+        return PortfolioRiskGenerationRunSaveResult(
+            calculation_id=record.calculation_id,
+            record_checksum=record.record_checksum or "",
+            status=PortfolioRiskGenerationRunSaveStatus.INSERTED,
+        )
+
+    existing = _decode_run_record_row(row)
+    if existing.record_checksum == record.record_checksum:
+        return PortfolioRiskGenerationRunSaveResult(
+            calculation_id=record.calculation_id,
+            record_checksum=record.record_checksum or "",
+            status=PortfolioRiskGenerationRunSaveStatus.IDEMPOTENT,
+        )
+    raise PortfolioRiskGenerationRunConflictError(
+        calculation_id=record.calculation_id,
+        existing_checksum=existing.record_checksum or "",
+        incoming_checksum=record.record_checksum or "",
+    )

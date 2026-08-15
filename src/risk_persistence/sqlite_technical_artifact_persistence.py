@@ -40,13 +40,10 @@ class SQLiteTechnicalRiskArtifactPersistenceCoordinator:
         self._with_connection(lambda connection: None)
 
     def save(self, artifact: RiskArtifact) -> RiskArtifactSaveResult:
-        expected_record = TechnicalRiskArtifactIndexRecord.from_artifact(artifact)
-        payload_json = encode_and_self_validate_artifact(artifact)
-
         def operation(connection: sqlite3.Connection) -> RiskArtifactSaveResult:
             try:
                 connection.execute("BEGIN IMMEDIATE")
-                result = self._persist_artifact_and_index(connection, artifact, payload_json, expected_record)
+                result = persist_technical_artifact_in_connection(connection, artifact)
                 connection.commit()
                 return result
             except (
@@ -64,33 +61,6 @@ class SQLiteTechnicalRiskArtifactPersistenceCoordinator:
                 raise RiskArtifactPersistenceError("SQLite Technical Risk artifact persistence failed.") from exc
 
         return self._with_connection(operation)
-
-    def _persist_artifact_and_index(
-        self,
-        connection: sqlite3.Connection,
-        artifact: RiskArtifact,
-        payload_json: str,
-        expected_record: TechnicalRiskArtifactIndexRecord,
-    ) -> RiskArtifactSaveResult:
-        core_row = load_core_artifact_row(connection, artifact.artifact_id)
-        stored_record = load_technical_index_record(connection, artifact.artifact_id)
-        if core_row is None and stored_record is not None:
-            raise RiskArtifactIndexCorruptionError(artifact.artifact_id)
-
-        result = persist_core_artifact_in_connection(connection, artifact, payload_json)
-
-        if stored_record is None:
-            insert_technical_index_record(connection, expected_record)
-            return result
-
-        if stored_record != expected_record:
-            raise RiskArtifactIndexCorruptionError(artifact.artifact_id)
-
-        return RiskArtifactSaveResult(
-            artifact_id=artifact.artifact_id,
-            checksum=artifact.checksum or "",
-            status=RiskArtifactSaveStatus.IDEMPOTENT,
-        )
 
     def _with_connection(self, operation):
         try:
@@ -111,3 +81,30 @@ class SQLiteTechnicalRiskArtifactPersistenceCoordinator:
             raise
         except sqlite3.DatabaseError as exc:
             raise RiskArtifactPersistenceError("SQLite Technical Risk artifact persistence failed.") from exc
+
+
+def persist_technical_artifact_in_connection(
+    connection: sqlite3.Connection,
+    artifact: RiskArtifact,
+) -> RiskArtifactSaveResult:
+    expected_record = TechnicalRiskArtifactIndexRecord.from_artifact(artifact)
+    payload_json = encode_and_self_validate_artifact(artifact)
+    core_row = load_core_artifact_row(connection, artifact.artifact_id)
+    stored_record = load_technical_index_record(connection, artifact.artifact_id)
+    if core_row is None and stored_record is not None:
+        raise RiskArtifactIndexCorruptionError(artifact.artifact_id)
+
+    result = persist_core_artifact_in_connection(connection, artifact, payload_json)
+
+    if stored_record is None:
+        insert_technical_index_record(connection, expected_record)
+        return result
+
+    if stored_record != expected_record:
+        raise RiskArtifactIndexCorruptionError(artifact.artifact_id)
+
+    return RiskArtifactSaveResult(
+        artifact_id=artifact.artifact_id,
+        checksum=artifact.checksum or "",
+        status=RiskArtifactSaveStatus.IDEMPOTENT,
+    )

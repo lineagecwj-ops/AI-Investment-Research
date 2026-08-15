@@ -6,6 +6,7 @@ from risk_persistence.contracts import RiskArtifactPersistenceError
 from risk_persistence.contracts import RiskArtifactRepository
 from risk_persistence.contracts import RiskArtifactSaveResult
 from risk_persistence.contracts import RiskArtifactSaveStatus
+from risk_persistence.capturing_risk_evaluator import CapturingRiskEvaluator
 from risk_persistence.portfolio_run_codec import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1
 from risk_persistence.portfolio_run_codec import PortfolioRiskGenerationRunRecordCodec
 from risk_persistence.portfolio_run_codec import PortfolioRiskGenerationRunRecordCodecError
@@ -24,6 +25,9 @@ from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunW
 from risk_persistence.sqlite_portfolio_run_repository import SQLitePortfolioRiskGenerationRunRepository
 from risk_persistence.sqlite_repository import SQLiteRiskArtifactRepository
 from risk_persistence.sqlite_technical_artifact_persistence import SQLiteTechnicalRiskArtifactPersistenceCoordinator
+from risk_persistence.sqlite_technical_portfolio_persistence import SQLiteTechnicalPortfolioRiskPersistenceCoordinator
+from risk_persistence.sqlite_technical_portfolio_persistence import TechnicalPortfolioRiskPersistenceError
+from risk_persistence.sqlite_technical_portfolio_persistence import TechnicalPortfolioRiskPersistenceResult
 from risk_persistence.sqlite_technical_query_repository import SQLiteTechnicalRiskArtifactQueryRepository
 from risk_persistence.technical_query_contracts import RiskArtifactIndexCorruptionError
 from risk_persistence.technical_query_contracts import TechnicalRiskArtifactIndexRecord
@@ -32,6 +36,7 @@ from risk_persistence.technical_query_contracts import TechnicalRiskArtifactQuer
 __all__ = [
     "PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1",
     "PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1",
+    "CapturingRiskEvaluator",
     "PortfolioRiskGenerationRunArtifactRef",
     "PortfolioRiskGenerationRunConflictError",
     "PortfolioRiskGenerationRunCorruptionError",
@@ -55,7 +60,10 @@ __all__ = [
     "SQLitePortfolioRiskGenerationRunRepository",
     "SQLiteRiskArtifactRepository",
     "SQLiteTechnicalRiskArtifactPersistenceCoordinator",
+    "SQLiteTechnicalPortfolioRiskPersistenceCoordinator",
     "SQLiteTechnicalRiskArtifactQueryRepository",
+    "TechnicalPortfolioRiskPersistenceError",
+    "TechnicalPortfolioRiskPersistenceResult",
     "TechnicalRiskArtifactIndexRecord",
     "TechnicalRiskArtifactQueryRepository",
 ]
