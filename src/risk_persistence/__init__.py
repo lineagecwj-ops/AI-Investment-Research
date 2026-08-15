@@ -28,6 +28,9 @@ from risk_persistence.production_config import RiskPersistenceEnvironment
 from risk_persistence.production_config import RiskPersistenceProductionConfig
 from risk_persistence.production_config import RiskPersistenceProductionError
 from risk_persistence.sqlite_portfolio_run_repository import SQLitePortfolioRiskGenerationRunRepository
+from risk_persistence.sqlite_production_health import RiskPersistenceHealthResult
+from risk_persistence.sqlite_production_health import RiskPersistenceHealthStatus
+from risk_persistence.sqlite_production_health import SQLiteRiskPersistenceHealthChecker
 from risk_persistence.sqlite_production_bootstrap import RiskPersistenceBootstrapResult
 from risk_persistence.sqlite_production_bootstrap import RiskPersistenceBootstrapStatus
 from risk_persistence.sqlite_production_bootstrap import SQLiteRiskPersistenceBootstrapper
@@ -63,6 +66,8 @@ __all__ = [
     "RiskPersistenceBootstrapStatus",
     "RiskPersistenceConfigurationError",
     "RiskPersistenceEnvironment",
+    "RiskPersistenceHealthResult",
+    "RiskPersistenceHealthStatus",
     "RiskPersistenceProductionConfig",
     "RiskPersistenceProductionError",
     "RiskArtifactIndexCorruptionError",
@@ -73,6 +78,7 @@ __all__ = [
     "RiskArtifactSaveResult",
     "RiskArtifactSaveStatus",
     "SQLitePortfolioRiskGenerationRunRepository",
+    "SQLiteRiskPersistenceHealthChecker",
     "SQLiteRiskPersistenceBootstrapper",
     "SQLiteRiskArtifactRepository",
     "SQLiteTechnicalRiskArtifactPersistenceCoordinator",
