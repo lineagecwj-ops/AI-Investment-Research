@@ -6,6 +6,7 @@ from risk_persistence.contracts import RiskArtifactPersistenceError
 from risk_persistence.contracts import RiskArtifactRepository
 from risk_persistence.contracts import RiskArtifactSaveResult
 from risk_persistence.contracts import RiskArtifactSaveStatus
+from risk_persistence.sqlite_repository import SQLiteRiskArtifactRepository
 
 __all__ = [
     "RiskArtifactConflictError",
@@ -14,4 +15,5 @@ __all__ = [
     "RiskArtifactRepository",
     "RiskArtifactSaveResult",
     "RiskArtifactSaveStatus",
+    "SQLiteRiskArtifactRepository",
 ]
