@@ -22,7 +22,15 @@ from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunR
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunSaveResult
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunSaveStatus
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunWarning
+from risk_persistence.production_config import RiskPersistenceBackupError
+from risk_persistence.production_config import RiskPersistenceConfigurationError
+from risk_persistence.production_config import RiskPersistenceEnvironment
+from risk_persistence.production_config import RiskPersistenceProductionConfig
+from risk_persistence.production_config import RiskPersistenceProductionError
 from risk_persistence.sqlite_portfolio_run_repository import SQLitePortfolioRiskGenerationRunRepository
+from risk_persistence.sqlite_production_bootstrap import RiskPersistenceBootstrapResult
+from risk_persistence.sqlite_production_bootstrap import RiskPersistenceBootstrapStatus
+from risk_persistence.sqlite_production_bootstrap import SQLiteRiskPersistenceBootstrapper
 from risk_persistence.sqlite_repository import SQLiteRiskArtifactRepository
 from risk_persistence.sqlite_technical_artifact_persistence import SQLiteTechnicalRiskArtifactPersistenceCoordinator
 from risk_persistence.sqlite_technical_portfolio_persistence import SQLiteTechnicalPortfolioRiskPersistenceCoordinator
@@ -50,6 +58,13 @@ __all__ = [
     "PortfolioRiskGenerationRunSaveResult",
     "PortfolioRiskGenerationRunSaveStatus",
     "PortfolioRiskGenerationRunWarning",
+    "RiskPersistenceBackupError",
+    "RiskPersistenceBootstrapResult",
+    "RiskPersistenceBootstrapStatus",
+    "RiskPersistenceConfigurationError",
+    "RiskPersistenceEnvironment",
+    "RiskPersistenceProductionConfig",
+    "RiskPersistenceProductionError",
     "RiskArtifactIndexCorruptionError",
     "RiskArtifactConflictError",
     "RiskArtifactCorruptionError",
@@ -58,6 +73,7 @@ __all__ = [
     "RiskArtifactSaveResult",
     "RiskArtifactSaveStatus",
     "SQLitePortfolioRiskGenerationRunRepository",
+    "SQLiteRiskPersistenceBootstrapper",
     "SQLiteRiskArtifactRepository",
     "SQLiteTechnicalRiskArtifactPersistenceCoordinator",
     "SQLiteTechnicalPortfolioRiskPersistenceCoordinator",

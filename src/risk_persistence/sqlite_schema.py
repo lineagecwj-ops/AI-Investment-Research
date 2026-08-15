@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
+from enum import StrEnum
 
 from risk import RiskArtifact
 from risk import RiskCategory
@@ -121,6 +123,85 @@ _TECHNICAL_FEATURE_LINEAGE_KEYS = frozenset(
 )
 
 
+class SQLiteRiskArtifactSchemaState(StrEnum):
+    """Read-only schema state classification for production bootstrap planning."""
+
+    EMPTY = "EMPTY"
+    V1 = "V1"
+    V2 = "V2"
+    CURRENT = "CURRENT"
+    WRONG_APPLICATION = "WRONG_APPLICATION"
+    FUTURE = "FUTURE"
+    MALFORMED = "MALFORMED"
+
+
+@dataclass(frozen=True)
+class SQLiteRiskArtifactSchemaInspection:
+    """Read-only SQLite RiskArtifact schema inspection result."""
+
+    state: SQLiteRiskArtifactSchemaState
+    application_id: int
+    user_version: int
+
+
+def inspect_schema_state(connection: sqlite3.Connection) -> SQLiteRiskArtifactSchemaInspection:
+    """Classify schema state without initializing, migrating, or changing journal mode."""
+
+    application_id = _pragma_int(connection, "application_id")
+    user_version = _pragma_int(connection, "user_version")
+    user_tables = _user_tables(connection)
+
+    if application_id == 0 and user_version == 0 and not user_tables:
+        return SQLiteRiskArtifactSchemaInspection(
+            state=SQLiteRiskArtifactSchemaState.EMPTY,
+            application_id=application_id,
+            user_version=user_version,
+        )
+    if application_id != APPLICATION_ID:
+        return SQLiteRiskArtifactSchemaInspection(
+            state=SQLiteRiskArtifactSchemaState.WRONG_APPLICATION,
+            application_id=application_id,
+            user_version=user_version,
+        )
+    if user_version > SCHEMA_VERSION:
+        return SQLiteRiskArtifactSchemaInspection(
+            state=SQLiteRiskArtifactSchemaState.FUTURE,
+            application_id=application_id,
+            user_version=user_version,
+        )
+
+    state_by_version = {
+        SCHEMA_VERSION_V1: SQLiteRiskArtifactSchemaState.V1,
+        SCHEMA_VERSION_V2: SQLiteRiskArtifactSchemaState.V2,
+        SCHEMA_VERSION: SQLiteRiskArtifactSchemaState.CURRENT,
+    }
+    state = state_by_version.get(user_version)
+    if state is None:
+        return SQLiteRiskArtifactSchemaInspection(
+            state=SQLiteRiskArtifactSchemaState.MALFORMED,
+            application_id=application_id,
+            user_version=user_version,
+        )
+    try:
+        if state == SQLiteRiskArtifactSchemaState.V1:
+            verify_schema_v1(connection)
+        elif state == SQLiteRiskArtifactSchemaState.V2:
+            verify_schema_v2(connection)
+        else:
+            verify_schema_v3(connection)
+    except RiskArtifactPersistenceError:
+        return SQLiteRiskArtifactSchemaInspection(
+            state=SQLiteRiskArtifactSchemaState.MALFORMED,
+            application_id=application_id,
+            user_version=user_version,
+        )
+    return SQLiteRiskArtifactSchemaInspection(
+        state=state,
+        application_id=application_id,
+        user_version=user_version,
+    )
+
+
 def initialize_or_verify_schema(connection: sqlite3.Connection) -> None:
     application_id = _pragma_int(connection, "application_id")
     user_version = _pragma_int(connection, "user_version")
@@ -144,6 +225,22 @@ def initialize_or_verify_schema(connection: sqlite3.Connection) -> None:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
     verify_schema_v3(connection)
     ensure_wal(connection)
+
+
+def verify_schema_v1(connection: sqlite3.Connection) -> None:
+    tables = _user_tables(connection)
+    if tables != (RISK_ARTIFACTS_TABLE,):
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema tables mismatch.")
+    _verify_table_shape(connection, RISK_ARTIFACTS_TABLE, EXPECTED_RISK_ARTIFACT_COLUMNS)
+    _verify_required_checks(connection, version=SCHEMA_VERSION_V1)
+
+
+def validate_schema_v1_readonly(connection: sqlite3.Connection) -> None:
+    if _pragma_int(connection, "application_id") != APPLICATION_ID:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
+    if _pragma_int(connection, "user_version") != SCHEMA_VERSION_V1:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
+    verify_schema_v1(connection)
 
 
 def verify_schema_v2(connection: sqlite3.Connection) -> None:
@@ -224,10 +321,7 @@ def _initialize_schema_v3(connection: sqlite3.Connection) -> None:
 
 
 def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
-    if _user_tables(connection) != (RISK_ARTIFACTS_TABLE,):
-        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema tables mismatch.")
-    _verify_table_shape(connection, RISK_ARTIFACTS_TABLE, EXPECTED_RISK_ARTIFACT_COLUMNS)
-    _verify_required_checks(connection, version=SCHEMA_VERSION_V1)
+    verify_schema_v1(connection)
     try:
         connection.execute("BEGIN IMMEDIATE")
         if _pragma_int(connection, "application_id") != APPLICATION_ID:
