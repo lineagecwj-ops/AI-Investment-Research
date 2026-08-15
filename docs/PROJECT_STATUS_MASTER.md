@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-15, after Sprint 6B Atomic Technical Artifact Persistence.
+Last updated: 2026-08-15, after Sprint 6C Portfolio Persistence Integration.
 
 ## Project Purpose
 
@@ -35,17 +35,19 @@ This status document is based on:
 - Sprint 6B-2B-1 SQLite Schema v2 + Technical Index Backfill release validation evidence
 - Sprint 6B-2B-2 SQLite Technical Query Repository release validation evidence
 - Sprint 6B-2B-3 Atomic Technical Artifact Persistence release validation evidence
-- Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record contract specification review
+- Sprint 6C-1 Portfolio Risk Generation Run Record release validation evidence
+- Sprint 6C-2 SQLite Schema v3 + Portfolio Risk Generation Run Repository release validation evidence
+- Sprint 6C-3 Technical Portfolio Persistence Coordinator + Portfolio-Level Atomic Persistence release validation evidence
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `5a56172 feat: add atomic technical risk artifact persistence`
-- Current full HEAD: `5a561724379da192e33bc78b8a194f1ff358f8c8`
-- Remote baseline at synchronization time: `origin/main` points to `5a561724379da192e33bc78b8a194f1ff358f8c8`
-- Documentation status: this file is being synchronized after Sprint 6B release pushes.
+- Implementation baseline: `2486fbb feat: add atomic portfolio risk persistence`
+- Current full HEAD: `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0`
+- Remote baseline at synchronization time: `origin/main` points to `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0`
+- Documentation status: this file is being synchronized after Sprint 6C release pushes.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -64,6 +66,9 @@ No network fetch, DB migration, live DB schema inspection, or production data qu
 - Sprint 6B-2B-1 SQLite Schema v2 + Technical Index Backfill is committed and pushed at `a93681b`.
 - Sprint 6B-2B-2 SQLite Technical Query Repository is committed and pushed at `24ca9c7`.
 - Sprint 6B-2B-3 Atomic Technical Artifact Persistence is committed and pushed at `5a56172`.
+- Sprint 6C-1 Portfolio Risk Generation Run Record Contract + Codec is committed and pushed at `2616478`.
+- Sprint 6C-2 SQLite Schema v3 + Portfolio Risk Generation Run Repository is committed and pushed at `b9bd272`.
+- Sprint 6C-3 Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence is committed and pushed at `2486fbb`.
 
 Repository state verification:
 
@@ -80,6 +85,10 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `2486fbb feat: add atomic portfolio risk persistence`
+- `b9bd272 feat: add sqlite portfolio risk run repository`
+- `2616478 feat: add portfolio risk generation run records`
+- `1c7e064 docs: sync project master status through sprint 6b`
 - `5a56172 feat: add atomic technical risk artifact persistence`
 - `24ca9c7 feat: add sqlite technical risk artifact queries`
 - `a93681b feat: add sqlite risk artifact schema v2`
@@ -229,11 +238,14 @@ The following phases are committed and pushed through `f834e40`.
 | Sprint 6B-2B-2 | SQLite Technical Query Repository + Verified Read | Complete / committed / pushed |
 | Sprint 6B-2B-3 | Atomic Technical Artifact Persistence | Complete / committed / pushed |
 | Sprint 6B | Technical Risk SQLite Storage Layer | Complete / committed / pushed |
-| Sprint 6C | Portfolio Persistence Integration / Run-Level Persistence Record | Specification review complete / planned split / not implemented |
+| Sprint 6C-1 | Portfolio Risk Generation Run Record Contract + Codec | Complete / committed / pushed |
+| Sprint 6C-2 | SQLite Schema v3 + Portfolio Run Repository | Complete / committed / pushed |
+| Sprint 6C-3 | Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence | Complete / committed / pushed |
+| Sprint 6C | Portfolio Persistence Integration Capability | Complete / committed / pushed |
 
 ## Current AI Platform Architecture
 
-Current intended architecture after Sprint 6B:
+Current intended architecture after Sprint 6C:
 
 ```text
 Research Snapshot
@@ -336,13 +348,49 @@ TechnicalRiskPortfolioEvaluator
 PortfolioRiskGenerationService
     |
     v
+CapturingRiskEvaluator
+    |
+    v
+RiskArtifact(s)
+    |
+    v
+PortfolioRiskGenerationResult
+    |
+    v
+PortfolioRiskGenerationRunRecord
+    |
+    v
+SQLiteTechnicalPortfolioRiskPersistenceCoordinator
+    |
+    v
+single SQLite transaction
+    |
+    +--> risk_artifacts
+    |
+    +--> technical_risk_artifact_index
+    |
+    +--> portfolio_risk_generation_runs
+    |
+    v
+SQLiteTechnicalRiskArtifactQueryRepository / SQLitePortfolioRiskGenerationRunRepository
+```
+
+In-memory generation path remains available and persistence-free:
+
+```text
+PortfolioSnapshot
+    |
+    v
+PortfolioRiskGenerationService
+    |
+    v
 existing MonitoringEvaluator
     |
     v
 PortfolioRiskGenerationResult
 ```
 
-Current RiskArtifact storage capability:
+Current RiskArtifact and portfolio run storage capability:
 
 ```text
 RiskArtifact
@@ -361,11 +409,22 @@ technical_risk_artifact_index
     |
     v
 SQLiteTechnicalRiskArtifactQueryRepository
+
+PortfolioRiskGenerationRunRecord
+    |
+    v
+PortfolioRiskGenerationRunRecordCodec
+    |
+    v
+SQLitePortfolioRiskGenerationRunRepository
+    |
+    v
+portfolio_risk_generation_runs
 ```
 
 The platform is research-oriented and artifact-oriented. It is not a trading system.
 
-Persistence boundary: SQLite storage-layer capability exists through Sprint 6B, but `PortfolioRiskGenerationService` is not yet automatically connected to `SQLiteTechnicalRiskArtifactPersistenceCoordinator`; production risk DB is not created or activated.
+Persistence boundary: external portfolio persistence coordination capability exists through Sprint 6C, while `PortfolioRiskGenerationService` itself remains persistence-free and does not import `risk_persistence`. Production risk DB is not created or activated.
 
 ## Feature Platform Status
 
@@ -1337,9 +1396,9 @@ verified Technical query
 
 Current production runtime status:
 
-- Technical Risk v1 production core evaluation, signal generation, single-position orchestration, RiskAssessment view, RiskArtifact adapter, existing RiskEvaluator seam integration, in-memory `PortfolioRiskGenerationService` Technical integration validation, `RiskArtifactCodec`, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v2, verified SQLite Technical query, and atomic Technical artifact persistence are complete through Sprint 6B
+- Technical Risk v1 production core evaluation, signal generation, single-position orchestration, RiskAssessment view, RiskArtifact adapter, existing RiskEvaluator seam integration, in-memory `PortfolioRiskGenerationService` Technical integration validation, `RiskArtifactCodec`, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, and portfolio-level atomic persistence coordination are complete through Sprint 6C
 - production deployment is not complete
-- still not implemented: automatic Portfolio persistence integration, RiskArtifact capture boundary implementation, run-level persistence record, run record codec / checksum, SQLite schema v3, Portfolio run repository, portfolio-level persistence transaction, risk_evaluated_position_ids durable audit, durable Technical evidence snapshot persistence, `ProductionTechnicalRiskPolicy` persistence, policy activation governance, scheduler, live execution, live market fetch, alert delivery, dashboard integration, and end-to-end deployment
+- still not implemented: production DB creation / activation, production bootstrap / ownership deployment, durable Technical evidence snapshot persistence, monitoring artifact payload SQLite persistence, `ProductionTechnicalRiskPolicy` persistence, policy activation governance, scheduler, live execution, live market fetch, alert delivery, dashboard SQLite integration, and end-to-end deployment
 
 Production runtime chain:
 
@@ -1443,10 +1502,43 @@ SQLiteTechnicalRiskArtifactPersistenceCoordinator
 SQLiteTechnicalRiskArtifactQueryRepository
 ```
 
+Current portfolio-level persistence capability:
+
+```text
+PortfolioSnapshot
+        |
+        v
+PortfolioRiskGenerationService
+        |
+        v
+CapturingRiskEvaluator
+        |
+        v
+RiskArtifact(s)
+        |
+        v
+PortfolioRiskGenerationResult
+        |
+        v
+PortfolioRiskGenerationRunRecord
+        |
+        v
+SQLiteTechnicalPortfolioRiskPersistenceCoordinator
+        |
+        v
+single SQLite transaction
+        |
+        +--> risk_artifacts
+        |
+        +--> technical_risk_artifact_index
+        |
+        +--> portfolio_risk_generation_runs
+```
+
 Important boundary:
 
-- SQLite storage-layer capability is complete through Sprint 6B
-- `PortfolioRiskGenerationService` is not yet automatically connected to `SQLiteTechnicalRiskArtifactPersistenceCoordinator`
+- SQLite portfolio persistence capability is complete through Sprint 6C
+- `PortfolioRiskGenerationService` remains persistence-free; external coordination handles durable persistence
 - production risk DB has not been created or activated
 - scheduler, live execution, dashboard repository reads, alert delivery, policy persistence, and deployment are not complete
 
@@ -1661,6 +1753,10 @@ Technical Risk v1 Production Runtime:
 - Sprint 6B-2B-2 SQLite Technical Query Repository + Verified Read scope is complete
 - Sprint 6B-2B-3 Atomic Technical Artifact Persistence scope is complete
 - Sprint 6B storage-layer capability is complete
+- Sprint 6C-1 Portfolio Risk Generation Run Record Contract + Codec scope is complete
+- Sprint 6C-2 SQLite Schema v3 + Portfolio Run Repository scope is complete
+- Sprint 6C-3 Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence scope is complete
+- Sprint 6C portfolio persistence integration capability is complete
 - input is caller-supplied frozen `RiskFeatureInput` through `RiskSignalProductionInput` plus `ProductionTechnicalRiskPolicy`
 - evaluator output is `TechnicalRiskEvaluationResult`
 - signal producer output is `ProducedRiskSignal` wrapping Phase 7K `RiskSignal`
@@ -1675,31 +1771,53 @@ Technical Risk v1 Production Runtime:
 - technical severity is symbol-level technical condition and must not change because of portfolio quantity, whole shares, or fractional shares
 - portfolio exposure / quantity belongs to later portfolio aggregation or context, not Technical Risk v1 severity calculation
 - full in-memory `PortfolioRiskGenerationService` integration is validated
-- automatic portfolio persistence integration, RiskArtifact capture boundary implementation, run-level persistence record, run record codec / checksum, SQLite schema v3, Portfolio run repository, portfolio-level persistence transaction, policy activation, scheduler, dashboard integration, alert delivery, and deployment remain planned future scope
+- external portfolio persistence coordination can durably save captured Technical RiskArtifacts, Technical index rows, and Portfolio RunRecords in one SQLite transaction
+- policy activation, production DB activation, scheduler, dashboard integration, alert delivery, monitoring artifact payload persistence, and deployment remain planned future scope
 
 Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record:
 
-- status: SPECIFICATION REVIEW COMPLETE / READY_FOR_IMPLEMENTATION_SPLIT / NOT IMPLEMENTED
-- planned split:
-  - Sprint 6C-1 Run Record Contract + Canonical Checksum / Codec
-  - Sprint 6C-2 SQLite Schema v3 + Run Repository
-  - Sprint 6C-3 Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence
-- current specification decisions:
-  - `PortfolioRiskGenerationService` should remain unchanged
-  - integration should use a higher-level persistence coordinator
-  - artifact capture should use a `CapturingRiskEvaluator` wrapper / collector seam
-  - `PortfolioRiskGenerationResult` should not be changed to carry `RiskArtifact` objects
-  - RiskArtifact persistence eligibility should be risk evaluation success
-  - monitoring failure positions may still have their `RiskArtifact` persisted
-  - `succeeded_position_ids` should retain existing risk + monitoring success semantics
-  - durable run record needs separate `risk_evaluated_position_ids`
-  - run key should be `calculation_id`
-  - run record should be immutable and idempotent
-  - artifacts plus run record should be persisted in one portfolio persistence transaction
-  - persistence failure should raise a persistence-layer error and should not mutate `PortfolioRiskGenerationResult`
-  - unexpected generation exceptions should not write a durable run record
-  - monitoring artifact persistence is out of scope; only monitoring artifact ids are recorded
-  - `TechnicalRiskEvidenceSnapshot` is out of scope for Sprint 6C
+- status: COMPLETE / COMMITTED / PUSHED
+- Sprint 6C-1 `PortfolioRiskGenerationRunRecord` contract and codec:
+  - identity is `calculation_id`
+  - status reuses `PortfolioRiskGenerationStatus`
+  - lifecycle fields are `attempted_position_ids`, `risk_evaluated_position_ids`, `succeeded_position_ids`, and `failed_position_ids`
+  - RiskArtifact refs store `position_id`, `artifact_id`, and `artifact_checksum`
+  - monitoring refs store `position_id` and `artifact_id`
+  - durable issues and warnings are retained
+  - `created_at` is caller-injected and timezone-aware
+  - `record_checksum` is canonical and semantic
+  - DB-agnostic `PortfolioRiskGenerationRunRepository` exposes exact methods `save(record)` and `get_by_calculation_id(calculation_id)`
+  - run repository semantics are `INSERTED`, `IDEMPOTENT`, conflict, corruption, and persistence errors
+- Sprint 6C-2 SQLite schema / repository:
+  - schema current version is `user_version = 3`
+  - `application_id` remains `0x41494952`
+  - current tables are `risk_artifacts`, `technical_risk_artifact_index`, and `portfolio_risk_generation_runs`
+  - `portfolio_risk_generation_runs` columns are exactly `calculation_id`, `record_checksum`, and `payload_json`
+  - `payload_json` stores the full `PortfolioRiskGenerationRunRecordCodec` envelope
+  - fresh DB initializes directly to schema v3
+  - v2 DB migrates atomically to v3
+  - v1 DB migrates stepwise through v2 to v3
+  - v2 -> v3 does not backfill historical RunRecords because existing artifacts cannot reliably reconstruct attempted, risk_evaluated, succeeded, failed, issues, warnings, monitoring refs, or caller-injected `created_at`
+  - standalone `SQLitePortfolioRiskGenerationRunRepository` does not validate referenced RiskArtifact existence; referential integrity is enforced by the portfolio-level coordinator
+- Sprint 6C-3 Technical portfolio persistence coordinator:
+  - `CapturingRiskEvaluator` wraps an existing `RiskEvaluator`, captures successful `RiskArtifact` outputs, preserves evaluation order, keeps run-scoped state, and propagates delegate failures
+  - `SQLiteTechnicalPortfolioRiskPersistenceCoordinator` is SQLite-specific and Technical-specific
+  - it creates `PortfolioRiskGenerationService` through the existing injection seam with `CapturingRiskEvaluator`
+  - `PortfolioRiskGenerationService` itself remains persistence-free and does not import `risk_persistence`
+  - generation completes before the SQLite persistence transaction starts
+  - persistence uses a single SQLite connection and one `BEGIN IMMEDIATE`
+  - captured Technical RiskArtifacts, Technical index projections, and the Portfolio RunRecord commit together
+  - canonical `MONITORING_FAILED` lifecycle example: P1 risk evaluation succeeds and monitoring succeeds; P2 risk evaluation succeeds but monitoring fails; P3 is not attempted because generation fails fast after P2
+  - in that `MONITORING_FAILED` example, RunRecord lifecycle fields are `attempted_position_ids = (P1, P2)`, `risk_evaluated_position_ids = (P1, P2)`, `succeeded_position_ids = (P1)`, `failed_position_ids = (P2)`, `risk_artifact_refs = (P1, P2)`, `monitoring_artifact_refs = (P1)`, and `status = MONITORING_FAILED`
+  - in that `MONITORING_FAILED` example, P1 RiskArtifact, P2 RiskArtifact, Technical index projections, and the `MONITORING_FAILED` RunRecord persist in the same portfolio-level SQLite transaction; P1 monitoring artifact reference is recorded, P2 monitoring artifact reference is not recorded because monitoring failed, and P3 is not evaluated or persisted
+  - `risk_evaluated_position_ids` is not equivalent to `succeeded_position_ids`; a position can pass risk evaluation and still be failed because monitoring failed, so `risk_evaluated_position_ids` and `failed_position_ids` can overlap
+  - any persistence failure rolls back the whole persistence transaction
+  - unexpected generation exceptions propagate unchanged and do not write RiskArtifacts, Technical index rows, or RunRecords
+  - same deterministic generation plus same `created_at` replays idempotently
+  - same calculation_id and artifacts with different `created_at` conflicts because `created_at` is part of the RunRecord checksum
+  - existing RunRecord referencing missing core RiskArtifact is durable corruption and fail closed; core exists plus missing Technical index remains deterministic index completion
+  - monitoring artifact payload persistence is out of scope; only monitoring artifact ids for successful monitoring positions are recorded
+  - `TechnicalRiskEvidenceSnapshot` remains out of scope
   - production risk DB remains not created and not activated
 
 ## Validation Evidence
@@ -1825,9 +1943,9 @@ Historical validation evidence after Sprint 5B:
 - source boundary scan: PASS
 - non-blocking warnings were observed for TWSE / TPEx offline refresh, Yahoo stale cache, and Streamlit bare-mode execution
 
-Current official validation evidence after Sprint 6B:
+Current official validation evidence after Sprint 6C:
 
-- Risk persistence tests: `130 tests OK`
+- Risk persistence tests: `225 tests OK`
 - Risk tests: `40 tests OK`
 - Portfolio generation tests: `86 tests OK`
 - Risk evaluation tests: `78 tests OK`
@@ -1837,11 +1955,12 @@ Current official validation evidence after Sprint 6B:
 - Targets tests: `42 tests OK`
 - Datasets tests: `16 tests OK`
 - Portfolio artifacts tests: `35 tests OK`
-- Full unittest: `1925 tests OK`
+- Full unittest: `2020 tests OK`
 - official full-suite command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -t .`
 - `compileall app.py src tests`: PASS
 - `git diff --check`: PASS
 - source boundary scan: PASS
+- production DB safety: PASS
 - non-blocking warnings were observed for TWSE / TPEx offline refresh, Yahoo stale cache, and Streamlit bare-mode execution
 
 Known warnings during full unittest:
@@ -1863,9 +1982,9 @@ Current state:
 - Portfolio Artifact Input / Repository / Dashboard Artifact Provider framework: complete, committed, and pushed
 - Portfolio State / Portfolio Generation Service Framework: complete, committed, and pushed
 - Risk Evaluation Production Contract: complete, committed, and pushed
-- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v2, verified SQLite Technical query, and atomic Technical artifact persistence: complete, committed, and pushed through Sprint 6B
-- Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record Contract Specification Review: complete; implementation split planned but not implemented
-- Next planned Technical Risk phase after documentation review / commit / validation / push: Sprint 6C-1 Run Record Contract + Canonical Checksum / Codec
+- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, and portfolio-level atomic persistence coordination: complete, committed, and pushed through Sprint 6C
+- Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
+- Next planned Technical Risk phase after documentation review / commit / validation / push: productionization specification review, unless a narrower sprint is explicitly scoped
 
 Current committed Long-Term Growth directories include:
 
@@ -1886,7 +2005,7 @@ Current committed Long-Term Growth directories include:
 - corresponding tests under `tests/`
 - Phase 7 architecture / framework docs under `docs/`
 
-Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Sprint 6B are now committed and pushed.
+Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Sprint 6C are now committed and pushed.
 
 ## Future Roadmap
 
@@ -1925,6 +2044,9 @@ Completed:
 - SQLite schema v2 and Technical index backfill
 - SQLite Technical query repository and verified read path
 - Atomic Technical artifact persistence
+- Portfolio Risk Generation RunRecord contract and canonical codec
+- SQLite schema v3 and Portfolio RunRecord repository
+- Technical portfolio persistence coordinator, CapturingRiskEvaluator, and portfolio-level atomic persistence
 
 Next planning candidate:
 
@@ -1932,9 +2054,7 @@ Next planning candidate:
 
 Future:
 
-- Sprint 6C-1 Run Record Contract + Canonical Checksum / Codec
-- Sprint 6C-2 SQLite Schema v3 + Run Repository
-- Sprint 6C-3 Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence
+- Productionization specification review, including production DB bootstrap / activation, runtime invocation, scheduler boundary, dashboard read-side integration, alert delivery boundary, and safe deployment boundary
 - Sprint 6D Policy Persistence / Activation Governance
 - Technical Risk v1 scheduler / live execution, only after explicit scope
 - Technical Risk v1 dashboard / alert integration, only after durable persistence and explicit scope
@@ -1975,7 +2095,7 @@ Planned persistence DB boundary:
 - Technical Risk artifact persistence must not use `LiveDataStore`
 - Technical Risk artifact persistence must not use `ResearchDataStore`
 
-Implemented artifact persistence semantics through Sprint 6B:
+Implemented artifact and portfolio run persistence semantics through Sprint 6C:
 
 - append-only / immutable artifact persistence
 - first save returns `INSERTED`
@@ -1993,17 +2113,35 @@ Implemented artifact persistence semantics through Sprint 6B:
 - atomic Technical persistence writes core artifact and Technical index in one transaction
 - write-path missing-index completion is deterministic and idempotent
 - orphan index, mismatched index, core conflict, core corruption, and index failure fail closed
+- Portfolio RunRecord contract stores attempted, risk_evaluated, succeeded, failed, RiskArtifact refs, monitoring refs, issues, warnings, and caller-injected timezone-aware `created_at`
+- RunRecord codec preserves a canonical versioned JSON envelope and semantic `record_checksum`
+- Portfolio RunRecord repository saves by `calculation_id` and supports `save(record)` plus `get_by_calculation_id(calculation_id)`
+- same `calculation_id` + same `record_checksum` returns `IDEMPOTENT`
+- same `calculation_id` + different valid RunRecord fails closed as `PortfolioRiskGenerationRunConflictError`
+- stored invalid RunRecord fails closed as `PortfolioRiskGenerationRunCorruptionError`
+- Technical portfolio persistence coordinator persists captured RiskArtifacts, Technical index projections, and Portfolio RunRecord in one transaction
+- risk evaluation failure can durably persist prior successful RiskArtifacts plus a failure RunRecord
+- monitoring failure can durably persist RiskArtifacts whose risk evaluation already succeeded, even if monitoring failed
+- in the canonical `MONITORING_FAILED` lifecycle, P1 complete and P2 risk-success / monitoring-failure gives attempted = P1, P2; risk_evaluated = P1, P2; succeeded = P1; failed = P2; RiskArtifact refs = P1, P2; monitoring refs = P1 only; P3 is not attempted or persisted
+- `risk_evaluated` and `succeeded` are intentionally distinct because `risk_evaluated` and failed positions can overlap when monitoring fails after risk evaluation succeeds
+- validation failure persists a RunRecord only
+- unexpected generation exception writes no RiskArtifacts, Technical index rows, or RunRecord
+- same deterministic generation and same `created_at` replays idempotently
+- same calculation_id and artifacts with different `created_at` conflicts because `created_at` participates in the RunRecord checksum
+- existing RunRecord referencing missing core RiskArtifact is durable corruption and is not auto-repaired
 
 Current SQLite storage scope:
 
 - core table: `risk_artifacts`
 - Technical projection table: `technical_risk_artifact_index`
-- current schema: `user_version = 2`
+- Portfolio run table: `portfolio_risk_generation_runs`
+- current schema: `user_version = 3`
+- `portfolio_risk_generation_runs` columns are `calculation_id`, `record_checksum`, and `payload_json`
 - verified read APIs exist through `SQLiteTechnicalRiskArtifactQueryRepository`
+- verified RunRecord reads exist through `SQLitePortfolioRiskGenerationRunRepository`
 - latest by position, history by position, and latest per position by portfolio are available for Technical artifacts
-- no run-level table yet
-- no SQLite schema v3 yet
-- no automatic save from `PortfolioRiskGenerationService`
+- no automatic production DB activation or scheduler wiring
+- `PortfolioRiskGenerationService` remains persistence-free
 - no dashboard read-side query contract
 
 Future Dashboard minimum query targets:
@@ -2029,21 +2167,16 @@ Current non-blocking gaps:
 - `RiskContext` still does not contain `position_id` or `valuation_date`; Sprint 5A / 5B did not change Phase 7K core schemas.
 - `PortfolioPosition` still has no first-class `position_id`; Technical Risk position lineage is preserved through `RiskSignalProductionInput.position_id` and `ProducedRiskSignal.position_id` metadata.
 - Production policy has no activation registry, persistence, or deployment workflow yet.
-- Technical Risk v1 has no run-level SQLite schema v3 yet.
-- Technical Risk v1 has no Portfolio run repository yet.
-- Technical Risk v1 has no portfolio-level persistence transaction yet.
-- Technical Risk v1 has no durable `risk_evaluated_position_ids` audit yet.
 - Technical Risk v1 has no Dashboard read-side repository contract yet.
-- Technical Risk v1 has no automatic `PortfolioRiskGenerationService` -> repository persistence integration yet.
-- Technical Risk v1 has no run-level persistence record yet.
 - Technical Risk v1 has no durable Technical evidence snapshot yet.
 - Technical Risk v1 has no `ProductionTechnicalRiskPolicy` persistence yet.
 - Technical Risk v1 production risk DB has not been created or activated yet.
 - Technical Risk v1 has no scheduler or live execution yet.
-- Technical Risk v1 output has storage-layer persistence capability, but it is not automatically persisted from the portfolio runtime yet.
+- Technical Risk v1 portfolio persistence capability exists through an external coordinator, but it is not production-activated or scheduled.
+- Technical Risk v1 has no monitoring artifact payload SQLite persistence yet.
 - Technical Risk v1 output is not integrated into dashboard or alert delivery yet.
 
-These gaps are not current blockers for the Sprint 6B synchronized state, but they must not be misrepresented as completed production deployment capability.
+These gaps are not current blockers for the Sprint 6C synchronized state, but they must not be misrepresented as completed production deployment capability.
 
 ## Important Design Rules
 
@@ -2068,7 +2201,7 @@ Hard rules to preserve:
 - Research policy freeze artifacts are research artifacts, not production policies.
 - Controlled promotion may create a production policy contract, but it must not imply activation or deployment.
 - `TechnicalRiskEvaluator` and `TechnicalRiskSignalProducer` exist, but they must not imply activation, scheduling, DB persistence, dashboard integration, or deployment.
-- `TechnicalRiskProductionService`, `TechnicalRiskArtifactAdapter`, and `TechnicalRiskPortfolioEvaluator` exist, in-memory `PortfolioRiskGenerationService` integration is validated, and Sprint 6B SQLite Technical storage-layer capability exists, but this must not imply automatic portfolio persistence integration, production DB activation, policy activation, scheduling, dashboard integration, alert delivery, or deployment.
+- `TechnicalRiskProductionService`, `TechnicalRiskArtifactAdapter`, `TechnicalRiskPortfolioEvaluator`, and the external Sprint 6C portfolio persistence coordinator exist, and in-memory `PortfolioRiskGenerationService` integration plus portfolio persistence capability are validated; this must not imply production DB activation, policy activation, scheduling, dashboard integration, alert delivery, or deployment.
 - Technical Risk v1 `LOW` is a real evaluated low-severity signal, not an evaluation failure.
 - Technical Risk v1 evaluation / producer failures must fail closed and must not become silent `LOW`, empty tuples, or failed signal artifacts.
 - Technical Risk v1 service failures must fail closed and must not become silent `LOW`, partial success, picked-first signal, or empty result.
@@ -2081,11 +2214,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `5a561724379da192e33bc78b8a194f1ff358f8c8` or inspect any newer commits.
-3. Confirm whether Technical Risk v1 through Sprint 6B files are still committed and whether new worktree changes exist.
+2. Confirm HEAD is still `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0` or inspect any newer commits.
+3. Confirm whether Technical Risk v1 through Sprint 6C files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
 8. Complete PROJECT_STATUS_MASTER review / commit / release validation / push before starting the next implementation sprint.
-9. If starting the next Technical Risk v1 sprint, verify it is Sprint 6C-1 Run Record Contract + Canonical Checksum / Codec first, not production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
+9. If starting the next Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
