@@ -13,25 +13,10 @@ from risk_persistence.contracts import RiskArtifactPersistenceError
 from risk_persistence.contracts import RiskArtifactRepository
 from risk_persistence.contracts import RiskArtifactSaveResult
 from risk_persistence.contracts import RiskArtifactSaveStatus
+from risk_persistence.sqlite_schema import initialize_or_verify_schema
 
 
-_APPLICATION_ID = 0x41494952
-_SCHEMA_VERSION = 1
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
-
-_CREATE_RISK_ARTIFACTS_TABLE_SQL = """
-CREATE TABLE risk_artifacts (
-    artifact_id TEXT PRIMARY KEY CHECK (artifact_id <> ''),
-    artifact_checksum TEXT NOT NULL CHECK (artifact_checksum <> ''),
-    payload_json TEXT NOT NULL CHECK (payload_json <> '')
-)
-"""
-
-_EXPECTED_RISK_ARTIFACT_COLUMNS = {
-    "artifact_id": {"type": "TEXT", "notnull": 0, "pk": 1},
-    "artifact_checksum": {"type": "TEXT", "notnull": 1, "pk": 0},
-    "payload_json": {"type": "TEXT", "notnull": 1, "pk": 0},
-}
 
 
 @dataclass(frozen=True)
@@ -164,55 +149,7 @@ class SQLiteRiskArtifactRepository(RiskArtifactRepository):
         connection.execute("PRAGMA foreign_keys=ON")
 
     def _initialize_or_verify_schema(self, connection: sqlite3.Connection) -> None:
-        application_id = _pragma_int(connection, "application_id")
-        user_version = _pragma_int(connection, "user_version")
-        user_tables = _user_tables(connection)
-
-        if application_id == 0 and user_version == 0 and not user_tables:
-            self._initialize_schema(connection)
-            return
-
-        if application_id != _APPLICATION_ID:
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
-        if user_version > _SCHEMA_VERSION:
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version is unsupported.")
-        if user_version != _SCHEMA_VERSION:
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
-        self._verify_schema_shape(connection)
-        self._ensure_wal(connection)
-
-    def _initialize_schema(self, connection: sqlite3.Connection) -> None:
-        try:
-            connection.execute(f"PRAGMA application_id={_APPLICATION_ID}")
-            connection.execute(_CREATE_RISK_ARTIFACTS_TABLE_SQL)
-            connection.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
-            self._ensure_wal(connection)
-            connection.commit()
-        except sqlite3.DatabaseError as exc:
-            connection.rollback()
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact schema initialization failed.") from exc
-        self._verify_schema_shape(connection)
-
-    def _ensure_wal(self, connection: sqlite3.Connection) -> None:
-        journal_mode = connection.execute("PRAGMA journal_mode=WAL").fetchone()[0]
-        if str(journal_mode).lower() != "wal":
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB requires WAL journal mode.")
-
-    def _verify_schema_shape(self, connection: sqlite3.Connection) -> None:
-        tables = _user_tables(connection)
-        if tables != ("risk_artifacts",):
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema tables mismatch.")
-        rows = connection.execute("PRAGMA table_info(risk_artifacts)").fetchall()
-        columns = {
-            row[1]: {
-                "type": str(row[2]).upper(),
-                "notnull": int(row[3]),
-                "pk": int(row[5]),
-            }
-            for row in rows
-        }
-        if columns != _EXPECTED_RISK_ARTIFACT_COLUMNS:
-            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema columns mismatch.")
+        initialize_or_verify_schema(connection)
 
     def _decode_row(self, row: sqlite3.Row | tuple) -> RiskArtifact:
         artifact_id = row[0]
@@ -249,20 +186,3 @@ def _validate_db_path(db_path: str | Path) -> Path:
     if not path.parent.exists():
         raise RiskArtifactPersistenceError("db_path parent directory must exist.")
     return path
-
-
-def _pragma_int(connection: sqlite3.Connection, name: str) -> int:
-    return int(connection.execute(f"PRAGMA {name}").fetchone()[0])
-
-
-def _user_tables(connection: sqlite3.Connection) -> tuple[str, ...]:
-    rows = connection.execute(
-        """
-        SELECT name
-        FROM sqlite_master
-        WHERE type = 'table'
-          AND name NOT LIKE 'sqlite_%'
-        ORDER BY name
-        """
-    ).fetchall()
-    return tuple(row[0] for row in rows)

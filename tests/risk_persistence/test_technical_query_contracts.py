@@ -586,16 +586,17 @@ class TechnicalRiskQueryContractsTestCase(unittest.TestCase):
             ("self", "artifact_id"),
         )
 
-    def test_sqlite_repository_still_has_no_query_apis_or_schema_v2(self):
+    def test_sqlite_repository_still_has_no_query_apis_or_technical_projection_logic(self):
         source = (SRC_PATH / "risk_persistence" / "sqlite_repository.py").read_text()
-        self.assertIn("_SCHEMA_VERSION = 1", source)
         forbidden = (
             "TechnicalRiskArtifactQueryRepository",
-            "technical_risk_artifact_index",
             "list_latest_by_portfolio",
             "list_history_by_position",
             "get_latest_by_position",
-            "user_version=2",
+            "TechnicalRiskArtifactIndexRecord",
+            "technical_position_id",
+            "technical_policy_id",
+            "technical_evaluation_id",
         )
         for text in forbidden:
             with self.subTest(text=text):
