@@ -21,6 +21,7 @@ from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunR
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunSaveResult
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunSaveStatus
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunWarning
+from risk_persistence.sqlite_portfolio_run_repository import SQLitePortfolioRiskGenerationRunRepository
 from risk_persistence.sqlite_repository import SQLiteRiskArtifactRepository
 from risk_persistence.sqlite_technical_artifact_persistence import SQLiteTechnicalRiskArtifactPersistenceCoordinator
 from risk_persistence.sqlite_technical_query_repository import SQLiteTechnicalRiskArtifactQueryRepository
@@ -51,6 +52,7 @@ __all__ = [
     "RiskArtifactRepository",
     "RiskArtifactSaveResult",
     "RiskArtifactSaveStatus",
+    "SQLitePortfolioRiskGenerationRunRepository",
     "SQLiteRiskArtifactRepository",
     "SQLiteTechnicalRiskArtifactPersistenceCoordinator",
     "SQLiteTechnicalRiskArtifactQueryRepository",

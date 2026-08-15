@@ -41,7 +41,7 @@ from risk_persistence import SQLiteRiskArtifactRepository
 
 
 APPLICATION_ID = 0x41494952
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class SQLiteRiskArtifactRepositoryTestCase(unittest.TestCase):
@@ -227,7 +227,7 @@ class SQLiteRiskArtifactRepositoryTestCase(unittest.TestCase):
                     """
                 ).fetchall()
             )
-            self.assertEqual(tables, ("risk_artifacts", "technical_risk_artifact_index"))
+            self.assertEqual(tables, ("portfolio_risk_generation_runs", "risk_artifacts", "technical_risk_artifact_index"))
         finally:
             connection.close()
 
@@ -462,7 +462,7 @@ class SQLiteRiskArtifactRepositoryTestCase(unittest.TestCase):
         connection = self.connection()
         try:
             connection.execute(f"PRAGMA application_id={APPLICATION_ID}")
-            connection.execute("PRAGMA user_version=3")
+            connection.execute("PRAGMA user_version=4")
             connection.commit()
         finally:
             connection.close()

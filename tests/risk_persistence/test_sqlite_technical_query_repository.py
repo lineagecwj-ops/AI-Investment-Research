@@ -329,7 +329,7 @@ class SQLiteTechnicalRiskArtifactQueryRepositoryTestCase(unittest.TestCase):
         self.core_repository()
         connection = self.connection()
         try:
-            connection.execute("PRAGMA user_version=3")
+            connection.execute("PRAGMA user_version=4")
             connection.commit()
         finally:
             connection.close()

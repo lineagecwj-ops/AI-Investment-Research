@@ -11,7 +11,7 @@ from risk import RiskArtifactCodecError
 from risk import RiskSeverity
 from risk_persistence.contracts import RiskArtifactCorruptionError
 from risk_persistence.contracts import RiskArtifactPersistenceError
-from risk_persistence.sqlite_schema import validate_schema_v2_readonly
+from risk_persistence.sqlite_schema import validate_current_schema_readonly
 from risk_persistence.sqlite_technical_index import technical_index_record_from_row
 from risk_persistence.sqlite_technical_index import technical_index_select_columns
 from risk_persistence.technical_query_contracts import RiskArtifactIndexCorruptionError
@@ -186,7 +186,7 @@ class SQLiteTechnicalRiskArtifactQueryRepository(TechnicalRiskArtifactQueryRepos
             connection.row_factory = sqlite3.Row
             try:
                 self._configure_connection(connection)
-                validate_schema_v2_readonly(connection)
+                validate_current_schema_readonly(connection)
                 try:
                     connection.execute("BEGIN")
                     result = operation(connection)

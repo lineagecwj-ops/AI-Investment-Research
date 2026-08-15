@@ -9,6 +9,7 @@ from datetime import date
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +19,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 import risk.risk_artifact_codec as codec_module
+import risk_persistence.sqlite_schema as schema_module
 from portfolio_generation import TechnicalRiskArtifactAdapter
 from risk import HoldingType
 from risk import PortfolioPosition
@@ -38,8 +40,9 @@ from risk_persistence import SQLiteRiskArtifactRepository
 
 
 APPLICATION_ID = 0x41494952
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA_VERSION_V1 = 1
+SCHEMA_VERSION_V2 = 2
 
 V1_CREATE_RISK_ARTIFACTS_TABLE_SQL = """
 CREATE TABLE risk_artifacts (
@@ -217,6 +220,14 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
         finally:
             connection.close()
 
+    def create_v2_db(self, artifacts=()):
+        self.create_v1_db(artifacts)
+        connection = self.connection()
+        try:
+            schema_module._migrate_v1_to_v2(connection)
+        finally:
+            connection.close()
+
     def schema_identity(self):
         connection = self.connection()
         try:
@@ -261,16 +272,33 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
         finally:
             connection.close()
 
-    def test_fresh_db_initializes_schema_v2(self):
+    def run_rows(self):
+        connection = self.connection()
+        try:
+            return connection.execute(
+                """
+                SELECT calculation_id, record_checksum, payload_json
+                FROM portfolio_risk_generation_runs
+                ORDER BY calculation_id
+                """
+            ).fetchall()
+        finally:
+            connection.close()
+
+    def test_fresh_db_initializes_schema_v3(self):
         self.repository()
 
         self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
-        self.assertEqual(self.user_tables(), ("risk_artifacts", "technical_risk_artifact_index"))
+        self.assertEqual(self.user_tables(), ("portfolio_risk_generation_runs", "risk_artifacts", "technical_risk_artifact_index"))
         connection = self.connection()
         try:
             core_columns = tuple(row[1] for row in connection.execute("PRAGMA table_info(risk_artifacts)").fetchall())
             technical_columns = tuple(
                 row[1] for row in connection.execute("PRAGMA table_info(technical_risk_artifact_index)").fetchall()
+            )
+            run_columns = tuple(
+                (row[1], row[2].upper(), int(row[3]), int(row[5]))
+                for row in connection.execute("PRAGMA table_info(portfolio_risk_generation_runs)").fetchall()
             )
             self.assertEqual(core_columns, ("artifact_id", "artifact_checksum", "payload_json"))
             self.assertEqual(
@@ -293,6 +321,14 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
                     "producer_version",
                 ),
             )
+            self.assertEqual(
+                run_columns,
+                (
+                    ("calculation_id", "TEXT", 0, 1),
+                    ("record_checksum", "TEXT", 1, 0),
+                    ("payload_json", "TEXT", 1, 0),
+                ),
+            )
             indexes = tuple(
                 row[1]
                 for row in connection.execute("PRAGMA index_list(technical_risk_artifact_index)").fetchall()
@@ -300,23 +336,30 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
             self.assertIn("idx_technical_risk_artifact_position_latest", indexes)
             fk = connection.execute("PRAGMA foreign_key_list(technical_risk_artifact_index)").fetchall()
             self.assertEqual(fk[0][2:5], ("risk_artifacts", "artifact_id", "artifact_id"))
+            run_sql = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'portfolio_risk_generation_runs'"
+            ).fetchone()[0]
+            self.assertIn("CHECK (calculation_id <> '')", run_sql)
+            self.assertIn("CHECK (record_checksum <> '')", run_sql)
+            self.assertIn("CHECK (payload_json <> '')", run_sql)
         finally:
             connection.close()
 
-    def test_existing_empty_file_initializes_schema_v2(self):
+    def test_existing_empty_file_initializes_schema_v3(self):
         self.db_path.touch()
 
         self.repository()
 
         self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
 
-    def test_existing_valid_v1_empty_db_migrates_to_v2(self):
+    def test_existing_valid_v1_empty_db_migrates_to_v3(self):
         self.create_v1_db()
 
         self.repository()
 
         self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
         self.assertEqual(self.index_rows(), [])
+        self.assertEqual(self.run_rows(), [])
 
     def test_v1_technical_low_medium_high_backfill(self):
         artifacts = (
@@ -405,6 +448,7 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
 
         self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
         self.assertEqual(len(self.index_rows()), 1)
+        self.assertEqual(self.run_rows(), [])
 
     def test_v1_with_existing_index_table_fails_closed(self):
         self.create_v1_db()
@@ -418,18 +462,35 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
         with self.assertRaises(RiskArtifactPersistenceError):
             self.repository()
 
-    def test_existing_valid_v2_opens(self):
-        self.repository()
+    def test_existing_valid_v2_migrates_to_v3(self):
+        self.create_v2_db()
 
         self.repository()
 
         self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
+        self.assertEqual(self.user_tables(), ("portfolio_risk_generation_runs", "risk_artifacts", "technical_risk_artifact_index"))
+        self.assertEqual(self.run_rows(), [])
+
+    def test_v2_to_v3_failed_migration_rolls_back_and_can_retry(self):
+        self.create_v2_db()
+
+        with patch.object(schema_module, "CREATE_PORTFOLIO_RISK_GENERATION_RUNS_TABLE_SQL", "CREATE TABLE broken_sql ("):
+            with self.assertRaises(RiskArtifactPersistenceError):
+                self.repository()
+
+        self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION_V2))
+        self.assertEqual(self.user_tables(), ("risk_artifacts", "technical_risk_artifact_index"))
+
+        self.repository()
+
+        self.assertEqual(self.schema_identity(), (APPLICATION_ID, SCHEMA_VERSION))
+        self.assertEqual(self.run_rows(), [])
 
     def test_future_version_fails_closed(self):
         self.create_v1_db()
         connection = self.connection()
         try:
-            connection.execute("PRAGMA user_version=3")
+            connection.execute("PRAGMA user_version=4")
             connection.commit()
         finally:
             connection.close()
@@ -525,6 +586,19 @@ class SQLiteSchemaV2TestCase(unittest.TestCase):
         connection = self.connection()
         try:
             connection.execute("CREATE TABLE extra_table (id TEXT PRIMARY KEY)")
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaises(RiskArtifactPersistenceError):
+            self.repository()
+
+    def test_wrong_v3_run_table_schema_fails_closed(self):
+        self.repository()
+        connection = self.connection()
+        try:
+            connection.execute("DROP TABLE portfolio_risk_generation_runs")
+            connection.execute("CREATE TABLE portfolio_risk_generation_runs (calculation_id TEXT PRIMARY KEY)")
             connection.commit()
         finally:
             connection.close()

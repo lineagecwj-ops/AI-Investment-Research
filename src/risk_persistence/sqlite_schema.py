@@ -12,11 +12,13 @@ from risk_persistence.technical_query_contracts import TechnicalRiskArtifactInde
 
 
 APPLICATION_ID = 0x41494952
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA_VERSION_V1 = 1
+SCHEMA_VERSION_V2 = 2
 
 RISK_ARTIFACTS_TABLE = "risk_artifacts"
 TECHNICAL_RISK_ARTIFACT_INDEX_TABLE = "technical_risk_artifact_index"
+PORTFOLIO_RISK_GENERATION_RUNS_TABLE = "portfolio_risk_generation_runs"
 TECHNICAL_RISK_ARTIFACT_POSITION_LATEST_INDEX = "idx_technical_risk_artifact_position_latest"
 
 CREATE_RISK_ARTIFACTS_TABLE_SQL = """
@@ -59,6 +61,14 @@ ON technical_risk_artifact_index (
 )
 """
 
+CREATE_PORTFOLIO_RISK_GENERATION_RUNS_TABLE_SQL = """
+CREATE TABLE portfolio_risk_generation_runs (
+    calculation_id TEXT PRIMARY KEY CHECK (calculation_id <> ''),
+    record_checksum TEXT NOT NULL CHECK (record_checksum <> ''),
+    payload_json TEXT NOT NULL CHECK (payload_json <> '')
+)
+"""
+
 EXPECTED_RISK_ARTIFACT_COLUMNS = {
     "artifact_id": {"type": "TEXT", "notnull": 0, "pk": 1},
     "artifact_checksum": {"type": "TEXT", "notnull": 1, "pk": 0},
@@ -81,6 +91,12 @@ EXPECTED_TECHNICAL_RISK_ARTIFACT_INDEX_COLUMNS = {
     "evaluation_id": {"type": "TEXT", "notnull": 1, "pk": 0},
     "evaluation_checksum": {"type": "TEXT", "notnull": 1, "pk": 0},
     "producer_version": {"type": "TEXT", "notnull": 1, "pk": 0},
+}
+
+EXPECTED_PORTFOLIO_RISK_GENERATION_RUNS_COLUMNS = {
+    "calculation_id": {"type": "TEXT", "notnull": 0, "pk": 1},
+    "record_checksum": {"type": "TEXT", "notnull": 1, "pk": 0},
+    "payload_json": {"type": "TEXT", "notnull": 1, "pk": 0},
 }
 
 _TECHNICAL_METADATA_KEYS = frozenset(
@@ -111,7 +127,7 @@ def initialize_or_verify_schema(connection: sqlite3.Connection) -> None:
     user_tables = _user_tables(connection)
 
     if application_id == 0 and user_version == 0 and not user_tables:
-        _initialize_schema_v2(connection)
+        _initialize_schema_v3(connection)
         return
 
     if application_id != APPLICATION_ID:
@@ -120,10 +136,13 @@ def initialize_or_verify_schema(connection: sqlite3.Connection) -> None:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version is unsupported.")
     if user_version == SCHEMA_VERSION_V1:
         _migrate_v1_to_v2(connection)
+        user_version = _pragma_int(connection, "user_version")
+    if user_version == SCHEMA_VERSION_V2:
+        _migrate_v2_to_v3(connection)
         return
     if user_version != SCHEMA_VERSION:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
-    verify_schema_v2(connection)
+    verify_schema_v3(connection)
     ensure_wal(connection)
 
 
@@ -139,15 +158,47 @@ def verify_schema_v2(connection: sqlite3.Connection) -> None:
     )
     _verify_foreign_key(connection)
     _verify_position_latest_index(connection)
-    _verify_required_checks(connection)
+    _verify_required_checks(connection, version=SCHEMA_VERSION_V2)
 
 
 def validate_schema_v2_readonly(connection: sqlite3.Connection) -> None:
     if _pragma_int(connection, "application_id") != APPLICATION_ID:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
-    if _pragma_int(connection, "user_version") != SCHEMA_VERSION:
+    if _pragma_int(connection, "user_version") != SCHEMA_VERSION_V2:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
     verify_schema_v2(connection)
+
+
+def verify_schema_v3(connection: sqlite3.Connection) -> None:
+    tables = _user_tables(connection)
+    if tables != (
+        PORTFOLIO_RISK_GENERATION_RUNS_TABLE,
+        RISK_ARTIFACTS_TABLE,
+        TECHNICAL_RISK_ARTIFACT_INDEX_TABLE,
+    ):
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema tables mismatch.")
+    _verify_table_shape(connection, RISK_ARTIFACTS_TABLE, EXPECTED_RISK_ARTIFACT_COLUMNS)
+    _verify_table_shape(
+        connection,
+        TECHNICAL_RISK_ARTIFACT_INDEX_TABLE,
+        EXPECTED_TECHNICAL_RISK_ARTIFACT_INDEX_COLUMNS,
+    )
+    _verify_table_shape(
+        connection,
+        PORTFOLIO_RISK_GENERATION_RUNS_TABLE,
+        EXPECTED_PORTFOLIO_RISK_GENERATION_RUNS_COLUMNS,
+    )
+    _verify_foreign_key(connection)
+    _verify_position_latest_index(connection)
+    _verify_required_checks(connection)
+
+
+def validate_current_schema_readonly(connection: sqlite3.Connection) -> None:
+    if _pragma_int(connection, "application_id") != APPLICATION_ID:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
+    if _pragma_int(connection, "user_version") != SCHEMA_VERSION:
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
+    verify_schema_v3(connection)
 
 
 def ensure_wal(connection: sqlite3.Connection) -> None:
@@ -156,19 +207,20 @@ def ensure_wal(connection: sqlite3.Connection) -> None:
         raise RiskArtifactPersistenceError("SQLite RiskArtifact DB requires WAL journal mode.")
 
 
-def _initialize_schema_v2(connection: sqlite3.Connection) -> None:
+def _initialize_schema_v3(connection: sqlite3.Connection) -> None:
     try:
         connection.execute(f"PRAGMA application_id={APPLICATION_ID}")
         connection.execute(CREATE_RISK_ARTIFACTS_TABLE_SQL)
         connection.execute(CREATE_TECHNICAL_RISK_ARTIFACT_INDEX_TABLE_SQL)
         connection.execute(CREATE_TECHNICAL_RISK_ARTIFACT_POSITION_LATEST_INDEX_SQL)
+        connection.execute(CREATE_PORTFOLIO_RISK_GENERATION_RUNS_TABLE_SQL)
         connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         ensure_wal(connection)
         connection.commit()
     except sqlite3.DatabaseError as exc:
         connection.rollback()
         raise RiskArtifactPersistenceError("SQLite RiskArtifact schema initialization failed.") from exc
-    verify_schema_v2(connection)
+    verify_schema_v3(connection)
 
 
 def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
@@ -187,7 +239,7 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
         connection.execute(CREATE_TECHNICAL_RISK_ARTIFACT_INDEX_TABLE_SQL)
         connection.execute(CREATE_TECHNICAL_RISK_ARTIFACT_POSITION_LATEST_INDEX_SQL)
         _backfill_technical_index(connection)
-        connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        connection.execute(f"PRAGMA user_version={SCHEMA_VERSION_V2}")
         connection.commit()
     except (sqlite3.DatabaseError, RiskArtifactPersistenceError) as exc:
         if connection.in_transaction:
@@ -196,6 +248,28 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
             raise
         raise RiskArtifactPersistenceError("SQLite RiskArtifact schema migration failed.") from exc
     verify_schema_v2(connection)
+    ensure_wal(connection)
+
+
+def _migrate_v2_to_v3(connection: sqlite3.Connection) -> None:
+    verify_schema_v2(connection)
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        if _pragma_int(connection, "application_id") != APPLICATION_ID:
+            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB application_id mismatch.")
+        if _pragma_int(connection, "user_version") != SCHEMA_VERSION_V2:
+            raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema version mismatch.")
+        verify_schema_v2(connection)
+        connection.execute(CREATE_PORTFOLIO_RISK_GENERATION_RUNS_TABLE_SQL)
+        connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        connection.commit()
+    except (sqlite3.DatabaseError, RiskArtifactPersistenceError) as exc:
+        if connection.in_transaction:
+            connection.rollback()
+        if isinstance(exc, RiskArtifactPersistenceError):
+            raise
+        raise RiskArtifactPersistenceError("SQLite RiskArtifact schema migration failed.") from exc
+    verify_schema_v3(connection)
     ensure_wal(connection)
 
 
@@ -271,8 +345,10 @@ def _verify_position_latest_index(connection: sqlite3.Connection) -> None:
 
 def _verify_required_checks(connection: sqlite3.Connection, *, version: int = SCHEMA_VERSION) -> None:
     table_names = [RISK_ARTIFACTS_TABLE]
-    if version == SCHEMA_VERSION:
+    if version >= SCHEMA_VERSION_V2:
         table_names.append(TECHNICAL_RISK_ARTIFACT_INDEX_TABLE)
+    if version >= SCHEMA_VERSION:
+        table_names.append(PORTFOLIO_RISK_GENERATION_RUNS_TABLE)
     for table_name in table_names:
         sql = _schema_sql(connection, table_name)
         for column_name in _expected_check_columns(table_name):
@@ -286,6 +362,8 @@ def _expected_check_columns(table_name: str) -> tuple[str, ...]:
         return ("artifact_id", "artifact_checksum", "payload_json")
     if table_name == TECHNICAL_RISK_ARTIFACT_INDEX_TABLE:
         return tuple(EXPECTED_TECHNICAL_RISK_ARTIFACT_INDEX_COLUMNS)
+    if table_name == PORTFOLIO_RISK_GENERATION_RUNS_TABLE:
+        return tuple(EXPECTED_PORTFOLIO_RISK_GENERATION_RUNS_COLUMNS)
     raise RiskArtifactPersistenceError("SQLite RiskArtifact DB schema table mismatch.")
 
 
