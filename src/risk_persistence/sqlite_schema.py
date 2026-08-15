@@ -3,11 +3,10 @@ from __future__ import annotations
 import sqlite3
 
 from risk import RiskArtifact
-from risk import RiskArtifactCodec
-from risk import RiskArtifactCodecError
 from risk import RiskCategory
-from risk_persistence.contracts import RiskArtifactCorruptionError
 from risk_persistence.contracts import RiskArtifactPersistenceError
+from risk_persistence.sqlite_storage import decode_core_artifact_row
+from risk_persistence.sqlite_technical_index import insert_technical_index_record
 from risk_persistence.technical_query_contracts import RiskArtifactIndexCorruptionError
 from risk_persistence.technical_query_contracts import TechnicalRiskArtifactIndexRecord
 
@@ -209,33 +208,12 @@ def _backfill_technical_index(connection: sqlite3.Connection) -> None:
         """
     ).fetchall()
     for row in rows:
-        artifact = _decode_row(row)
+        artifact = decode_core_artifact_row(row)
         classification = _classify_artifact(artifact)
         if classification == "VALID_NON_TECHNICAL":
             continue
         record = TechnicalRiskArtifactIndexRecord.from_artifact(artifact)
-        _insert_index_record(connection, record)
-
-
-def _decode_row(row: sqlite3.Row | tuple) -> RiskArtifact:
-    artifact_id = row[0]
-    artifact_checksum = row[1]
-    payload_json = row[2]
-    if not isinstance(artifact_id, str) or not artifact_id:
-        raise RiskArtifactCorruptionError(str(artifact_id or "unknown"))
-    if not isinstance(artifact_checksum, str) or not artifact_checksum:
-        raise RiskArtifactCorruptionError(artifact_id)
-    if not isinstance(payload_json, str) or not payload_json:
-        raise RiskArtifactCorruptionError(artifact_id)
-    try:
-        artifact = RiskArtifactCodec().decode(payload_json)
-    except RiskArtifactCodecError as exc:
-        raise RiskArtifactCorruptionError(artifact_id) from exc
-    if artifact.artifact_id != artifact_id:
-        raise RiskArtifactCorruptionError(artifact_id)
-    if artifact.checksum != artifact_checksum:
-        raise RiskArtifactCorruptionError(artifact_id)
-    return artifact
+        insert_technical_index_record(connection, record)
 
 
 def _classify_artifact(artifact: RiskArtifact) -> str:
@@ -247,48 +225,6 @@ def _classify_artifact(artifact: RiskArtifact) -> str:
     if has_technical_signal:
         return "VALID_TECHNICAL"
     raise RiskArtifactIndexCorruptionError(artifact.artifact_id)
-
-
-def _insert_index_record(connection: sqlite3.Connection, record: TechnicalRiskArtifactIndexRecord) -> None:
-    connection.execute(
-        """
-        INSERT INTO technical_risk_artifact_index (
-            artifact_id,
-            portfolio_id,
-            position_id,
-            symbol,
-            severity,
-            analysis_date,
-            valuation_date,
-            created_at,
-            calculation_id,
-            policy_id,
-            policy_version,
-            policy_checksum,
-            evaluation_id,
-            evaluation_checksum,
-            producer_version
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            record.artifact_id,
-            record.portfolio_id,
-            record.position_id,
-            record.symbol,
-            record.severity.value,
-            record.analysis_date.isoformat(),
-            record.valuation_date.isoformat(),
-            record.created_at.isoformat(),
-            record.calculation_id,
-            record.policy_id,
-            record.policy_version,
-            record.policy_checksum,
-            record.evaluation_id,
-            record.evaluation_checksum,
-            record.producer_version,
-        ),
-    )
 
 
 def _verify_table_shape(connection: sqlite3.Connection, table_name: str, expected_columns: dict[str, dict[str, int | str]]) -> None:

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import date
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -14,6 +12,8 @@ from risk import RiskSeverity
 from risk_persistence.contracts import RiskArtifactCorruptionError
 from risk_persistence.contracts import RiskArtifactPersistenceError
 from risk_persistence.sqlite_schema import validate_schema_v2_readonly
+from risk_persistence.sqlite_technical_index import technical_index_record_from_row
+from risk_persistence.sqlite_technical_index import technical_index_select_columns
 from risk_persistence.technical_query_contracts import RiskArtifactIndexCorruptionError
 from risk_persistence.technical_query_contracts import TechnicalRiskArtifactIndexRecord
 from risk_persistence.technical_query_contracts import TechnicalRiskArtifactQueryRepository
@@ -21,23 +21,7 @@ from risk_persistence.technical_query_contracts import TechnicalRiskArtifactQuer
 
 _DEFAULT_BUSY_TIMEOUT_MS = 5000
 
-_INDEX_COLUMNS = """
-idx.artifact_id AS idx_artifact_id,
-idx.portfolio_id AS idx_portfolio_id,
-idx.position_id AS idx_position_id,
-idx.symbol AS idx_symbol,
-idx.severity AS idx_severity,
-idx.analysis_date AS idx_analysis_date,
-idx.valuation_date AS idx_valuation_date,
-idx.created_at AS idx_created_at,
-idx.calculation_id AS idx_calculation_id,
-idx.policy_id AS idx_policy_id,
-idx.policy_version AS idx_policy_version,
-idx.policy_checksum AS idx_policy_checksum,
-idx.evaluation_id AS idx_evaluation_id,
-idx.evaluation_checksum AS idx_evaluation_checksum,
-idx.producer_version AS idx_producer_version
-"""
+_INDEX_COLUMNS = technical_index_select_columns("idx")
 
 _CORE_COLUMNS = """
 core.artifact_id AS core_artifact_id,
@@ -237,7 +221,7 @@ class SQLiteTechnicalRiskArtifactQueryRepository(TechnicalRiskArtifactQueryRepos
         connection.execute("PRAGMA query_only=ON")
 
     def _materialize_row(self, row: sqlite3.Row) -> RiskArtifact:
-        stored_record = _index_record_from_row(row)
+        stored_record = technical_index_record_from_row(row)
         core_artifact_id = row["core_artifact_id"]
         core_checksum = row["core_artifact_checksum"]
         payload_json = row["core_payload_json"]
@@ -266,30 +250,6 @@ class SQLiteTechnicalRiskArtifactQueryRepository(TechnicalRiskArtifactQueryRepos
         if stored_record != rebuilt_record:
             raise RiskArtifactIndexCorruptionError(stored_record.artifact_id)
         return artifact
-
-
-def _index_record_from_row(row: sqlite3.Row) -> TechnicalRiskArtifactIndexRecord:
-    artifact_id = row["idx_artifact_id"] if isinstance(row["idx_artifact_id"], str) and row["idx_artifact_id"] else "unknown"
-    try:
-        return TechnicalRiskArtifactIndexRecord(
-            artifact_id=_require_text(row["idx_artifact_id"], "artifact_id"),
-            portfolio_id=_require_text(row["idx_portfolio_id"], "portfolio_id"),
-            position_id=_require_text(row["idx_position_id"], "position_id"),
-            symbol=_require_text(row["idx_symbol"], "symbol"),
-            severity=RiskSeverity(_require_text(row["idx_severity"], "severity")),
-            analysis_date=date.fromisoformat(_require_text(row["idx_analysis_date"], "analysis_date")),
-            valuation_date=date.fromisoformat(_require_text(row["idx_valuation_date"], "valuation_date")),
-            created_at=datetime.fromisoformat(_require_text(row["idx_created_at"], "created_at")),
-            calculation_id=_require_text(row["idx_calculation_id"], "calculation_id"),
-            policy_id=_require_text(row["idx_policy_id"], "policy_id"),
-            policy_version=_require_text(row["idx_policy_version"], "policy_version"),
-            policy_checksum=_require_text(row["idx_policy_checksum"], "policy_checksum"),
-            evaluation_id=_require_text(row["idx_evaluation_id"], "evaluation_id"),
-            evaluation_checksum=_require_text(row["idx_evaluation_checksum"], "evaluation_checksum"),
-            producer_version=_require_text(row["idx_producer_version"], "producer_version"),
-        )
-    except (RiskArtifactPersistenceError, ValueError, TypeError) as exc:
-        raise RiskArtifactIndexCorruptionError(artifact_id) from exc
 
 
 def _validate_existing_db_path(db_path: str | Path) -> Path:

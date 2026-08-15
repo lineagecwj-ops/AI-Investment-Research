@@ -7,6 +7,7 @@ from risk_persistence.contracts import RiskArtifactRepository
 from risk_persistence.contracts import RiskArtifactSaveResult
 from risk_persistence.contracts import RiskArtifactSaveStatus
 from risk_persistence.sqlite_repository import SQLiteRiskArtifactRepository
+from risk_persistence.sqlite_technical_artifact_persistence import SQLiteTechnicalRiskArtifactPersistenceCoordinator
 from risk_persistence.sqlite_technical_query_repository import SQLiteTechnicalRiskArtifactQueryRepository
 from risk_persistence.technical_query_contracts import RiskArtifactIndexCorruptionError
 from risk_persistence.technical_query_contracts import TechnicalRiskArtifactIndexRecord
@@ -21,6 +22,7 @@ __all__ = [
     "RiskArtifactSaveResult",
     "RiskArtifactSaveStatus",
     "SQLiteRiskArtifactRepository",
+    "SQLiteTechnicalRiskArtifactPersistenceCoordinator",
     "SQLiteTechnicalRiskArtifactQueryRepository",
     "TechnicalRiskArtifactIndexRecord",
     "TechnicalRiskArtifactQueryRepository",
