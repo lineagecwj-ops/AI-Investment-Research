@@ -16,7 +16,9 @@ if str(SRC_PATH) not in sys.path:
 
 from portfolio_generation import PortfolioRiskGenerationStatus
 from risk_persistence import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1
+from risk_persistence import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2
 from risk_persistence import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1
+from risk_persistence import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2
 from risk_persistence import PortfolioRiskGenerationRunArtifactRef
 from risk_persistence import PortfolioRiskGenerationRunIssue
 from risk_persistence import PortfolioRiskGenerationRunMonitoringArtifactRef
@@ -45,6 +47,7 @@ class PortfolioRiskGenerationRunCodecTestCase(unittest.TestCase):
         values = {
             "calculation_id": "portfolio_risk_calc_001",
             "generation_key": "portfolio_risk_generation_001",
+            "feature_set_checksum": "technical_feature_set_" + "a" * 64,
             "portfolio_id": "portfolio_001",
             "snapshot_id": "snapshot_001",
             "snapshot_checksum": "snapshot_checksum_001",
@@ -184,8 +187,17 @@ class PortfolioRiskGenerationRunCodecTestCase(unittest.TestCase):
     def test_known_versions_encoded(self):
         payload = self.decoded_payload()
 
-        self.assertEqual(payload["schema_version"], PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1)
-        self.assertEqual(payload["codec_version"], PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1)
+        self.assertEqual(PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1, "1")
+        self.assertEqual(PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1, "1")
+        self.assertEqual(payload["schema_version"], PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2)
+        self.assertEqual(payload["codec_version"], PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2)
+
+    def test_feature_set_checksum_encoded_and_decoded(self):
+        record = self.record(feature_set_checksum="technical_feature_set_" + "b" * 64)
+        payload = self.decoded_payload(record)
+
+        self.assertEqual(payload["record"]["feature_set_checksum"], record.feature_set_checksum)
+        self.assertEqual(self.codec().decode(self.encode_payload(payload)).feature_set_checksum, record.feature_set_checksum)
 
     def test_unknown_record_field_rejected(self):
         payload = self.decoded_payload()
@@ -199,6 +211,20 @@ class PortfolioRiskGenerationRunCodecTestCase(unittest.TestCase):
         del payload["record"]["portfolio_id"]
 
         with self.assertRaisesRegex(PortfolioRiskGenerationRunRecordCodecError, "payload"):
+            self.codec().decode(self.encode_payload(payload))
+
+    def test_missing_feature_set_checksum_rejected(self):
+        payload = self.decoded_payload()
+        del payload["record"]["feature_set_checksum"]
+
+        with self.assertRaisesRegex(PortfolioRiskGenerationRunRecordCodecError, "payload"):
+            self.codec().decode(self.encode_payload(payload))
+
+    def test_malformed_feature_set_checksum_rejected(self):
+        payload = self.decoded_payload()
+        payload["record"]["feature_set_checksum"] = "technical_feature_set_" + "A" * 64
+
+        with self.assertRaisesRegex(PortfolioRiskGenerationRunRecordCodecError, "feature_set_checksum"):
             self.codec().decode(self.encode_payload(payload))
 
     def test_unknown_status_enum_rejected(self):
@@ -240,6 +266,13 @@ class PortfolioRiskGenerationRunCodecTestCase(unittest.TestCase):
     def test_semantic_payload_tamper_with_old_checksum_rejected(self):
         payload = self.decoded_payload()
         payload["record"]["portfolio_id"] = "portfolio_other"
+
+        with self.assertRaisesRegex(PortfolioRiskGenerationRunRecordCodecError, "record_checksum"):
+            self.codec().decode(self.encode_payload(payload))
+
+    def test_feature_set_checksum_tamper_with_old_checksum_rejected(self):
+        payload = self.decoded_payload()
+        payload["record"]["feature_set_checksum"] = "technical_feature_set_" + "b" * 64
 
         with self.assertRaisesRegex(PortfolioRiskGenerationRunRecordCodecError, "record_checksum"):
             self.codec().decode(self.encode_payload(payload))

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from datetime import datetime
 from enum import StrEnum
+import re
 from typing import Any
 from typing import Mapping
 from typing import Protocol
@@ -13,6 +14,9 @@ from portfolio_generation import PortfolioRiskGenerationStatus
 
 
 PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1 = "1"
+PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2 = "2"
+
+_FEATURE_SET_CHECKSUM_PATTERN = re.compile(r"^technical_feature_set_[0-9a-f]{64}$")
 
 
 class PortfolioRiskGenerationRunSaveStatus(StrEnum):
@@ -109,6 +113,7 @@ class PortfolioRiskGenerationRunRecord:
 
     calculation_id: str
     generation_key: str
+    feature_set_checksum: str
     portfolio_id: str
     snapshot_id: str
     snapshot_checksum: str
@@ -129,6 +134,7 @@ class PortfolioRiskGenerationRunRecord:
     def __post_init__(self):
         _require_text(self.calculation_id, "calculation_id")
         _require_text(self.generation_key, "generation_key")
+        _require_feature_set_checksum(self.feature_set_checksum)
         _require_text(self.portfolio_id, "portfolio_id")
         _require_text(self.snapshot_id, "snapshot_id")
         _require_text(self.snapshot_checksum, "snapshot_checksum")
@@ -245,6 +251,7 @@ def _record_checksum_payload(record: PortfolioRiskGenerationRunRecord) -> dict[s
     return {
         "calculation_id": record.calculation_id,
         "generation_key": record.generation_key,
+        "feature_set_checksum": record.feature_set_checksum,
         "portfolio_id": record.portfolio_id,
         "snapshot_id": record.snapshot_id,
         "snapshot_checksum": record.snapshot_checksum,
@@ -287,7 +294,7 @@ def _record_checksum_payload(record: PortfolioRiskGenerationRunRecord) -> dict[s
             for warning in record.warnings
         ),
         "created_at": record.created_at,
-        "schema_version": PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1,
+        "schema_version": PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2,
     }
 
 
@@ -324,6 +331,20 @@ def _stable_value(value: Any) -> Any:
 def _require_text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value:
         raise PortfolioRiskGenerationRunPersistenceError(f"{field_name} must be a non-empty string.")
+    return value
+
+
+def _require_feature_set_checksum(value: object) -> str:
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise PortfolioRiskGenerationRunPersistenceError("feature_set_checksum must be a string.")
+    if not value:
+        raise PortfolioRiskGenerationRunPersistenceError("feature_set_checksum must be non-empty.")
+    if value.strip() != value or "\n" in value or "\r" in value:
+        raise PortfolioRiskGenerationRunPersistenceError("feature_set_checksum must be canonical.")
+    if _FEATURE_SET_CHECKSUM_PATTERN.fullmatch(value) is None:
+        raise PortfolioRiskGenerationRunPersistenceError(
+            "feature_set_checksum must match technical_feature_set_<sha256>."
+        )
     return value
 
 

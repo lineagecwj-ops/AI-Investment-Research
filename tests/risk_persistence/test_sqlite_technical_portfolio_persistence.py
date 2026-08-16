@@ -346,6 +346,7 @@ class SQLiteTechnicalPortfolioRiskPersistenceCoordinatorTestCase(unittest.TestCa
         self.assertEqual(result.run_record.succeeded_position_ids, ("position_a", "position_b"))
         self.assertEqual(tuple(item.status for item in result.artifact_save_results), (RiskArtifactSaveStatus.INSERTED,) * 2)
         self.assertEqual(result.run_save_result.status, PortfolioRiskGenerationRunSaveStatus.INSERTED)
+        self.assertEqual(result.run_record.feature_set_checksum, evaluation_input.feature_set_checksum)
         self.assertEqual(self.row_count("risk_artifacts"), 2)
         self.assertEqual(self.row_count("technical_risk_artifact_index"), 2)
         self.assertEqual(self.row_count("portfolio_risk_generation_runs"), 1)
@@ -472,6 +473,36 @@ class SQLiteTechnicalPortfolioRiskPersistenceCoordinatorTestCase(unittest.TestCa
         self.assertEqual(self.row_count("risk_artifacts"), 1)
         self.assertEqual(self.row_count("portfolio_risk_generation_runs"), 1)
 
+    def test_different_feature_set_checksums_are_preserved_in_distinct_runs(self):
+        positions = (self.position("position_a", "2330.TW"),)
+        snapshot = self.snapshot(positions)
+        first_input = self.evaluation_input(snapshot, feature_set_checksum="technical_feature_set_" + "a" * 64)
+        second_input = self.evaluation_input(snapshot, feature_set_checksum="technical_feature_set_" + "b" * 64)
+
+        first = self.coordinator().generate_and_persist(snapshot, first_input, created_at=self.created_at())
+        second = self.coordinator().generate_and_persist(
+            snapshot,
+            second_input,
+            created_at=datetime(2026, 8, 15, 13, 1, tzinfo=UTC),
+        )
+
+        self.assertNotEqual(first_input.generation_key, second_input.generation_key)
+        self.assertNotEqual(first_input.calculation_id, second_input.calculation_id)
+        self.assertEqual(first.run_record.feature_set_checksum, first_input.feature_set_checksum)
+        self.assertEqual(second.run_record.feature_set_checksum, second_input.feature_set_checksum)
+        self.assertEqual(
+            SQLitePortfolioRiskGenerationRunRepository(self.db_path)
+            .get_by_calculation_id(first_input.calculation_id)
+            .feature_set_checksum,
+            first_input.feature_set_checksum,
+        )
+        self.assertEqual(
+            SQLitePortfolioRiskGenerationRunRepository(self.db_path)
+            .get_by_calculation_id(second_input.calculation_id)
+            .feature_set_checksum,
+            second_input.feature_set_checksum,
+        )
+
     def test_existing_artifacts_missing_run_completes_run_insert(self):
         positions = (self.position("position_a", "2330.TW"),)
         snapshot = self.snapshot(positions)
@@ -576,6 +607,7 @@ class SQLiteTechnicalPortfolioRiskPersistenceCoordinatorTestCase(unittest.TestCa
         conflicting_run = PortfolioRiskGenerationRunRecord(
             calculation_id=evaluation_input.calculation_id,
             generation_key="different_generation_key",
+            feature_set_checksum=evaluation_input.feature_set_checksum,
             portfolio_id=evaluation_input.portfolio_id,
             snapshot_id=evaluation_input.snapshot_id,
             snapshot_checksum=evaluation_input.snapshot_checksum,

@@ -2,6 +2,8 @@ import inspect
 import sys
 import unittest
 from dataclasses import FrozenInstanceError
+from dataclasses import MISSING
+from dataclasses import fields
 from datetime import UTC
 from datetime import date
 from datetime import datetime
@@ -16,7 +18,9 @@ if str(SRC_PATH) not in sys.path:
 
 from portfolio_generation import PortfolioRiskGenerationStatus
 from risk_persistence import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1
+from risk_persistence import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2
 from risk_persistence import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1
+from risk_persistence import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2
 from risk_persistence import PortfolioRiskGenerationRunArtifactRef
 from risk_persistence import PortfolioRiskGenerationRunConflictError
 from risk_persistence import PortfolioRiskGenerationRunCorruptionError
@@ -83,6 +87,7 @@ class PortfolioRiskGenerationRunContractsTestCase(unittest.TestCase):
         values = {
             "calculation_id": "portfolio_risk_calc_001",
             "generation_key": "portfolio_risk_generation_001",
+            "feature_set_checksum": "technical_feature_set_" + "a" * 64,
             "portfolio_id": "portfolio_001",
             "snapshot_id": "snapshot_001",
             "snapshot_checksum": "snapshot_checksum_001",
@@ -104,7 +109,9 @@ class PortfolioRiskGenerationRunContractsTestCase(unittest.TestCase):
 
     def test_version_constants(self):
         self.assertEqual(PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1, "1")
+        self.assertEqual(PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2, "2")
         self.assertEqual(PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1, "1")
+        self.assertEqual(PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2, "2")
 
     def test_record_is_frozen(self):
         record = self.record()
@@ -131,8 +138,15 @@ class PortfolioRiskGenerationRunContractsTestCase(unittest.TestCase):
         record = self.record()
 
         self.assertEqual(record.status, PortfolioRiskGenerationStatus.SUCCESS)
+        self.assertEqual(record.feature_set_checksum, "technical_feature_set_" + "a" * 64)
         self.assertEqual(record.risk_evaluated_position_ids, ("position_a", "position_b"))
         self.assertTrue(record.record_checksum)
+
+    def test_feature_set_checksum_is_required_without_default(self):
+        field = next(item for item in fields(PortfolioRiskGenerationRunRecord) if item.name == "feature_set_checksum")
+
+        self.assertIs(field.default, MISSING)
+        self.assertIs(field.default_factory, MISSING)
 
     def test_risk_evaluation_failed_partial_record(self):
         record = self.record(
@@ -265,13 +279,36 @@ class PortfolioRiskGenerationRunContractsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(PortfolioRiskGenerationRunPersistenceError, "calculation_id"):
             self.record(calculation_id="")
 
+    def test_feature_set_checksum_validation(self):
+        self.assertEqual(self.record().feature_set_checksum, "technical_feature_set_" + "a" * 64)
+        invalid_values = (
+            None,
+            "",
+            " technical_feature_set_" + "a" * 64,
+            "technical_feature_set_" + "a" * 64 + "\n",
+            "wrong_prefix_" + "a" * 64,
+            "technical_feature_set_" + "a" * 63,
+            "technical_feature_set_" + "a" * 65,
+            "technical_feature_set_" + "A" * 64,
+            "technical_feature_set_" + "g" * 64,
+            True,
+            123,
+            [],
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(PortfolioRiskGenerationRunPersistenceError, "feature_set_checksum"):
+                    self.record(feature_set_checksum=value)
+
     def test_record_checksum_is_deterministic_and_semantic(self):
         first = self.record()
         second = self.record()
         changed = self.record(generation_key="portfolio_risk_generation_other")
+        changed_feature_set = self.record(feature_set_checksum="technical_feature_set_" + "b" * 64)
 
         self.assertEqual(first.record_checksum, second.record_checksum)
         self.assertNotEqual(first.record_checksum, changed.record_checksum)
+        self.assertNotEqual(first.record_checksum, changed_feature_set.record_checksum)
 
     def test_supplied_record_checksum_is_verified(self):
         valid = self.record()

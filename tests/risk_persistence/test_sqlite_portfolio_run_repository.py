@@ -68,6 +68,7 @@ class SQLitePortfolioRiskGenerationRunRepositoryTestCase(unittest.TestCase):
         values = {
             "calculation_id": "portfolio_risk_calc_001",
             "generation_key": "portfolio_generation_001",
+            "feature_set_checksum": "technical_feature_set_" + "a" * 64,
             "portfolio_id": "portfolio_001",
             "snapshot_id": "snapshot_001",
             "snapshot_checksum": "snapshot_checksum_001",
@@ -196,9 +197,21 @@ class SQLitePortfolioRiskGenerationRunRepositoryTestCase(unittest.TestCase):
         self.assertEqual(row[1], record.record_checksum)
         payload = json.loads(row[2])
         self.assertEqual(tuple(payload), ("codec_version", "record", "schema_version"))
+        self.assertEqual(payload["record"]["feature_set_checksum"], record.feature_set_checksum)
         self.assertEqual(payload["record"]["record_checksum"], record.record_checksum)
         self.assertNotIn("serialization_checksum", payload)
         self.assertEqual(self.row_count(), 1)
+
+    def test_save_get_preserves_feature_set_checksum(self):
+        record = self.record(feature_set_checksum="technical_feature_set_" + "b" * 64)
+        repository = self.repository()
+
+        repository.save(record)
+
+        self.assertEqual(
+            repository.get_by_calculation_id(record.calculation_id).feature_set_checksum,
+            record.feature_set_checksum,
+        )
 
     def test_save_idempotent_keeps_single_row(self):
         record = self.record()

@@ -191,6 +191,7 @@ def _build_run_record(
     return PortfolioRiskGenerationRunRecord(
         calculation_id=evaluation_input.calculation_id,
         generation_key=evaluation_input.generation_key,
+        feature_set_checksum=evaluation_input.feature_set_checksum,
         portfolio_id=evaluation_input.portfolio_id,
         snapshot_id=evaluation_input.snapshot_id,
         snapshot_checksum=evaluation_input.snapshot_checksum,

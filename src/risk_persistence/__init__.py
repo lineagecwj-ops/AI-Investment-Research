@@ -8,9 +8,11 @@ from risk_persistence.contracts import RiskArtifactSaveResult
 from risk_persistence.contracts import RiskArtifactSaveStatus
 from risk_persistence.capturing_risk_evaluator import CapturingRiskEvaluator
 from risk_persistence.portfolio_run_codec import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1
+from risk_persistence.portfolio_run_codec import PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2
 from risk_persistence.portfolio_run_codec import PortfolioRiskGenerationRunRecordCodec
 from risk_persistence.portfolio_run_codec import PortfolioRiskGenerationRunRecordCodecError
 from risk_persistence.portfolio_run_contracts import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1
+from risk_persistence.portfolio_run_contracts import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunArtifactRef
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunConflictError
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunCorruptionError
@@ -46,7 +48,9 @@ from risk_persistence.technical_query_contracts import TechnicalRiskArtifactQuer
 
 __all__ = [
     "PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1",
+    "PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2",
     "PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1",
+    "PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2",
     "CapturingRiskEvaluator",
     "PortfolioRiskGenerationRunArtifactRef",
     "PortfolioRiskGenerationRunConflictError",

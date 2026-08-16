@@ -6,7 +6,7 @@ from typing import Any
 from typing import Mapping
 
 from portfolio_generation import PortfolioRiskGenerationStatus
-from risk_persistence.portfolio_run_contracts import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1
+from risk_persistence.portfolio_run_contracts import PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunArtifactRef
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunIssue
 from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunMonitoringArtifactRef
@@ -16,6 +16,7 @@ from risk_persistence.portfolio_run_contracts import PortfolioRiskGenerationRunW
 
 
 PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1 = "1"
+PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2 = "2"
 
 _ENVELOPE_FIELDS = frozenset(
     {
@@ -29,6 +30,7 @@ _RECORD_FIELDS = frozenset(
     {
         "calculation_id",
         "generation_key",
+        "feature_set_checksum",
         "portfolio_id",
         "snapshot_id",
         "snapshot_checksum",
@@ -68,8 +70,8 @@ class PortfolioRiskGenerationRunRecordCodec:
             )
         try:
             envelope = {
-                "schema_version": PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1,
-                "codec_version": PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1,
+                "schema_version": PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2,
+                "codec_version": PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2,
                 "record": _record_payload(record),
             }
             return canonical_json_dumps(envelope)
@@ -91,12 +93,12 @@ class PortfolioRiskGenerationRunRecordCodec:
         envelope = _require_exact_mapping(decoded, _ENVELOPE_FIELDS, "run record envelope")
         _validate_version(
             envelope["schema_version"],
-            PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V1,
+            PORTFOLIO_RUN_RECORD_SCHEMA_VERSION_V2,
             "run record schema_version",
         )
         _validate_version(
             envelope["codec_version"],
-            PORTFOLIO_RUN_RECORD_CODEC_VERSION_V1,
+            PORTFOLIO_RUN_RECORD_CODEC_VERSION_V2,
             "run record codec_version",
         )
         record_payload = _require_exact_mapping(envelope["record"], _RECORD_FIELDS, "run record payload")
@@ -104,6 +106,7 @@ class PortfolioRiskGenerationRunRecordCodec:
             return PortfolioRiskGenerationRunRecord(
                 calculation_id=_require_string(record_payload["calculation_id"], "calculation_id"),
                 generation_key=_require_string(record_payload["generation_key"], "generation_key"),
+                feature_set_checksum=_require_string(record_payload["feature_set_checksum"], "feature_set_checksum"),
                 portfolio_id=_require_string(record_payload["portfolio_id"], "portfolio_id"),
                 snapshot_id=_require_string(record_payload["snapshot_id"], "snapshot_id"),
                 snapshot_checksum=_require_string(record_payload["snapshot_checksum"], "snapshot_checksum"),
@@ -149,6 +152,7 @@ def _record_payload(record: PortfolioRiskGenerationRunRecord) -> dict[str, Any]:
     return {
         "calculation_id": record.calculation_id,
         "generation_key": record.generation_key,
+        "feature_set_checksum": record.feature_set_checksum,
         "portfolio_id": record.portfolio_id,
         "snapshot_id": record.snapshot_id,
         "snapshot_checksum": record.snapshot_checksum,
