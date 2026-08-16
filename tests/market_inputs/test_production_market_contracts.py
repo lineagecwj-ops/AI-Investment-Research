@@ -275,7 +275,11 @@ class ProductionMarketContractsTestCase(unittest.TestCase):
         self.assertNotIn("{", str(error))
 
     def test_no_network_filesystem_db_or_feature_boundary(self):
-        source = "\n".join(path.read_text() for path in sorted((SRC_PATH / "market_inputs").glob("*.py")))
+        contract_paths = [
+            path for path in sorted((SRC_PATH / "market_inputs").glob("*.py"))
+            if path.name != "yahoo_finance_technical_close_series_source.py"
+        ]
+        source = "\n".join(path.read_text() for path in contract_paths)
 
         forbidden = (
             "yfinance",

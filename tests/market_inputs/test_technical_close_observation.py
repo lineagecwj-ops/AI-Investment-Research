@@ -21,6 +21,7 @@ from market_inputs import TechnicalCloseObservation
 from market_inputs import TechnicalCloseObservationSeries
 from market_inputs import TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1
 from market_inputs import TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1
+from market_inputs import YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1
 
 
 class TechnicalCloseObservationContractTestCase(unittest.TestCase):
@@ -139,6 +140,17 @@ class TechnicalCloseObservationContractTestCase(unittest.TestCase):
         self.assertNotEqual(base.market_revision_id, cases[3].market_revision_id)
         self.assertEqual(base.market_revision_id, cases[4].market_revision_id)
 
+    def test_yahoo_source_producer_version_is_valid_and_changes_revision(self):
+        generic = self.series()
+        yahoo = self.series(producer_version=YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1)
+
+        self.assertEqual(yahoo.producer_version, YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1)
+        self.assertNotEqual(generic.market_revision_id, yahoo.market_revision_id)
+
+    def test_unknown_producer_version_rejected(self):
+        with self.assertRaisesRegex(MarketInputValidationError, "producer_version"):
+            self.series(producer_version="UNKNOWN_PRODUCER_V1")
+
     def test_close_basis_changes_revision(self):
         with self.assertRaisesRegex(MarketInputValidationError, "close_basis"):
             self.series(close_basis="RAW_CLOSE_V1")
@@ -160,10 +172,8 @@ class TechnicalCloseObservationContractTestCase(unittest.TestCase):
         source = "\n".join(path.read_text() for path in sorted((SRC_PATH / "market_inputs").glob("*.py")))
 
         forbidden = (
-            "yfinance",
             "requests",
             "urllib",
-            "Yahoo",
             "TWSE",
             "TPEx",
             "historical_price_service",

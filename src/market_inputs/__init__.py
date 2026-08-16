@@ -24,9 +24,11 @@ from market_inputs.technical_close_observation import TechnicalCloseObservation
 from market_inputs.technical_close_observation import TechnicalCloseObservationSeries
 from market_inputs.technical_close_observation import TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1
 from market_inputs.technical_close_observation import TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1
+from market_inputs.technical_close_observation import YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1
 from market_inputs.technical_close_observation_codec import TechnicalCloseObservationSeriesCodec
 from market_inputs.technical_close_observation_codec import TechnicalCloseObservationSeriesCodecError
 from market_inputs.technical_close_observation_codec import TECHNICAL_CLOSE_OBSERVATION_CODEC_VERSION_V1
+from market_inputs.yahoo_finance_technical_close_series_source import YahooFinanceTechnicalCloseSeriesSource
 
 
 __all__ = [
@@ -46,6 +48,7 @@ __all__ = [
     "TECHNICAL_CLOSE_OBSERVATION_CODEC_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1",
+    "YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1",
     "TechnicalCloseBasis",
     "TechnicalCloseObservation",
     "TechnicalCloseObservationSeries",
@@ -57,4 +60,5 @@ __all__ = [
     "TechnicalCloseSeriesStore",
     "TechnicalMarketDataProvider",
     "YAHOO_FINANCE_PROVIDER_ID_V1",
+    "YahooFinanceTechnicalCloseSeriesSource",
 ]

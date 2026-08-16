@@ -14,6 +14,13 @@ from typing import Mapping
 
 TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1 = "1"
 TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1 = "TECHNICAL_CLOSE_OBSERVATION_PRODUCER_V1"
+YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1 = "YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1"
+SUPPORTED_TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSIONS = frozenset(
+    {
+        TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1,
+        YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1,
+    }
+)
 
 
 class TechnicalCloseBasis(StrEnum):
@@ -77,7 +84,7 @@ class TechnicalCloseObservationSeries:
         _require_timezone_aware_datetime(self.fetched_at, "fetched_at")
         if self.schema_version != TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1:
             raise MarketInputValidationError("Unsupported TechnicalCloseObservationSeries schema_version.")
-        if self.producer_version != TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1:
+        if self.producer_version not in SUPPORTED_TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSIONS:
             raise MarketInputValidationError("Unsupported TechnicalCloseObservationSeries producer_version.")
         if not isinstance(self.observations, tuple):
             raise MarketInputValidationError("observations must be a tuple.")
