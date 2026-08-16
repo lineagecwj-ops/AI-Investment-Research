@@ -16,6 +16,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from portfolio_state import GenerationIdentityMismatchError
+from portfolio_state import GENERATION_IDENTITY_SCHEMA_VERSION
 from portfolio_state import HoldingType
 from portfolio_state import PortfolioPositionState
 from portfolio_state import PortfolioPositionStateError
@@ -25,6 +26,19 @@ from portfolio_state import PortfolioSnapshotError
 from portfolio_state import PositionStatus
 from portfolio_state import RiskEvaluationInput
 from portfolio_state import RiskEvaluationInputError
+from market_inputs import TechnicalFeatureSet
+from market_inputs import TechnicalFeatureBundle
+from market_inputs import TECHNICAL_FEATURE_BUNDLE_SCHEMA_VERSION_V1
+from market_inputs import PRODUCTION_TECHNICAL_FEATURE_MATERIALIZER_V1
+from market_inputs.technical_feature_bundle import effective_observation_checksum
+from risk_evaluation.feature_input import TECH_AS_OF_CLOSE_FEATURE_ID
+from risk_evaluation.feature_input import TECH_RSI14_FEATURE_ID
+from risk_evaluation.feature_input import TECH_SMA20_FEATURE_ID
+from risk_evaluation.feature_input import TECH_SMA60_FEATURE_ID
+
+
+FEATURE_SET_CHECKSUM_A = "technical_feature_set_" + "a" * 64
+FEATURE_SET_CHECKSUM_B = "technical_feature_set_" + "b" * 64
 
 
 class PortfolioStateContractTestCase(unittest.TestCase):
@@ -73,6 +87,7 @@ class PortfolioStateContractTestCase(unittest.TestCase):
         active_snapshot = snapshot or self.snapshot()
         params = {
             "feature_version": "feature_set_v1",
+            "feature_set_checksum": FEATURE_SET_CHECKSUM_A,
             "model_version": "baseline_model_v1",
             "risk_definition_version": "risk_definition_v1",
             "risk_policy_version": "risk_policy_v1",
@@ -186,6 +201,10 @@ class PortfolioStateContractTestCase(unittest.TestCase):
 
         self.assertEqual(first.generation_key, second.generation_key)
         self.assertEqual(first.calculation_id, second.calculation_id)
+        self.assertEqual(first.generation_schema_version, "2")
+        self.assertEqual(GENERATION_IDENTITY_SCHEMA_VERSION, "2")
+        self.assertEqual(first.feature_set_checksum, FEATURE_SET_CHECKSUM_A)
+        self.assertEqual(first.identity_material["feature_set_checksum"], FEATURE_SET_CHECKSUM_A)
 
     def test_different_snapshot_changes_identity(self):
         first = self.evaluation_input(self.snapshot(snapshot_id="snapshot_001"))
@@ -201,6 +220,30 @@ class PortfolioStateContractTestCase(unittest.TestCase):
             self.evaluation_input(snapshot, feature_version="feature_set_v1").generation_key,
             self.evaluation_input(snapshot, feature_version="feature_set_v2").generation_key,
         )
+
+    def test_different_feature_set_checksum_changes_identity(self):
+        snapshot = self.snapshot()
+        first = self.evaluation_input(snapshot, feature_set_checksum=FEATURE_SET_CHECKSUM_A)
+        second = self.evaluation_input(snapshot, feature_set_checksum=FEATURE_SET_CHECKSUM_B)
+
+        self.assertNotEqual(first.generation_key, second.generation_key)
+        self.assertNotEqual(first.calculation_id, second.calculation_id)
+
+    def test_feature_set_checksum_does_not_replace_feature_version(self):
+        snapshot = self.snapshot()
+        first = self.evaluation_input(
+            snapshot,
+            feature_version="feature_set_v1",
+            feature_set_checksum=FEATURE_SET_CHECKSUM_A,
+        )
+        second = self.evaluation_input(
+            snapshot,
+            feature_version="feature_set_v2",
+            feature_set_checksum=FEATURE_SET_CHECKSUM_A,
+        )
+
+        self.assertNotEqual(first.generation_key, second.generation_key)
+        self.assertNotEqual(first.calculation_id, second.calculation_id)
 
     def test_different_policy_version_changes_identity(self):
         snapshot = self.snapshot()
@@ -232,6 +275,56 @@ class PortfolioStateContractTestCase(unittest.TestCase):
         self.assertEqual(snapshot.valuation_date, date(2026, 8, 12))
         self.assertEqual(evaluation_input.as_of_date, date(2026, 8, 13))
         self.assertEqual(evaluation_input.valuation_date, date(2026, 8, 12))
+
+    def test_different_valuation_date_changes_identity_with_same_feature_set_checksum(self):
+        first = self.evaluation_input(self.snapshot())
+        second = self.evaluation_input(
+            PortfolioSnapshot(
+                snapshot_id="snapshot_001",
+                portfolio_id="portfolio_synthetic_001",
+                as_of_date=date(2026, 8, 13),
+                valuation_date=date(2026, 8, 14),
+                positions=(self.position(),),
+                created_at=self.created_at(),
+                source_lineage={"source_type": "manual_contract_test", "source_version": "v1"},
+            )
+        )
+
+        self.assertNotEqual(first.generation_key, second.generation_key)
+        self.assertNotEqual(first.calculation_id, second.calculation_id)
+
+    def test_real_technical_feature_set_checksum_integrates_with_evaluation_input(self):
+        valuation_date = date(2026, 8, 12)
+        checksum = effective_observation_checksum(
+            symbol="2330.TW",
+            valuation_date=valuation_date,
+            observations=(
+                {
+                    "market_session_date": valuation_date.isoformat(),
+                    "technical_close": (100.25).hex(),
+                },
+            ),
+        )
+        bundle = TechnicalFeatureBundle(
+            schema_version=TECHNICAL_FEATURE_BUNDLE_SCHEMA_VERSION_V1,
+            feature_materializer_version=PRODUCTION_TECHNICAL_FEATURE_MATERIALIZER_V1,
+            symbol="2330.TW",
+            valuation_date=valuation_date,
+            market_revision_id="market_revision_" + "1" * 64,
+            effective_observation_checksum=checksum,
+            features={
+                TECH_AS_OF_CLOSE_FEATURE_ID: 100.25,
+                TECH_SMA20_FEATURE_ID: 98.5,
+                TECH_SMA60_FEATURE_ID: 95.75,
+                TECH_RSI14_FEATURE_ID: 55.0,
+            },
+        )
+        feature_set = TechnicalFeatureSet(bundles=(bundle,))
+
+        evaluation_input = self.evaluation_input(feature_set_checksum=feature_set.technical_feature_set_checksum)
+
+        self.assertEqual(evaluation_input.feature_set_checksum, feature_set.technical_feature_set_checksum)
+        self.assertIn("feature_set_checksum", evaluation_input.identity_material)
 
     def test_timezone_aware_created_at(self):
         with self.assertRaisesRegex(PortfolioSnapshotError, "timezone-aware"):
@@ -270,6 +363,32 @@ class PortfolioStateContractTestCase(unittest.TestCase):
             replace(self.snapshot(), checksum="bad_checksum")
         with self.assertRaisesRegex(RiskEvaluationInputError, "feature_version"):
             self.evaluation_input(feature_version="")
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum=None)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="")
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="   ")
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="wrong_prefix_" + "a" * 64)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="technical_feature_set_" + "a" * 63)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="technical_feature_set_" + "a" * 65)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="technical_feature_set_" + "A" * 64)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="technical_feature_set_" + "g" * 64)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="technical_feature_set_" + "a" * 63 + "\n")
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum="/tmp/technical_feature_set_" + "a" * 64)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum=True)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum=123)
+        with self.assertRaisesRegex(RiskEvaluationInputError, "feature_set_checksum"):
+            self.evaluation_input(feature_set_checksum=[])
         with self.assertRaises(GenerationIdentityMismatchError):
             replace(self.evaluation_input(), generation_key="bad_generation_key")
 

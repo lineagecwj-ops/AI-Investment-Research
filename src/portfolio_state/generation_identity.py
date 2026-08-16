@@ -8,7 +8,7 @@ from typing import Any
 from typing import Mapping
 
 
-GENERATION_IDENTITY_SCHEMA_VERSION = "1"
+GENERATION_IDENTITY_SCHEMA_VERSION = "2"
 
 
 def canonical_json_dumps(payload: Mapping[str, Any]) -> str:
@@ -29,6 +29,7 @@ def build_generation_identity_material(
     as_of_date: date,
     valuation_date: date,
     feature_version: str,
+    feature_set_checksum: str,
     model_version: str | None,
     risk_definition_version: str,
     risk_policy_version: str,
@@ -43,6 +44,7 @@ def build_generation_identity_material(
         "as_of_date": as_of_date,
         "valuation_date": valuation_date,
         "feature_version": feature_version,
+        "feature_set_checksum": feature_set_checksum,
         "model_version": _nullable_text(model_version),
         "risk_definition_version": risk_definition_version,
         "risk_policy_version": risk_policy_version,

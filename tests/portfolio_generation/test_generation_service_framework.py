@@ -36,6 +36,9 @@ from risk import RiskSeverity
 from risk import RiskSignal
 
 
+FEATURE_SET_CHECKSUM_A = "technical_feature_set_" + "a" * 64
+
+
 @dataclass(frozen=True)
 class FakeMonitoringArtifact:
     artifact_id: str
@@ -166,6 +169,7 @@ class PortfolioRiskGenerationServiceFrameworkTestCase(unittest.TestCase):
     def evaluation_input(self, snapshot, **overrides):
         params = {
             "feature_version": "feature_set_v1",
+            "feature_set_checksum": FEATURE_SET_CHECKSUM_A,
             "model_version": "baseline_model_v1",
             "risk_definition_version": "risk_definition_v1",
             "risk_policy_version": "risk_policy_v1",

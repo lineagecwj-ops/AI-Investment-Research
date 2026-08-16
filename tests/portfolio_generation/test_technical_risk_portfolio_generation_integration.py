@@ -61,6 +61,9 @@ from portfolio_state import PortfolioSnapshot
 from portfolio_state import RiskEvaluationInput
 
 
+FEATURE_SET_CHECKSUM_A = "technical_feature_set_" + "a" * 64
+
+
 @dataclass(frozen=True)
 class CapturedMonitoringArtifact:
     artifact_id: str
@@ -182,6 +185,7 @@ class TechnicalRiskPortfolioGenerationIntegrationTestCase(unittest.TestCase):
         return RiskEvaluationInput.from_snapshot(
             snapshot,
             feature_version="technical_risk_feature_set_v1",
+            feature_set_checksum=FEATURE_SET_CHECKSUM_A,
             model_version=None,
             risk_definition_version="risk_definition_v1",
             risk_policy_version="risk_policy_v1",

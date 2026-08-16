@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
+import re
 
 from portfolio_state.generation_identity import GENERATION_IDENTITY_SCHEMA_VERSION
 from portfolio_state.generation_identity import build_generation_identity_material
@@ -14,6 +15,9 @@ class RiskEvaluationInputError(PortfolioStateValidationError):
     """Raised when deterministic risk evaluation input is invalid."""
 
 
+_FEATURE_SET_CHECKSUM_PATTERN = re.compile(r"^technical_feature_set_[0-9a-f]{64}$")
+
+
 @dataclass(frozen=True)
 class RiskEvaluationInput:
     """Deterministic upstream contract for future risk generation."""
@@ -25,6 +29,7 @@ class RiskEvaluationInput:
     valuation_date: date
     active_position_ids: tuple[str, ...]
     feature_version: str
+    feature_set_checksum: str
     model_version: str | None
     risk_definition_version: str
     risk_policy_version: str
@@ -39,6 +44,7 @@ class RiskEvaluationInput:
             "snapshot_id": self.snapshot_id,
             "snapshot_checksum": self.snapshot_checksum,
             "feature_version": self.feature_version,
+            "feature_set_checksum": self.feature_set_checksum,
             "risk_definition_version": self.risk_definition_version,
             "risk_policy_version": self.risk_policy_version,
             "monitoring_policy_version": self.monitoring_policy_version,
@@ -55,6 +61,7 @@ class RiskEvaluationInput:
             raise RiskEvaluationInputError("RiskEvaluationInput as_of_date must be a date.")
         if not isinstance(self.valuation_date, date):
             raise RiskEvaluationInputError("RiskEvaluationInput valuation_date must be a date.")
+        _require_feature_set_checksum(self.feature_set_checksum)
         if not isinstance(self.active_position_ids, tuple):
             raise RiskEvaluationInputError("RiskEvaluationInput active_position_ids must be a tuple.")
         if not all(isinstance(position_id, str) and position_id for position_id in self.active_position_ids):
@@ -82,6 +89,7 @@ class RiskEvaluationInput:
         snapshot: PortfolioSnapshot,
         *,
         feature_version: str,
+        feature_set_checksum: str,
         model_version: str | None,
         risk_definition_version: str,
         risk_policy_version: str,
@@ -97,6 +105,7 @@ class RiskEvaluationInput:
             valuation_date=snapshot.valuation_date,
             active_position_ids=snapshot.active_position_ids,
             feature_version=feature_version,
+            feature_set_checksum=feature_set_checksum,
             model_version=model_version,
             risk_definition_version=risk_definition_version,
             risk_policy_version=risk_policy_version,
@@ -112,9 +121,24 @@ class RiskEvaluationInput:
             as_of_date=self.as_of_date,
             valuation_date=self.valuation_date,
             feature_version=self.feature_version,
+            feature_set_checksum=self.feature_set_checksum,
             model_version=self.model_version,
             risk_definition_version=self.risk_definition_version,
             risk_policy_version=self.risk_policy_version,
             monitoring_policy_version=self.monitoring_policy_version,
             generation_schema_version=self.generation_schema_version,
         )
+
+
+def _require_feature_set_checksum(value: object) -> str:
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise RiskEvaluationInputError("RiskEvaluationInput feature_set_checksum must be a string.")
+    if not value:
+        raise RiskEvaluationInputError("RiskEvaluationInput feature_set_checksum must be non-empty.")
+    if value.strip() != value or "\n" in value or "\r" in value:
+        raise RiskEvaluationInputError("RiskEvaluationInput feature_set_checksum must be canonical.")
+    if _FEATURE_SET_CHECKSUM_PATTERN.fullmatch(value) is None:
+        raise RiskEvaluationInputError(
+            "RiskEvaluationInput feature_set_checksum must match technical_feature_set_<sha256>."
+        )
+    return value
