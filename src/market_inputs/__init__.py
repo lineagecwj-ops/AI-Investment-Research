@@ -1,5 +1,6 @@
 """Production market input contracts."""
 
+from market_inputs.filesystem_technical_close_series_store import FilesystemTechnicalCloseSeriesStore
 from market_inputs.production_market_contracts import MarketArtifactConflictError
 from market_inputs.production_market_contracts import MarketArtifactCorruptionError
 from market_inputs.production_market_contracts import MarketArtifactSaveResult
@@ -41,6 +42,7 @@ __all__ = [
     "MarketSourceUnavailableError",
     "ProductionMarketInputConfig",
     "ProductionMarketInputMode",
+    "FilesystemTechnicalCloseSeriesStore",
     "TECHNICAL_CLOSE_OBSERVATION_CODEC_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1",

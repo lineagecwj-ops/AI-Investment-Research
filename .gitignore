@@ -21,4 +21,5 @@ data/taiwan_company_summaries.json
 *.sqlite-shm
 data/live/
 data/portfolio_artifacts/
+data/production/
 data/research/snapshots/
