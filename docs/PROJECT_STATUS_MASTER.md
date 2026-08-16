@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-15, after Sprint 6C Portfolio Persistence Integration.
+Last updated: 2026-08-16, after Productionization P1A / P1B persistence preparation.
 
 ## Project Purpose
 
@@ -38,16 +38,18 @@ This status document is based on:
 - Sprint 6C-1 Portfolio Risk Generation Run Record release validation evidence
 - Sprint 6C-2 SQLite Schema v3 + Portfolio Risk Generation Run Repository release validation evidence
 - Sprint 6C-3 Technical Portfolio Persistence Coordinator + Portfolio-Level Atomic Persistence release validation evidence
+- Productionization P1A Production Persistence Config + Bootstrap / Backup source and test inspection
+- Productionization P1B Read-Only Health Check + Operator Verify Command source and test inspection
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `2486fbb feat: add atomic portfolio risk persistence`
-- Current full HEAD: `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0`
-- Remote baseline at synchronization time: `origin/main` points to `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0`
-- Documentation status: this file is being synchronized after Sprint 6C release pushes.
+- Implementation baseline: `e6ef1b0 feat: add production risk persistence health check`
+- Current full HEAD: `e6ef1b01d77a87018e06f33087381ac6070cfa78`
+- Remote baseline at synchronization time: `origin/main` points to `e6ef1b01d77a87018e06f33087381ac6070cfa78`
+- Documentation status: this file is being synchronized after Productionization P1A / P1B release pushes.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -69,6 +71,8 @@ No network fetch, DB migration, live DB schema inspection, or production data qu
 - Sprint 6C-1 Portfolio Risk Generation Run Record Contract + Codec is committed and pushed at `2616478`.
 - Sprint 6C-2 SQLite Schema v3 + Portfolio Risk Generation Run Repository is committed and pushed at `b9bd272`.
 - Sprint 6C-3 Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence is committed and pushed at `2486fbb`.
+- Productionization P1A Production Persistence Config + Bootstrap / Backup is committed and pushed at `3e1e903`.
+- Productionization P1B Read-Only Health Check + Operator Verify Command is committed and pushed at `e6ef1b0`.
 
 Repository state verification:
 
@@ -85,6 +89,9 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `e6ef1b0 feat: add production risk persistence health check`
+- `3e1e903 feat: add production risk persistence bootstrap`
+- `c6b2921 docs: sync project master status through sprint 6c`
 - `2486fbb feat: add atomic portfolio risk persistence`
 - `b9bd272 feat: add sqlite portfolio risk run repository`
 - `2616478 feat: add portfolio risk generation run records`
@@ -242,10 +249,12 @@ The following phases are committed and pushed through `f834e40`.
 | Sprint 6C-2 | SQLite Schema v3 + Portfolio Run Repository | Complete / committed / pushed |
 | Sprint 6C-3 | Technical Portfolio Persistence Coordinator + CapturingRiskEvaluator + Portfolio-Level Atomic Persistence | Complete / committed / pushed |
 | Sprint 6C | Portfolio Persistence Integration Capability | Complete / committed / pushed |
+| Productionization P1A | Production Persistence Config + Bootstrap / Backup | Complete / committed / pushed |
+| Productionization P1B | Read-Only Health Check + Operator Verify Command | Complete / committed / pushed |
 
 ## Current AI Platform Architecture
 
-Current intended architecture after Sprint 6C:
+Current intended architecture after Productionization P1B:
 
 ```text
 Research Snapshot
@@ -422,9 +431,25 @@ SQLitePortfolioRiskGenerationRunRepository
 portfolio_risk_generation_runs
 ```
 
+Production persistence preparation layer:
+
+```text
+RiskPersistenceProductionConfig
+    |
+    +--> SQLiteRiskPersistenceBootstrapper
+    |        |
+    |        v
+    |   production SQLite storage preparation
+    |
+    +--> SQLiteRiskPersistenceHealthChecker
+             |
+             v
+        operator verify CLI
+```
+
 The platform is research-oriented and artifact-oriented. It is not a trading system.
 
-Persistence boundary: external portfolio persistence coordination capability exists through Sprint 6C, while `PortfolioRiskGenerationService` itself remains persistence-free and does not import `risk_persistence`. Production risk DB is not created or activated.
+Persistence boundary: external portfolio persistence coordination capability exists through Sprint 6C, while `PortfolioRiskGenerationService` itself remains persistence-free and does not import `risk_persistence`. Productionization P1A / P1B adds bootstrap / backup / migration capability plus read-only health / verify capability, but production risk DB is not created or activated. The `verify` command does not execute the Sprint 6C portfolio persistence coordinator.
 
 ## Feature Platform Status
 
@@ -1396,9 +1421,9 @@ verified Technical query
 
 Current production runtime status:
 
-- Technical Risk v1 production core evaluation, signal generation, single-position orchestration, RiskAssessment view, RiskArtifact adapter, existing RiskEvaluator seam integration, in-memory `PortfolioRiskGenerationService` Technical integration validation, `RiskArtifactCodec`, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, and portfolio-level atomic persistence coordination are complete through Sprint 6C
+- Technical Risk v1 production core evaluation, signal generation, single-position orchestration, RiskAssessment view, RiskArtifact adapter, existing RiskEvaluator seam integration, in-memory `PortfolioRiskGenerationService` Technical integration validation, `RiskArtifactCodec`, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability are complete
 - production deployment is not complete
-- still not implemented: production DB creation / activation, production bootstrap / ownership deployment, durable Technical evidence snapshot persistence, monitoring artifact payload SQLite persistence, `ProductionTechnicalRiskPolicy` persistence, policy activation governance, scheduler, live execution, live market fetch, alert delivery, dashboard SQLite integration, and end-to-end deployment
+- still not implemented: actual production DB initialization / activation, bootstrap operator CLI, manual Technical portfolio runtime, formal production portfolio source, formal production feature / market source, durable Technical evidence snapshot persistence, monitoring artifact payload SQLite persistence, `ProductionTechnicalRiskPolicy` persistence, policy activation governance, scheduler, live execution, live market fetch, alert delivery, dashboard SQLite integration, restore command / runbook, backup retention policy, and end-to-end deployment
 
 Production runtime chain:
 
@@ -1963,6 +1988,28 @@ Current official validation evidence after Sprint 6C:
 - production DB safety: PASS
 - non-blocking warnings were observed for TWSE / TPEx offline refresh, Yahoo stale cache, and Streamlit bare-mode execution
 
+Current official validation evidence after Productionization P1A / P1B:
+
+- P1A focused tests: `33 tests OK`
+- P1B focused tests: `27 tests OK`
+- Risk persistence tests: `285 tests OK`
+- Portfolio generation tests: `86 tests OK`
+- Risk tests: `40 tests OK`
+- Risk evaluation tests: `78 tests OK`
+- Risk integration tests: `33 tests OK`
+- Risk OOS tests: `231 tests OK`
+- Features tests: `31 tests OK`
+- Targets tests: `42 tests OK`
+- Datasets tests: `16 tests OK`
+- Portfolio artifacts tests: `35 tests OK`
+- Full unittest: `2080 tests OK`
+- official full-suite command: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests -t .`
+- `compileall app.py src tests`: PASS
+- `git diff --check`: PASS
+- source boundary scan: PASS
+- production DB safety: PASS
+- non-blocking warnings were observed for ignored `__pycache__` affecting a no-side-effect test until Python cache cleanup, TWSE / TPEx offline refresh, Yahoo stale cache, and Streamlit bare-mode execution
+
 Known warnings during full unittest:
 
 - existing offline warnings for external data source refresh
@@ -1982,9 +2029,9 @@ Current state:
 - Portfolio Artifact Input / Repository / Dashboard Artifact Provider framework: complete, committed, and pushed
 - Portfolio State / Portfolio Generation Service Framework: complete, committed, and pushed
 - Risk Evaluation Production Contract: complete, committed, and pushed
-- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, and portfolio-level atomic persistence coordination: complete, committed, and pushed through Sprint 6C
+- Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Next planned Technical Risk phase after documentation review / commit / validation / push: productionization specification review, unless a narrower sprint is explicitly scoped
+- Next planned Technical Risk phase after documentation review / commit / validation / push: Productionization P2 Prerequisite / Runtime Input Source Specification Review, unless a narrower sprint is explicitly scoped
 
 Current committed Long-Term Growth directories include:
 
@@ -2005,7 +2052,7 @@ Current committed Long-Term Growth directories include:
 - corresponding tests under `tests/`
 - Phase 7 architecture / framework docs under `docs/`
 
-Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Sprint 6C are now committed and pushed.
+Important: future sessions should still inspect the live working tree before editing, but Phase 7A-7L, Phase 8A-8F, and Technical Risk v1 through Productionization P1B are now committed and pushed.
 
 ## Future Roadmap
 
@@ -2047,6 +2094,8 @@ Completed:
 - Portfolio Risk Generation RunRecord contract and canonical codec
 - SQLite schema v3 and Portfolio RunRecord repository
 - Technical portfolio persistence coordinator, CapturingRiskEvaluator, and portfolio-level atomic persistence
+- Production Persistence Config + Bootstrap / Backup
+- Read-Only Health Check + Operator Verify Command
 
 Next planning candidate:
 
@@ -2054,7 +2103,8 @@ Next planning candidate:
 
 Future:
 
-- Productionization specification review, including production DB bootstrap / activation, runtime invocation, scheduler boundary, dashboard read-side integration, alert delivery boundary, and safe deployment boundary
+- Productionization P2 Prerequisite / Runtime Input Source Specification Review, including production portfolio source, production feature / market source, policy source / pinning, and runtime input construction
+- bootstrap operator CLI, production DB activation, runtime invocation, scheduler boundary, dashboard read-side integration, alert delivery boundary, restore / retention runbook, and safe deployment boundary
 - Sprint 6D Policy Persistence / Activation Governance
 - Technical Risk v1 scheduler / live execution, only after explicit scope
 - Technical Risk v1 dashboard / alert integration, only after durable persistence and explicit scope
@@ -2065,7 +2115,7 @@ These future items require explicit scope before implementation.
 
 ## Production Persistence Roadmap
 
-Persistence Contract Specification Review has been implemented through Sprint 6A and Sprint 6B:
+Persistence Contract Specification Review has been implemented through Sprint 6A, Sprint 6B, Sprint 6C, and Productionization P1A / P1B:
 
 - Sprint 6A-1 `RiskArtifactCodec`: COMPLETE / COMMITTED / PUSHED
 - Sprint 6A-2 DB-agnostic `RiskArtifactRepository` Protocol: COMPLETE / COMMITTED / PUSHED
@@ -2074,7 +2124,114 @@ Persistence Contract Specification Review has been implemented through Sprint 6A
 - Sprint 6B-2B-1 SQLite Schema v2 + Technical Index Backfill: COMPLETE / COMMITTED / PUSHED
 - Sprint 6B-2B-2 SQLite Technical Query Repository + Verified Read: COMPLETE / COMMITTED / PUSHED
 - Sprint 6B-2B-3 Atomic Technical Artifact Persistence: COMPLETE / COMMITTED / PUSHED
-- production DB activation and portfolio workflow persistence integration remain future scope
+- Productionization P1A Production Persistence Config + Bootstrap / Backup: COMPLETE / COMMITTED / PUSHED at `3e1e903 feat: add production risk persistence bootstrap`
+- Productionization P1B Read-Only Health Check + Operator Verify Command: COMPLETE / COMMITTED / PUSHED at `e6ef1b0 feat: add production risk persistence health check`
+- production DB activation and production portfolio workflow runtime remain future scope
+
+Productionization P1A: Production Persistence Config + Bootstrap / Backup:
+
+- `RiskPersistenceProductionConfig` and `RiskPersistenceEnvironment.PRODUCTION` define the production persistence configuration boundary
+- canonical production DB path is derived from explicit `project_root`: `project_root / data / production / risk_artifacts.db`
+- canonical backup path is derived from explicit `project_root`: `project_root / data / production / backups`
+- arbitrary `db_path` / backup path injection is rejected
+- Production SQLite v1 supported deployment boundary is local filesystem only
+- NAS / SMB / NFS are not validated or supported for this v1 path; future separate locking / WAL validation is required before considering network filesystems
+- `SQLiteRiskPersistenceBootstrapper` owns explicit creation of `data/production/` and `data/production/backups/`
+- generic repositories still keep missing parent as fail-closed
+- `RiskPersistenceBootstrapStatus` is exactly `CREATED`, `ALREADY_READY`, and `MIGRATED`; it does not include `ACTIVATED`, `LIVE`, or `DEPLOYED`
+- missing DB and zero-byte empty DB initialize current schema v3 directly and return `CREATED`
+- valid current v3 verifies and returns `ALREADY_READY`
+- fresh DB does not create v1 before migration
+- `inspect_schema_state(...)` is the read-only schema inspection seam and can classify `EMPTY`, `V1`, `V2`, `CURRENT`, `WRONG_APPLICATION`, `FUTURE`, and `MALFORMED`
+- schema inspection does not initialize, migrate, or write
+- valid v2 inspection was verified with unchanged SHA-256, unchanged mtime, `user_version` remaining 2, and unchanged schema
+
+Productionization P1A backup-before-migrate invariant:
+
+```text
+inspect
+    |
+    v
+backup
+    |
+    v
+verify backup
+    |
+    v
+migrate
+    |
+    v
+verify current
+```
+
+- only legal v1 and legal v2 are supported migration sources
+- backup uses `sqlite3.Connection.backup()`, not raw `.db` file copy, to preserve WAL consistency
+- backups are append-only and never overwritten
+- backup naming is `risk_artifacts.schema-v{source_version}.{UTC_TIMESTAMP}.db`
+- backup timestamp is UTC, microsecond precision, and filesystem-safe
+- migration begins only after backup verification passes
+- backup verification checks `APPLICATION_ID`, source `user_version`, exact old schema shape, and `PRAGMA quick_check == ok`
+- backup failure blocks migration
+- if backup succeeds but migration fails, backup remains, source DB remains on the previous legal schema, and no success result is returned
+- wrong application id, future schema, malformed v1/v2/v3, extra table, and wrong schema fail closed without overwrite, downgrade, repair, or reinitialize
+
+Productionization P1B: Read-Only Health Check + Operator Verify Command:
+
+- components are `RiskPersistenceHealthStatus`, `RiskPersistenceHealthResult`, and `SQLiteRiskPersistenceHealthChecker`
+- health checker is separate from `SQLiteRiskPersistenceBootstrapper`
+- status vocabulary is exactly `READY`, `MISSING`, `MIGRATION_REQUIRED`, `INVALID`, and `UNHEALTHY`
+- missing parent / DB maps to `MISSING`
+- empty DB maps to `MISSING`
+- valid v1 and valid v2 map to `MIGRATION_REQUIRED`
+- valid exact v3 plus `quick_check == ok` maps to `READY`
+- wrong application id, future schema, malformed schema, and extra table map to `INVALID`
+- quick_check / read failure maps to `UNHEALTHY`
+- health checker must not `mkdir`, create DB, initialize, migrate, backup, repair, change journal mode, set user_version, or write rows
+- health checker uses SQLite URI `mode=ro`, `PRAGMA query_only=ON`, `PRAGMA foreign_keys=ON`, and configured `PRAGMA busy_timeout`
+- default health check uses `PRAGMA quick_check`; full `PRAGMA integrity_check` is not the default and remains future deep maintenance scope
+- valid v3 health check was verified with unchanged SHA-256, unchanged mtime, unchanged `user_version`, and unchanged schema
+- valid v2 health check returns `MIGRATION_REQUIRED`, keeps `user_version = 2`, and does not migrate
+- missing DB health check does not create directory or DB
+
+Operator verify CLI:
+
+```text
+PYTHONPATH=src python -m risk_persistence.production_cli verify --project-root <root>
+```
+
+- CLI framework is standard library `argparse`
+- `--project-root` is required
+- CLI does not accept `--db-path`; production path still comes from canonical `RiskPersistenceProductionConfig`
+- first command surface is only `verify`
+- no `bootstrap`, `migrate`, `repair`, `force`, `execute`, `run`, or `schedule` command exists
+- `verify` is read-only and only constructs production config, constructs health checker, runs health check, formats the result, and returns exit code
+- exit codes: `READY` -> 0; `MISSING`, `MIGRATION_REQUIRED`, `INVALID`, `UNHEALTHY` -> 1; usage / config error -> 2
+- output is concise status, schema version, DB alias, quick_check, and warnings only
+- output must not expose symbols, position ids, artifact ids, holdings, payload JSON, raw SQL, or traceback
+
+Productionization P1 overall:
+
+- P1A: COMPLETE / COMMITTED / PUSHED
+- P1B: COMPLETE / COMMITTED / PUSHED
+- production persistence preparation foundation is complete
+- this means bootstrap / backup / migration capability plus read-only health / verify capability
+- this does not mean production DB active, production runtime active, scheduler active, Dashboard SQLite integrated, alerts active, or deployment complete
+- current real `data/production/` is not present
+- `data/production/risk_artifacts.db`, `risk_artifacts.db-wal`, and `risk_artifacts.db-shm` are not present
+- storage capability exists, but actual production persistence storage has not been initialized
+
+Productionization P2 blockers:
+
+1. formal production portfolio source is not defined
+2. formal production feature / market source is not defined
+3. policy activation / governance source still needs definition
+4. created_at retry UX and operator runtime command behavior still need specification
+
+Recommended next step:
+
+- Productionization P2 Prerequisite / Runtime Input Source Specification Review
+- define production portfolio source, production feature / market source, policy source / pinning, and runtime input construction before manual runtime implementation
+- scheduler should not start until production DB bootstrap / health capability, portfolio source, feature source, policy source, manual runtime, trading calendar, and operator runbook are all explicitly scoped
 
 Recommended durable source of truth:
 
@@ -2176,7 +2333,7 @@ Current non-blocking gaps:
 - Technical Risk v1 has no monitoring artifact payload SQLite persistence yet.
 - Technical Risk v1 output is not integrated into dashboard or alert delivery yet.
 
-These gaps are not current blockers for the Sprint 6C synchronized state, but they must not be misrepresented as completed production deployment capability.
+These gaps are not current blockers for the Productionization P1A / P1B synchronized state, but they must not be misrepresented as completed production deployment capability.
 
 ## Important Design Rules
 
@@ -2214,8 +2371,8 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `2486fbb3df0569afb1ba274bbf9d51e73e9dd2c0` or inspect any newer commits.
-3. Confirm whether Technical Risk v1 through Sprint 6C files are still committed and whether new worktree changes exist.
+2. Confirm HEAD is still `e6ef1b01d77a87018e06f33087381ac6070cfa78` or inspect any newer commits.
+3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
