@@ -20,6 +20,8 @@ from market_inputs.production_market_contracts import MARKET_INPUT_ARTIFACT_ROOT
 from market_inputs.production_market_contracts import YAHOO_FINANCE_PROVIDER_ID_V1
 from market_inputs.production_technical_market_input_service import ProductionTechnicalMarketInputResult
 from market_inputs.production_technical_market_input_service import ProductionTechnicalMarketInputService
+from market_inputs.production_technical_feature_materializer import ProductionTechnicalFeatureMaterializer
+from market_inputs.production_technical_feature_materializer import REQUIRED_TECHNICAL_FEATURE_OBSERVATIONS_V1
 from market_inputs.technical_close_observation import MarketInputError
 from market_inputs.technical_close_observation import MarketInputValidationError
 from market_inputs.technical_close_observation import TechnicalCloseBasis
@@ -31,6 +33,11 @@ from market_inputs.technical_close_observation import YAHOO_FINANCE_TECHNICAL_CL
 from market_inputs.technical_close_observation_codec import TechnicalCloseObservationSeriesCodec
 from market_inputs.technical_close_observation_codec import TechnicalCloseObservationSeriesCodecError
 from market_inputs.technical_close_observation_codec import TECHNICAL_CLOSE_OBSERVATION_CODEC_VERSION_V1
+from market_inputs.technical_feature_bundle import PRODUCTION_TECHNICAL_FEATURE_MATERIALIZER_V1
+from market_inputs.technical_feature_bundle import TECHNICAL_FEATURE_BUNDLE_SCHEMA_VERSION_V1
+from market_inputs.technical_feature_bundle import TECHNICAL_RISK_V1_FEATURE_IDS
+from market_inputs.technical_feature_bundle import TechnicalFeatureBundle
+from market_inputs.technical_feature_bundle import TechnicalFeatureMaterializationError
 from market_inputs.yahoo_finance_technical_close_series_source import YahooFinanceTechnicalCloseSeriesSource
 
 
@@ -48,18 +55,25 @@ __all__ = [
     "MarketSourceUnavailableError",
     "ProductionMarketInputConfig",
     "ProductionMarketInputMode",
+    "ProductionTechnicalFeatureMaterializer",
     "ProductionTechnicalMarketInputResult",
     "ProductionTechnicalMarketInputService",
+    "PRODUCTION_TECHNICAL_FEATURE_MATERIALIZER_V1",
+    "REQUIRED_TECHNICAL_FEATURE_OBSERVATIONS_V1",
     "FilesystemTechnicalCloseSeriesStore",
     "TECHNICAL_CLOSE_OBSERVATION_CODEC_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1",
+    "TECHNICAL_FEATURE_BUNDLE_SCHEMA_VERSION_V1",
+    "TECHNICAL_RISK_V1_FEATURE_IDS",
     "YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1",
     "TechnicalCloseBasis",
     "TechnicalCloseObservation",
     "TechnicalCloseObservationSeries",
     "TechnicalCloseObservationSeriesCodec",
     "TechnicalCloseObservationSeriesCodecError",
+    "TechnicalFeatureBundle",
+    "TechnicalFeatureMaterializationError",
     "TechnicalCloseSeriesArtifactIdentity",
     "TechnicalCloseSeriesRequest",
     "TechnicalCloseSeriesSource",

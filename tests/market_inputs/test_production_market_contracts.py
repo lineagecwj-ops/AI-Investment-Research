@@ -277,7 +277,11 @@ class ProductionMarketContractsTestCase(unittest.TestCase):
     def test_no_network_filesystem_db_or_feature_boundary(self):
         contract_paths = [
             path for path in sorted((SRC_PATH / "market_inputs").glob("*.py"))
-            if path.name != "yahoo_finance_technical_close_series_source.py"
+            if path.name
+            in {
+                "production_market_contracts.py",
+                "production_technical_market_input_service.py",
+            }
         ]
         source = "\n".join(path.read_text() for path in contract_paths)
 

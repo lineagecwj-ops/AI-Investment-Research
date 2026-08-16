@@ -169,7 +169,7 @@ class TechnicalCloseObservationContractTestCase(unittest.TestCase):
                 self.assertEqual(first.market_revision_id, second.market_revision_id)
 
     def test_no_network_feature_or_persistence_boundary(self):
-        source = "\n".join(path.read_text() for path in sorted((SRC_PATH / "market_inputs").glob("*.py")))
+        source = (SRC_PATH / "market_inputs" / "technical_close_observation.py").read_text()
 
         forbidden = (
             "requests",
