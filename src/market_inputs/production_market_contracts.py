@@ -52,6 +52,10 @@ class MarketArtifactStoreError(MarketInputError):
     """Raised when immutable market artifacts cannot be stored or loaded."""
 
 
+class MarketArtifactNotFoundError(MarketArtifactStoreError):
+    """Raised when an explicit replay artifact identity is not found."""
+
+
 class MarketArtifactConflictError(MarketArtifactStoreError):
     """Raised when an immutable artifact identity already has different content."""
 
