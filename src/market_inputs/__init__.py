@@ -38,6 +38,8 @@ from market_inputs.technical_feature_bundle import TECHNICAL_FEATURE_BUNDLE_SCHE
 from market_inputs.technical_feature_bundle import TECHNICAL_RISK_V1_FEATURE_IDS
 from market_inputs.technical_feature_bundle import TechnicalFeatureBundle
 from market_inputs.technical_feature_bundle import TechnicalFeatureMaterializationError
+from market_inputs.technical_feature_set import TECHNICAL_FEATURE_SET_SCHEMA_VERSION_V1
+from market_inputs.technical_feature_set import TechnicalFeatureSet
 from market_inputs.yahoo_finance_technical_close_series_source import YahooFinanceTechnicalCloseSeriesSource
 
 
@@ -65,6 +67,7 @@ __all__ = [
     "TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1",
     "TECHNICAL_CLOSE_OBSERVATION_SCHEMA_VERSION_V1",
     "TECHNICAL_FEATURE_BUNDLE_SCHEMA_VERSION_V1",
+    "TECHNICAL_FEATURE_SET_SCHEMA_VERSION_V1",
     "TECHNICAL_RISK_V1_FEATURE_IDS",
     "YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1",
     "TechnicalCloseBasis",
@@ -74,6 +77,7 @@ __all__ = [
     "TechnicalCloseObservationSeriesCodecError",
     "TechnicalFeatureBundle",
     "TechnicalFeatureMaterializationError",
+    "TechnicalFeatureSet",
     "TechnicalCloseSeriesArtifactIdentity",
     "TechnicalCloseSeriesRequest",
     "TechnicalCloseSeriesSource",
