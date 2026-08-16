@@ -39,14 +39,12 @@ class FilesystemTechnicalCloseSeriesStore:
         _reject_symlink_components(self.config.project_root, final_path)
 
         if final_path.exists() or final_path.is_symlink():
-            stored_payload = self._verified_payload(final_path, identity)
-            if stored_payload == payload:
-                return MarketArtifactSaveResult(
-                    status=MarketArtifactSaveStatus.IDEMPOTENT,
-                    identity=identity,
-                    relative_path=relative_path,
-                )
-            raise MarketArtifactConflictError(_safe_message("Artifact identity already has different content.", identity, relative_path))
+            self._verified_series(final_path, identity)
+            return MarketArtifactSaveResult(
+                status=MarketArtifactSaveStatus.IDEMPOTENT,
+                identity=identity,
+                relative_path=relative_path,
+            )
 
         self._ensure_parent(final_path)
         _reject_symlink_components(self.config.project_root, final_path)
@@ -56,15 +54,11 @@ class FilesystemTechnicalCloseSeriesStore:
             try:
                 os.link(temp_path, final_path)
             except FileExistsError:
-                stored_payload = self._verified_payload(final_path, identity)
-                if stored_payload == payload:
-                    return MarketArtifactSaveResult(
-                        status=MarketArtifactSaveStatus.IDEMPOTENT,
-                        identity=identity,
-                        relative_path=relative_path,
-                    )
-                raise MarketArtifactConflictError(
-                    _safe_message("Artifact identity already has different content.", identity, relative_path)
+                self._verified_series(final_path, identity)
+                return MarketArtifactSaveResult(
+                    status=MarketArtifactSaveStatus.IDEMPOTENT,
+                    identity=identity,
+                    relative_path=relative_path,
                 )
             except OSError as exc:
                 raise MarketArtifactStoreError(_safe_message("Artifact publish failed.", identity, relative_path)) from exc

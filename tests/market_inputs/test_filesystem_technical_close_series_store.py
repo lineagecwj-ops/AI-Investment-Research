@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 import sys
 import tempfile
 import threading
@@ -29,7 +30,9 @@ from market_inputs import TechnicalCloseObservationSeries
 from market_inputs import TechnicalCloseObservationSeriesCodec
 from market_inputs import TechnicalCloseSeriesArtifactIdentity
 from market_inputs import TechnicalCloseSeriesStore
+from market_inputs import TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1
 from market_inputs import YAHOO_FINANCE_PROVIDER_ID_V1
+from market_inputs import YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1
 
 
 class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
@@ -106,13 +109,39 @@ class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
             path = self.final_path(temp_dir, series)
 
             first = store.save(series)
+            first_sha = self.file_sha256(path)
             first_mtime = path.stat().st_mtime_ns
             second = store.save(series)
+            second_sha = self.file_sha256(path)
             second_mtime = path.stat().st_mtime_ns
 
             self.assertEqual(first.status, MarketArtifactSaveStatus.INSERTED)
             self.assertEqual(second.status, MarketArtifactSaveStatus.IDEMPOTENT)
+            self.assertEqual(first_sha, second_sha)
             self.assertEqual(first_mtime, second_mtime)
+
+    def test_same_revision_different_fetched_at_is_idempotent_without_rewrite(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = self.store(temp_dir)
+            first_series = self.series(fetched_at=datetime(2026, 8, 16, 9, 0, tzinfo=timezone.utc))
+            second_series = self.series(fetched_at=datetime(2026, 8, 17, 9, 0, tzinfo=timezone.utc))
+            path = self.final_path(temp_dir, first_series)
+
+            self.assertEqual(first_series.market_revision_id, second_series.market_revision_id)
+
+            first = store.save(first_series)
+            first_sha = self.file_sha256(path)
+            first_mtime = path.stat().st_mtime_ns
+            first_payload = path.read_bytes()
+            second = store.save(second_series)
+
+            self.assertEqual(first.status, MarketArtifactSaveStatus.INSERTED)
+            self.assertEqual(second.status, MarketArtifactSaveStatus.IDEMPOTENT)
+            self.assertEqual(path.read_bytes(), first_payload)
+            self.assertEqual(self.file_sha256(path), first_sha)
+            self.assertEqual(path.stat().st_mtime_ns, first_mtime)
+            self.assertEqual(store.get(self.identity(first_series)).fetched_at, first_series.fetched_at)
+            self.assertNotEqual(store.get(self.identity(first_series)).fetched_at, second_series.fetched_at)
 
     def test_get_returns_exact_frozen_series(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -143,6 +172,21 @@ class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
             self.assertNotEqual(first_result.relative_path, second_result.relative_path)
             self.assertEqual(store.get(self.identity(first)), first)
             self.assertEqual(store.get(self.identity(second)), second)
+
+    def test_different_producer_versions_create_different_revisions(self):
+        generic = self.series(producer_version=TECHNICAL_CLOSE_OBSERVATION_PRODUCER_VERSION_V1)
+        yahoo = self.series(producer_version=YAHOO_FINANCE_TECHNICAL_CLOSE_SOURCE_V1)
+
+        self.assertNotEqual(generic.market_revision_id, yahoo.market_revision_id)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = self.store(temp_dir)
+            first_result = store.save(generic)
+            second_result = store.save(yahoo)
+
+            self.assertEqual(first_result.status, MarketArtifactSaveStatus.INSERTED)
+            self.assertEqual(second_result.status, MarketArtifactSaveStatus.INSERTED)
+            self.assertNotEqual(first_result.relative_path, second_result.relative_path)
 
     def test_malformed_json_invalid_utf8_wrong_version_and_oversized_files_are_corruption(self):
         cases = (
@@ -286,6 +330,29 @@ class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
             self.assertEqual(store.get(self.identity(series)), series)
             self.assertTrue(path.exists())
 
+    def test_publish_race_same_revision_different_fetched_at_returns_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = self.store(temp_dir)
+            winner = self.series(fetched_at=datetime(2026, 8, 16, 9, 0, tzinfo=timezone.utc))
+            loser = self.series(fetched_at=datetime(2026, 8, 17, 9, 0, tzinfo=timezone.utc))
+            path = self.final_path(temp_dir, loser)
+            original_link = os.link
+
+            self.assertEqual(winner.market_revision_id, loser.market_revision_id)
+
+            def race_link(src, dst):
+                if not Path(dst).exists():
+                    Path(dst).write_text(TechnicalCloseObservationSeriesCodec().encode(winner), encoding="utf-8")
+                    raise FileExistsError("race")
+                return original_link(src, dst)
+
+            with mock.patch("market_inputs.filesystem_technical_close_series_store.os.link", side_effect=race_link):
+                result = store.save(loser)
+
+            self.assertEqual(result.status, MarketArtifactSaveStatus.IDEMPOTENT)
+            self.assertEqual(store.get(self.identity(loser)), winner)
+            self.assertTrue(path.exists())
+
     def test_concurrent_same_revision_one_inserted_one_idempotent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config = self.config(temp_dir)
@@ -300,6 +367,26 @@ class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
                 statuses = sorted(result.value for result in executor.map(lambda _: save_once(), range(2)))
 
             self.assertEqual(statuses, ["IDEMPOTENT", "INSERTED"])
+
+    def test_concurrent_same_revision_different_fetched_at_one_inserted_one_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = self.config(temp_dir)
+            first = self.series(fetched_at=datetime(2026, 8, 16, 9, 0, tzinfo=timezone.utc))
+            second = self.series(fetched_at=datetime(2026, 8, 17, 9, 0, tzinfo=timezone.utc))
+            barrier = threading.Barrier(2)
+
+            self.assertEqual(first.market_revision_id, second.market_revision_id)
+
+            def save_once(series):
+                barrier.wait()
+                return FilesystemTechnicalCloseSeriesStore(config).save(series).status
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                statuses = sorted(result.value for result in executor.map(save_once, (first, second)))
+
+            stored = FilesystemTechnicalCloseSeriesStore(config).get(self.identity(first))
+            self.assertEqual(statuses, ["IDEMPOTENT", "INSERTED"])
+            self.assertIn(stored.fetched_at, {first.fetched_at, second.fetched_at})
 
     def test_concurrent_different_revisions_are_both_inserted(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -357,6 +444,9 @@ class FilesystemTechnicalCloseSeriesStoreTestCase(unittest.TestCase):
         payload = json.loads(TechnicalCloseObservationSeriesCodec().encode(self.series()))
         payload["codec_version"] = "2"
         return json.dumps(payload).encode("utf-8")
+
+    def file_sha256(self, path):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 if __name__ == "__main__":
