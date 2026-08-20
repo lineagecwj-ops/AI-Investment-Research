@@ -51,6 +51,26 @@ from risk_oos.holdout_confirmation import TechnicalRiskHoldoutCoverageHandling
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutEvaluationReference
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutMonotonicityHandling
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutWarningHandling
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CANDIDATE_ID
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONFIRMED_NOT_APPROVAL
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONTRACT_V1
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_DECISION_PACKAGE_CHECKSUM
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_DECISION_PACKAGE_ID
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_END_DATE
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_POST_VALIDATION_METHOD_DECISION
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_ID
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_LEVEL_V1
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_THRESHOLD_COUNT
+from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_START_DATE
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionConfirmationContract
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionConfirmationError
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionConfirmationStatus
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionEvidenceHorizon
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionSeparationEvidence
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionSeverityEvidence
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionSummary
+from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionThresholdResult
+from risk_oos.holdout_region_confirmation import build_technical_risk_v1_holdout_region_confirmation_contract
 from risk_oos.historical_features import EXCLUSION_FEATURE_CALCULATION_FAILED
 from risk_oos.historical_features import EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY
 from risk_oos.historical_features import EXCLUSION_INVALID_PRICE
@@ -238,6 +258,17 @@ __all__ = [
     "TECH_RISK_DEVELOPMENT_EVALUATION_CONTEXT_V1",
     "TECH_RISK_HOLDOUT_CONFIRMATION_ARTIFACT_V1",
     "TECH_RISK_HOLDOUT_CONFIRMATION_CRITERIA_V1",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CANDIDATE_ID",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONFIRMED_NOT_APPROVAL",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONTRACT_V1",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_DECISION_PACKAGE_CHECKSUM",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_DECISION_PACKAGE_ID",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_END_DATE",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_POST_VALIDATION_METHOD_DECISION",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_ID",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_LEVEL_V1",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_THRESHOLD_COUNT",
+    "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_START_DATE",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1",
@@ -303,6 +334,14 @@ __all__ = [
     "TechnicalRiskHoldoutCoverageHandling",
     "TechnicalRiskHoldoutEvaluationReference",
     "TechnicalRiskHoldoutMonotonicityHandling",
+    "TechnicalRiskHoldoutRegionConfirmationContract",
+    "TechnicalRiskHoldoutRegionConfirmationError",
+    "TechnicalRiskHoldoutRegionConfirmationStatus",
+    "TechnicalRiskHoldoutRegionEvidenceHorizon",
+    "TechnicalRiskHoldoutRegionSeparationEvidence",
+    "TechnicalRiskHoldoutRegionSeverityEvidence",
+    "TechnicalRiskHoldoutRegionSummary",
+    "TechnicalRiskHoldoutRegionThresholdResult",
     "TechnicalRiskHoldoutWarningHandling",
     "TechnicalRiskMedianSeparationPreference",
     "TechnicalRiskMethodologyWarningPolicy",
@@ -386,6 +425,7 @@ __all__ = [
     "TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION",
     "build_technical_risk_v1_temporal_split_methodology",
     "build_technical_risk_v1_temporal_split_specs",
+    "build_technical_risk_v1_holdout_region_confirmation_contract",
     "build_technical_risk_v1_threshold_axis_set",
     "build_technical_risk_v1_validation_selection_methodology",
     "build_default_research_validation_candidate_evaluation_request",
