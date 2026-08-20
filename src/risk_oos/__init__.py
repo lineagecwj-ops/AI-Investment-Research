@@ -111,6 +111,14 @@ from risk_oos.threshold_grid import TechnicalRiskThresholdGridError
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridMaterializer
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridResult
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridSpec
+from risk_oos.threshold_axis_set import TECHNICAL_RISK_V1_THRESHOLD_AXIS_EVIDENCE_NEAREST_RANK_LOWER_TAIL_V1
+from risk_oos.threshold_axis_set import TECHNICAL_RISK_V1_THRESHOLD_AXIS_SET_V1
+from risk_oos.threshold_axis_set import TECHNICAL_RISK_V1_VALIDATION_SEARCH_USAGE
+from risk_oos.threshold_axis_set import TechnicalRiskThresholdAxisSetApprovalStatus
+from risk_oos.threshold_axis_set import TechnicalRiskThresholdAxisSetError
+from risk_oos.threshold_axis_set import TechnicalRiskV1ThresholdAxisSet
+from risk_oos.threshold_axis_set import build_technical_risk_v1_threshold_axis_set
+from risk_oos.threshold_axis_set import materialize_technical_risk_v1_threshold_grid
 from risk_oos.temporal_split_methodology import TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1
 from risk_oos.temporal_split_methodology import TechnicalRiskTemporalSplitMethodologyError
 from risk_oos.temporal_split_methodology import TechnicalRiskV1TemporalSplitMethodology
@@ -177,6 +185,9 @@ __all__ = [
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1",
+    "TECHNICAL_RISK_V1_THRESHOLD_AXIS_EVIDENCE_NEAREST_RANK_LOWER_TAIL_V1",
+    "TECHNICAL_RISK_V1_THRESHOLD_AXIS_SET_V1",
+    "TECHNICAL_RISK_V1_VALIDATION_SEARCH_USAGE",
     "TECHNICAL_RISK_V1_FEATURE_SET_ID",
     "TECHNICAL_RISK_V1_TARGET_IDENTITIES",
     "TECH_RISK_DERIVED_EVIDENCE_V1",
@@ -248,6 +259,8 @@ __all__ = [
     "TechnicalRiskSeverityMAEMetrics",
     "TechnicalRiskThresholdDimension",
     "TechnicalRiskThresholdDimensionId",
+    "TechnicalRiskThresholdAxisSetApprovalStatus",
+    "TechnicalRiskThresholdAxisSetError",
     "TechnicalRiskThresholdGridError",
     "TechnicalRiskThresholdGridMaterializer",
     "TechnicalRiskThresholdGridResult",
@@ -267,13 +280,16 @@ __all__ = [
     "TechnicalRiskValidationSelectionReasonCode",
     "TechnicalRiskValidationSelectionStatus",
     "TechnicalRiskV1TemporalSplitMethodology",
+    "TechnicalRiskV1ThresholdAxisSet",
     "ThresholdCandidateGenerationContract",
     "DevelopmentEvaluationContext",
     "TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION",
     "build_technical_risk_v1_temporal_split_methodology",
     "build_technical_risk_v1_temporal_split_specs",
+    "build_technical_risk_v1_threshold_axis_set",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
+    "materialize_technical_risk_v1_threshold_grid",
     "technical_risk_candidate_a_spec",
     "technical_risk_candidate_b_spec",
     "technical_risk_candidate_c_spec",
