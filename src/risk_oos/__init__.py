@@ -98,6 +98,14 @@ from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenc
 from risk_oos.validation_evidence_artifact import load_validation_evidence_artifact
 from risk_oos.validation_evidence_artifact import save_validation_evidence_artifact
 from risk_oos.validation_evidence_artifact import validation_evidence_artifact_path
+from risk_oos.validation_evidence_shortlist import TECH_RISK_DESCRIPTIVE_SHORTLIST_ONLY_V1
+from risk_oos.validation_evidence_shortlist import TECH_RISK_VALIDATION_EVIDENCE_SHORTLIST_EXECUTOR_V1
+from risk_oos.validation_evidence_shortlist import TECH_RISK_VALIDATION_EVIDENCE_SHORTLIST_RESULT_V1
+from risk_oos.validation_evidence_shortlist import TechnicalRiskValidationEvidencePoint
+from risk_oos.validation_evidence_shortlist import TechnicalRiskValidationEvidenceRegion
+from risk_oos.validation_evidence_shortlist import TechnicalRiskValidationEvidenceShortlist
+from risk_oos.validation_evidence_shortlist import TechnicalRiskValidationEvidenceShortlistError
+from risk_oos.validation_evidence_shortlist import build_technical_risk_validation_evidence_shortlist
 from risk_oos.validation_selection_methodology import APPROVED_STRUCTURED_EVIDENCE_DIMENSIONS_V1
 from risk_oos.validation_selection_methodology import TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_CHECKSUM
 from risk_oos.validation_selection_methodology import TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_ID
@@ -256,8 +264,11 @@ __all__ = [
     "TECH_RISK_VALIDATION_CANDIDATE_IDS_V1",
     "TECH_RISK_VALIDATION_DATASET_SPEC_ID_V1",
     "TECH_RISK_VALIDATION_DATASET_SPEC_VERSION_V1",
+    "TECH_RISK_DESCRIPTIVE_SHORTLIST_ONLY_V1",
     "TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_CODEC_V1",
     "TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_SCHEMA_V1",
+    "TECH_RISK_VALIDATION_EVIDENCE_SHORTLIST_EXECUTOR_V1",
+    "TECH_RISK_VALIDATION_EVIDENCE_SHORTLIST_RESULT_V1",
     "TechnicalRiskCandidateFamily",
     "TechnicalRiskCandidateIdentity",
     "TechnicalRiskCandidateEvaluationError",
@@ -338,6 +349,10 @@ __all__ = [
     "TechnicalRiskValidationEvidenceArtifactCodec",
     "TechnicalRiskValidationEvidenceArtifactError",
     "TechnicalRiskValidationEvidenceArtifactSaveResult",
+    "TechnicalRiskValidationEvidencePoint",
+    "TechnicalRiskValidationEvidenceRegion",
+    "TechnicalRiskValidationEvidenceShortlist",
+    "TechnicalRiskValidationEvidenceShortlistError",
     "TechnicalRiskValidationGridPoint",
     "TechnicalRiskValidationRobustRegion",
     "TechnicalRiskValidationSelectionCriteria",
@@ -362,6 +377,7 @@ __all__ = [
     "build_technical_risk_v1_validation_selection_methodology",
     "build_default_research_validation_candidate_evaluation_request",
     "build_technical_risk_v1_validation_candidate_evaluation_request",
+    "build_technical_risk_validation_evidence_shortlist",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
     "load_validation_evidence_artifact",
