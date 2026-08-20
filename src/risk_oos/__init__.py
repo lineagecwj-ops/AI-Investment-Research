@@ -68,6 +68,12 @@ from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeArtifact
 from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeError
 from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeReasonCode
 from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeStatus
+from risk_oos.real_oos_materialization import PRICE_BASIS_DAILY_CLOSE
+from risk_oos.real_oos_materialization import TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION
+from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializationError
+from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializationRequest
+from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializationResult
+from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializer
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
 from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
@@ -142,6 +148,7 @@ __all__ = [
     "HistoricalRiskFeatureMaterializer",
     "HistoricalRiskFeatureObservation",
     "HistoricalRiskFeatureStatus",
+    "PRICE_BASIS_DAILY_CLOSE",
     "REQUIRED_THRESHOLD_DIMENSIONS_V1",
     "TARGET_MAE20",
     "TARGET_MAE60",
@@ -215,6 +222,10 @@ __all__ = [
     "TechnicalRiskPolicyFreezeError",
     "TechnicalRiskPolicyFreezeReasonCode",
     "TechnicalRiskPolicyFreezeStatus",
+    "TechnicalRiskRealOOSDatasetMaterializationError",
+    "TechnicalRiskRealOOSDatasetMaterializationRequest",
+    "TechnicalRiskRealOOSDatasetMaterializationResult",
+    "TechnicalRiskRealOOSDatasetMaterializer",
     "TechnicalRiskReasonCode",
     "TechnicalRiskRuleCandidateError",
     "TechnicalRiskRuleCandidateSpec",
@@ -236,6 +247,7 @@ __all__ = [
     "TechnicalRiskValidationSelectionStatus",
     "ThresholdCandidateGenerationContract",
     "DevelopmentEvaluationContext",
+    "TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
     "technical_risk_candidate_a_spec",
