@@ -88,6 +88,16 @@ from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCand
 from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateSummary
 from risk_oos.validation_candidate_evaluation import build_default_research_validation_candidate_evaluation_request
 from risk_oos.validation_candidate_evaluation import build_technical_risk_v1_validation_candidate_evaluation_request
+from risk_oos.validation_evidence_artifact import DEFAULT_TECH_RISK_VALIDATION_EVIDENCE_DIR
+from risk_oos.validation_evidence_artifact import TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_CODEC_V1
+from risk_oos.validation_evidence_artifact import TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_SCHEMA_V1
+from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenceArtifact
+from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenceArtifactCodec
+from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenceArtifactError
+from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenceArtifactSaveResult
+from risk_oos.validation_evidence_artifact import load_validation_evidence_artifact
+from risk_oos.validation_evidence_artifact import save_validation_evidence_artifact
+from risk_oos.validation_evidence_artifact import validation_evidence_artifact_path
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
 from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
@@ -166,6 +176,7 @@ __all__ = [
     "ALLOWED_CANDIDATE_SEVERITIES_V1",
     "ALLOWED_PREDICATES_V1",
     "DEVELOPMENT_SHORTLIST_ARTIFACT_V1",
+    "DEFAULT_TECH_RISK_VALIDATION_EVIDENCE_DIR",
     "DevelopmentEvaluationReference",
     "DevelopmentShortlistArtifact",
     "DevelopmentShortlistEligiblePair",
@@ -224,6 +235,8 @@ __all__ = [
     "TECH_RISK_VALIDATION_CANDIDATE_IDS_V1",
     "TECH_RISK_VALIDATION_DATASET_SPEC_ID_V1",
     "TECH_RISK_VALIDATION_DATASET_SPEC_VERSION_V1",
+    "TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_CODEC_V1",
+    "TECH_RISK_VALIDATION_EVIDENCE_ARTIFACT_SCHEMA_V1",
     "TechnicalRiskCandidateFamily",
     "TechnicalRiskCandidateIdentity",
     "TechnicalRiskCandidateEvaluationError",
@@ -299,6 +312,10 @@ __all__ = [
     "TechnicalRiskValidationCandidateEvaluationRequest",
     "TechnicalRiskValidationCandidateEvaluationResult",
     "TechnicalRiskValidationCandidateSummary",
+    "TechnicalRiskValidationEvidenceArtifact",
+    "TechnicalRiskValidationEvidenceArtifactCodec",
+    "TechnicalRiskValidationEvidenceArtifactError",
+    "TechnicalRiskValidationEvidenceArtifactSaveResult",
     "TechnicalRiskValidationSelectionCriteria",
     "TechnicalRiskValidationSelectionDecision",
     "TechnicalRiskValidationSelectionError",
@@ -317,9 +334,12 @@ __all__ = [
     "build_technical_risk_v1_validation_candidate_evaluation_request",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
+    "load_validation_evidence_artifact",
     "materialize_technical_risk_v1_threshold_grid",
+    "save_validation_evidence_artifact",
     "technical_risk_candidate_a_spec",
     "technical_risk_candidate_b_spec",
     "technical_risk_candidate_c_spec",
     "technical_risk_candidate_d_spec",
+    "validation_evidence_artifact_path",
 ]
