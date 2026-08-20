@@ -197,6 +197,21 @@ class TechnicalRiskRealOOSMaterializationTestCase(unittest.TestCase):
         self.assertEqual(result.aligned_row_count, len(result.oos_dataset_result.included_rows))
         self.assertEqual(self.before_sha, self._sha256(self.db_path))
 
+    def test_validation_only_output_can_be_required_without_holdout_rows(self):
+        result = self.materialize(
+            analysis_start_date=self.start + timedelta(days=69),
+            analysis_end_date=self.start + timedelta(days=150),
+            required_output_split_roles=(TechnicalRiskOOSSplitRole.VALIDATION,),
+        )
+
+        self.assertGreater(result.split_counts["validation"], 0)
+        self.assertEqual(result.split_counts["holdout"], 0)
+        self.assertEqual(
+            {row.split_role for row in result.oos_dataset_result.included_rows},
+            {TechnicalRiskOOSSplitRole.VALIDATION},
+        )
+        self.assertEqual(self.before_sha, self._sha256(self.db_path))
+
     def test_feature_values_match_existing_calculators(self):
         result = self.materialize()
         row = result.oos_dataset_result.included_rows[0]

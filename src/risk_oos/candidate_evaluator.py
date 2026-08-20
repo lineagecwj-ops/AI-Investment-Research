@@ -7,6 +7,7 @@ from enum import StrEnum
 import hashlib
 import json
 from numbers import Real
+from types import MappingProxyType
 from typing import Mapping
 
 from risk_oos.aligned_dataset import AlignedTechnicalRiskOOSRow
@@ -20,11 +21,13 @@ from risk_oos.rule_candidates import TECH_RISK_DERIVED_EVIDENCE_V1
 from risk_oos.rule_candidates import TECH_RISK_NUMERIC_REPRESENTATION_V1
 from risk_oos.rule_candidates import TechnicalRiskCandidateRule
 from risk_oos.rule_candidates import TechnicalRiskCandidateSeverity
+from risk_oos.rule_candidates import TechnicalRiskDerivedEvidence
 from risk_oos.rule_candidates import TechnicalRiskPredicateId
 from risk_oos.rule_candidates import TechnicalRiskPredicateState
 from risk_oos.rule_candidates import TechnicalRiskReasonCode
 from risk_oos.rule_candidates import TechnicalRiskRuleCandidateError
 from risk_oos.rule_candidates import TechnicalRiskRuleCandidateSpec
+from risk_oos.rule_candidates import TechnicalRiskThresholdDimensionId
 from risk_oos.rule_candidates import TechnicalRiskThresholdOperator
 from risk_oos.rule_candidates import TechnicalRiskThresholdSet
 from risk_oos.rule_candidates import derive_technical_risk_evidence
@@ -36,6 +39,12 @@ TECH_RISK_CANDIDATE_EVALUATOR_V1 = "TECH_RISK_CANDIDATE_EVALUATOR_V1"
 TECH_RISK_CONTINUOUS_MAE_METRIC_V1 = "TECH_RISK_CONTINUOUS_MAE_METRIC_V1"
 TECH_RISK_QUANTILE_NEAREST_RANK_V1 = "TECH_RISK_QUANTILE_NEAREST_RANK_V1"
 TECH_RISK_LOW_REASON_V1 = "NO_ELEVATED_TECHNICAL_DOWNSIDE_EVIDENCE"
+_PREDICATE_ORDER = (
+    TechnicalRiskPredicateId.SHORT_PRICE_WEAKNESS,
+    TechnicalRiskPredicateId.MEDIUM_PRICE_WEAKNESS,
+    TechnicalRiskPredicateId.TREND_STRUCTURE_WEAKNESS,
+    TechnicalRiskPredicateId.MOMENTUM_WEAKNESS_CONFIRMATION,
+)
 
 
 class TechnicalRiskCandidateEvaluationError(Exception):
@@ -222,10 +231,15 @@ class TechnicalRiskCandidateEvaluationResult:
     aggregate_metrics: tuple[TechnicalRiskSeverityMAEMetrics, ...]
     monotonicity_results: tuple[TechnicalRiskMonotonicityResult, ...]
     evaluation_checksum: str
+    evaluated_row_count: int | None = None
 
 
 class TechnicalRiskCandidateEvaluator:
     """Evaluates one frozen Technical Risk rule candidate against one threshold set."""
+
+    def __init__(self) -> None:
+        self._row_runtime_cache: dict[tuple[object, ...], tuple[TechnicalRiskDerivedEvidence, Decimal]] = {}
+        self._candidate_rule_mask_cache: dict[str, tuple[tuple[TechnicalRiskCandidateRule, int], ...]] = {}
 
     def evaluate(
         self,
@@ -276,6 +290,117 @@ class TechnicalRiskCandidateEvaluator:
             aggregate_metrics=aggregate_metrics,
             monotonicity_results=monotonicity_results,
             evaluation_checksum=checksum,
+            evaluated_row_count=len(row_evaluations),
+        )
+
+    def evaluate_compact(
+        self,
+        dataset: TechnicalRiskOOSDatasetResult,
+        candidate_spec: TechnicalRiskRuleCandidateSpec,
+        threshold_set: TechnicalRiskThresholdSet,
+        evaluation_input: TechnicalRiskCandidateEvaluationInput,
+    ) -> TechnicalRiskCandidateEvaluationResult:
+        self._validate_integrity(dataset, candidate_spec, threshold_set, evaluation_input)
+        split_roles = evaluation_input.allowed_split_roles
+        rows = tuple(
+            sorted(
+                (row for row in dataset.included_rows if row.split_role in split_roles),
+                key=_row_sort_key,
+            )
+        )
+        threshold_values = threshold_set.bound_decimal_values
+        bucket_values: dict[tuple[TechnicalRiskOOSSplitRole, TechnicalRiskCandidateSeverity], tuple[list[Decimal], list[Decimal]]] = {
+            (split_role, severity): ([], [])
+            for split_role in split_roles
+            for severity in ALLOWED_CANDIDATE_SEVERITIES_V1
+        }
+        split_totals = {split_role: 0 for split_role in split_roles}
+        row_payloads: list[dict[str, object]] = []
+        for row in rows:
+            try:
+                evidence, rsi = self._row_runtime_values(row)
+                predicate_states, predicate_mask = _evaluate_bound_predicates(evidence, rsi, threshold_values)
+            except TechnicalRiskRuleCandidateError as exc:
+                raise TechnicalRiskCandidateEvaluationError(str(exc)) from exc
+            rule = self._matched_rule(candidate_spec, predicate_mask)
+            severity = TechnicalRiskCandidateSeverity.LOW if rule is None else rule.severity
+            reason_codes = _reason_codes(rule, predicate_states)
+            calculation_id = _stable_id(
+                "technical_risk_candidate_row_evaluation",
+                {
+                    "row_id": row.row_id,
+                    "candidate_checksum": evaluation_input.candidate_structural_checksum,
+                    "threshold_checksum": evaluation_input.threshold_set_checksum,
+                    "evaluator_version": evaluation_input.evaluator_version,
+                },
+            )
+            mae20_value = _canonical_decimal(row.mae20_value)
+            mae60_value = _canonical_decimal(row.mae60_value)
+            split_totals[row.split_role] += 1
+            mae20_values, mae60_values = bucket_values[(row.split_role, severity)]
+            mae20_values.append(mae20_value)
+            mae60_values.append(mae60_value)
+            row_payloads.append(
+                {
+                    "row_id": row.row_id,
+                    "symbol": row.symbol,
+                    "evaluation_date": row.evaluation_date.isoformat(),
+                    "split_id": row.split_id,
+                    "split_role": row.split_role.value,
+                    "candidate_id": evaluation_input.candidate_id,
+                    "candidate_version": evaluation_input.candidate_version,
+                    "candidate_structural_checksum": evaluation_input.candidate_structural_checksum,
+                    "threshold_set_id": evaluation_input.threshold_set_id,
+                    "threshold_set_version": evaluation_input.threshold_set_version,
+                    "threshold_set_checksum": evaluation_input.threshold_set_checksum,
+                    "derived_evidence_version": evidence.derived_evidence_version,
+                    "close_vs_sma20": evidence.close_vs_sma20,
+                    "close_vs_sma60": evidence.close_vs_sma60,
+                    "relative_sma_spread": evidence.relative_sma_spread,
+                    "predicate_states": [
+                        {"predicate_id": state.predicate_id.value, "is_triggered": state.is_triggered}
+                        for state in predicate_states
+                    ],
+                    "severity": severity.value,
+                    "matched_rule_id": None if rule is None else rule.rule_id,
+                    "reason_codes": reason_codes,
+                    "mae20_value": mae20_value,
+                    "mae60_value": mae60_value,
+                    "evaluation_version": evaluation_input.evaluator_version,
+                    "calculation_id": calculation_id,
+                }
+            )
+        aggregate_metrics = _aggregate_metrics_from_bucket_values(bucket_values, split_totals, split_roles)
+        monotonicity_results = _monotonicity_results(aggregate_metrics, split_roles)
+        evaluation_id = _evaluation_id(evaluation_input)
+        checksum = _evaluation_checksum_from_payloads(
+            evaluation_id,
+            evaluation_input,
+            row_payloads,
+            aggregate_metrics,
+            monotonicity_results,
+        )
+        return TechnicalRiskCandidateEvaluationResult(
+            evaluation_id=evaluation_id,
+            dataset_id=evaluation_input.dataset_id,
+            dataset_checksum=evaluation_input.dataset_checksum,
+            candidate_id=evaluation_input.candidate_id,
+            candidate_version=evaluation_input.candidate_version,
+            candidate_structural_checksum=evaluation_input.candidate_structural_checksum,
+            threshold_set_id=evaluation_input.threshold_set_id,
+            threshold_set_version=evaluation_input.threshold_set_version,
+            threshold_set_checksum=evaluation_input.threshold_set_checksum,
+            derived_evidence_version=evaluation_input.derived_evidence_version,
+            evaluator_version=evaluation_input.evaluator_version,
+            metric_version=evaluation_input.metric_version,
+            quantile_version=evaluation_input.quantile_version,
+            numeric_context_version=evaluation_input.numeric_context_version,
+            evaluated_split_roles=split_roles,
+            row_evaluations=(),
+            aggregate_metrics=aggregate_metrics,
+            monotonicity_results=monotonicity_results,
+            evaluation_checksum=checksum,
+            evaluated_row_count=len(rows),
         )
 
     def _validate_integrity(
@@ -324,11 +449,11 @@ class TechnicalRiskCandidateEvaluator:
         evaluation_input: TechnicalRiskCandidateEvaluationInput,
     ) -> TechnicalRiskCandidateRowEvaluation:
         try:
-            evidence = derive_technical_risk_evidence(row)
-            predicate_states = evaluate_technical_risk_predicates(evidence, row.rsi14, threshold_set)
+            evidence, rsi = self._row_runtime_values(row)
+            predicate_states, predicate_mask = _evaluate_bound_predicates(evidence, rsi, threshold_set.bound_decimal_values)
         except TechnicalRiskRuleCandidateError as exc:
             raise TechnicalRiskCandidateEvaluationError(str(exc)) from exc
-        rule = _matched_rule(candidate_spec, predicate_states)
+        rule = self._matched_rule(candidate_spec, predicate_mask)
         severity = TechnicalRiskCandidateSeverity.LOW if rule is None else rule.severity
         reason_codes = _reason_codes(rule, predicate_states)
         calculation_id = _stable_id(
@@ -365,6 +490,40 @@ class TechnicalRiskCandidateEvaluator:
             evaluation_version=evaluation_input.evaluator_version,
             calculation_id=calculation_id,
         )
+
+    def _row_runtime_values(self, row: AlignedTechnicalRiskOOSRow) -> tuple[TechnicalRiskDerivedEvidence, Decimal]:
+        key = (
+            row.row_id,
+            row.observation_id,
+            row.feature_observation_checksum,
+            row.as_of_close,
+            row.sma20,
+            row.sma60,
+            row.rsi14,
+        )
+        cached = self._row_runtime_cache.get(key)
+        if cached is not None:
+            return cached
+        evidence = derive_technical_risk_evidence(row)
+        values = (evidence, _canonical_decimal(row.rsi14))
+        self._row_runtime_cache[key] = values
+        return values
+
+    def _matched_rule(self, candidate_spec: TechnicalRiskRuleCandidateSpec, predicate_mask: int) -> TechnicalRiskCandidateRule | None:
+        rule_masks = self._candidate_rule_mask_cache.get(candidate_spec.candidate_structural_checksum)
+        if rule_masks is None:
+            rule_masks = tuple(
+                (
+                    rule,
+                    _predicate_mask_for_ids(rule.required_predicates),
+                )
+                for rule in sorted(candidate_spec.rules, key=lambda item: (_severity_order(item.severity), item.rule_priority))
+            )
+            self._candidate_rule_mask_cache[candidate_spec.candidate_structural_checksum] = rule_masks
+        for rule, required_mask in rule_masks:
+            if predicate_mask & required_mask == required_mask:
+                return rule
+        return None
 
 
 def _matched_rule(
@@ -406,6 +565,34 @@ def _optional_reason(predicate: TechnicalRiskPredicateId) -> str:
     }[predicate]
 
 
+def _evaluate_bound_predicates(
+    evidence: TechnicalRiskDerivedEvidence,
+    rsi14: Decimal,
+    threshold_values: tuple[Decimal, Decimal, Decimal, Decimal],
+) -> tuple[tuple[TechnicalRiskPredicateState, ...], int]:
+    values = (
+        evidence.close_vs_sma20 <= threshold_values[0],
+        evidence.close_vs_sma60 <= threshold_values[1],
+        evidence.relative_sma_spread <= threshold_values[2],
+        rsi14 <= threshold_values[3],
+    )
+    predicate_mask = 0
+    states: list[TechnicalRiskPredicateState] = []
+    for index, is_triggered in enumerate(values):
+        if is_triggered:
+            predicate_mask |= 1 << index
+        states.append(TechnicalRiskPredicateState(_PREDICATE_ORDER[index], is_triggered))
+    return tuple(states), predicate_mask
+
+
+def _predicate_mask_for_ids(predicate_ids: tuple[TechnicalRiskPredicateId, ...]) -> int:
+    index = MappingProxyType({predicate_id: position for position, predicate_id in enumerate(_PREDICATE_ORDER)})
+    mask = 0
+    for predicate_id in predicate_ids:
+        mask |= 1 << index[predicate_id]
+    return mask
+
+
 def _aggregate_metrics(
     row_evaluations: tuple[TechnicalRiskCandidateRowEvaluation, ...],
     split_roles: tuple[TechnicalRiskOOSSplitRole, ...],
@@ -417,6 +604,20 @@ def _aggregate_metrics(
         for severity in ALLOWED_CANDIDATE_SEVERITIES_V1:
             bucket = tuple(row for row in split_rows if row.severity == severity)
             metrics.append(_severity_metrics(split_role, severity, bucket, total))
+    return tuple(metrics)
+
+
+def _aggregate_metrics_from_bucket_values(
+    bucket_values: Mapping[tuple[TechnicalRiskOOSSplitRole, TechnicalRiskCandidateSeverity], tuple[list[Decimal], list[Decimal]]],
+    split_totals: Mapping[TechnicalRiskOOSSplitRole, int],
+    split_roles: tuple[TechnicalRiskOOSSplitRole, ...],
+) -> tuple[TechnicalRiskSeverityMAEMetrics, ...]:
+    metrics: list[TechnicalRiskSeverityMAEMetrics] = []
+    for split_role in split_roles:
+        total = split_totals[split_role]
+        for severity in ALLOWED_CANDIDATE_SEVERITIES_V1:
+            mae20_values, mae60_values = bucket_values[(split_role, severity)]
+            metrics.append(_severity_metrics_from_values(split_role, severity, tuple(mae20_values), tuple(mae60_values), total))
     return tuple(metrics)
 
 
@@ -441,23 +642,66 @@ def _severity_metrics(
             mae60_p25=None,
             mae60_p75=None,
         )
-    mae20 = tuple(row.mae20_value for row in rows)
-    mae60 = tuple(row.mae60_value for row in rows)
+    mae20 = _distribution_stats(tuple(row.mae20_value for row in rows))
+    mae60 = _distribution_stats(tuple(row.mae60_value for row in rows))
+    return _severity_metrics_from_distributions(split_role, severity, len(rows), mae20, mae60, total_rows)
+
+
+def _severity_metrics_from_values(
+    split_role: TechnicalRiskOOSSplitRole,
+    severity: TechnicalRiskCandidateSeverity,
+    mae20_values: tuple[Decimal, ...],
+    mae60_values: tuple[Decimal, ...],
+    total_rows: int,
+) -> TechnicalRiskSeverityMAEMetrics:
+    if not mae20_values:
+        return TechnicalRiskSeverityMAEMetrics(
+            split_role=split_role,
+            severity=severity,
+            sample_count=0,
+            coverage_ratio=Decimal("0"),
+            mae20_mean=None,
+            mae20_median=None,
+            mae20_p25=None,
+            mae20_p75=None,
+            mae60_mean=None,
+            mae60_median=None,
+            mae60_p25=None,
+            mae60_p75=None,
+        )
+    return _severity_metrics_from_distributions(
+        split_role,
+        severity,
+        len(mae20_values),
+        _distribution_stats(mae20_values),
+        _distribution_stats(mae60_values),
+        total_rows,
+    )
+
+
+def _severity_metrics_from_distributions(
+    split_role: TechnicalRiskOOSSplitRole,
+    severity: TechnicalRiskCandidateSeverity,
+    sample_count: int,
+    mae20: Mapping[str, Decimal],
+    mae60: Mapping[str, Decimal],
+    total_rows: int,
+) -> TechnicalRiskSeverityMAEMetrics:
     with localcontext(FIXED_TECH_RISK_DECIMAL_CONTEXT):
-        coverage = Decimal(len(rows)) / Decimal(total_rows)
+        coverage = Decimal(sample_count) / Decimal(total_rows)
     return TechnicalRiskSeverityMAEMetrics(
         split_role=split_role,
         severity=severity,
-        sample_count=len(rows),
+        sample_count=sample_count,
         coverage_ratio=coverage,
-        mae20_mean=_mean(mae20),
-        mae20_median=_median(mae20),
-        mae20_p25=_nearest_rank_quantile(mae20, Decimal("0.25")),
-        mae20_p75=_nearest_rank_quantile(mae20, Decimal("0.75")),
-        mae60_mean=_mean(mae60),
-        mae60_median=_median(mae60),
-        mae60_p25=_nearest_rank_quantile(mae60, Decimal("0.25")),
-        mae60_p75=_nearest_rank_quantile(mae60, Decimal("0.75")),
+        mae20_mean=mae20["mean"],
+        mae20_median=mae20["median"],
+        mae20_p25=mae20["p25"],
+        mae20_p75=mae20["p75"],
+        mae60_mean=mae60["mean"],
+        mae60_median=mae60["median"],
+        mae60_p25=mae60["p25"],
+        mae60_p75=mae60["p75"],
     )
 
 
@@ -505,8 +749,29 @@ def _mean(values: tuple[Decimal, ...]) -> Decimal:
         return _canonical_decimal(sum(values) / Decimal(len(values)))
 
 
+def _distribution_stats(values: tuple[Decimal, ...]) -> Mapping[str, Decimal]:
+    if not values:
+        raise TechnicalRiskCandidateEvaluationError("distribution stats require at least one value.")
+    canonical_values = tuple(_canonical_decimal(value) for value in values)
+    ordered = tuple(sorted(canonical_values))
+    with localcontext(FIXED_TECH_RISK_DECIMAL_CONTEXT):
+        mean = _canonical_decimal(sum(canonical_values) / Decimal(len(canonical_values)))
+    return {
+        "mean": mean,
+        "median": _median_from_ordered(ordered),
+        "p25": ordered[_nearest_rank(Decimal("0.25"), len(ordered)) - 1],
+        "p75": ordered[_nearest_rank(Decimal("0.75"), len(ordered)) - 1],
+    }
+
+
 def _median(values: tuple[Decimal, ...]) -> Decimal:
     ordered = tuple(sorted(_canonical_decimal(value) for value in values))
+    if not ordered:
+        raise TechnicalRiskCandidateEvaluationError("median requires at least one value.")
+    return _median_from_ordered(ordered)
+
+
+def _median_from_ordered(ordered: tuple[Decimal, ...]) -> Decimal:
     if not ordered:
         raise TechnicalRiskCandidateEvaluationError("median requires at least one value.")
     midpoint = len(ordered) // 2
@@ -577,6 +842,38 @@ def _evaluation_checksum(
             "numeric_context_version": evaluation_input.numeric_context_version,
             "evaluated_split_roles": [role.value for role in evaluation_input.allowed_split_roles],
             "row_evaluations": [_row_evaluation_payload(row) for row in row_evaluations],
+            "aggregate_metrics": [_metric_payload(metric) for metric in aggregate_metrics],
+            "monotonicity_results": [_monotonicity_payload(result) for result in monotonicity_results],
+        }
+    )
+
+
+def _evaluation_checksum_from_payloads(
+    evaluation_id: str,
+    evaluation_input: TechnicalRiskCandidateEvaluationInput,
+    row_payloads: list[dict[str, object]],
+    aggregate_metrics: tuple[TechnicalRiskSeverityMAEMetrics, ...],
+    monotonicity_results: tuple[TechnicalRiskMonotonicityResult, ...],
+) -> str:
+    return _stable_hash(
+        {
+            "evaluation_id": evaluation_id,
+            "evaluation_input_version": evaluation_input.evaluation_input_version,
+            "dataset_id": evaluation_input.dataset_id,
+            "dataset_checksum": evaluation_input.dataset_checksum,
+            "candidate_id": evaluation_input.candidate_id,
+            "candidate_version": evaluation_input.candidate_version,
+            "candidate_structural_checksum": evaluation_input.candidate_structural_checksum,
+            "threshold_set_id": evaluation_input.threshold_set_id,
+            "threshold_set_version": evaluation_input.threshold_set_version,
+            "threshold_set_checksum": evaluation_input.threshold_set_checksum,
+            "derived_evidence_version": evaluation_input.derived_evidence_version,
+            "evaluator_version": evaluation_input.evaluator_version,
+            "metric_version": evaluation_input.metric_version,
+            "quantile_version": evaluation_input.quantile_version,
+            "numeric_context_version": evaluation_input.numeric_context_version,
+            "evaluated_split_roles": [role.value for role in evaluation_input.allowed_split_roles],
+            "row_evaluations": row_payloads,
             "aggregate_metrics": [_metric_payload(metric) for metric in aggregate_metrics],
             "monotonicity_results": [_monotonicity_payload(result) for result in monotonicity_results],
         }

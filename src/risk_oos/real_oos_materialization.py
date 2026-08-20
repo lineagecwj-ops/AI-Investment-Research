@@ -56,6 +56,10 @@ class TechnicalRiskRealOOSDatasetMaterializationRequest:
     dataset_spec_id: str
     dataset_spec_version: str
     feature_set_id: str
+    required_output_split_roles: tuple[TechnicalRiskOOSSplitRole, ...] = (
+        TechnicalRiskOOSSplitRole.VALIDATION,
+        TechnicalRiskOOSSplitRole.HOLDOUT,
+    )
     materializer_version: str = TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION
 
     def __post_init__(self) -> None:
@@ -63,6 +67,7 @@ class TechnicalRiskRealOOSDatasetMaterializationRequest:
         object.__setattr__(self, "research_manifest_path", Path(self.research_manifest_path))
         object.__setattr__(self, "symbols", _normalize_symbols(self.symbols))
         object.__setattr__(self, "split_specs", tuple(self.split_specs))
+        object.__setattr__(self, "required_output_split_roles", _normalize_required_output_split_roles(self.required_output_split_roles))
         _require_text(self.source_snapshot_id, "source_snapshot_id")
         _require_text(self.source_snapshot_checksum, "source_snapshot_checksum")
         _require_text(self.dataset_spec_id, "dataset_spec_id")
@@ -167,10 +172,7 @@ class TechnicalRiskRealOOSDatasetMaterializer:
         except TechnicalRiskOOSDatasetError as exc:
             raise TechnicalRiskRealOOSDatasetMaterializationError(f"OOS dataset build failed: {exc}") from exc
 
-        if dataset_result.summary_counts.get("validation_included", 0) <= 0:
-            raise TechnicalRiskRealOOSDatasetMaterializationError("No validation aligned rows were produced.")
-        if dataset_result.summary_counts.get("holdout_included", 0) <= 0:
-            raise TechnicalRiskRealOOSDatasetMaterializationError("No holdout aligned rows were produced.")
+        _validate_required_output_splits(dataset_result, request.required_output_split_roles)
 
         return TechnicalRiskRealOOSDatasetMaterializationResult(
             oos_dataset_result=dataset_result,
@@ -320,6 +322,36 @@ def _require_split_roles(split_specs: tuple[TechnicalRiskOOSSplitSpec, ...]) -> 
     missing = sorted(role.value for role in required if role not in roles)
     if missing:
         raise TechnicalRiskRealOOSDatasetMaterializationError(f"Missing required OOS split role: {', '.join(missing)}.")
+
+
+def _normalize_required_output_split_roles(
+    values: tuple[TechnicalRiskOOSSplitRole, ...],
+) -> tuple[TechnicalRiskOOSSplitRole, ...]:
+    roles = tuple(value if isinstance(value, TechnicalRiskOOSSplitRole) else TechnicalRiskOOSSplitRole(value) for value in values)
+    if not roles:
+        raise TechnicalRiskRealOOSDatasetMaterializationError("required_output_split_roles must not be empty.")
+    if len(set(roles)) != len(roles):
+        raise TechnicalRiskRealOOSDatasetMaterializationError("Duplicate required_output_split_role.")
+    unsupported = tuple(role for role in roles if role not in (TechnicalRiskOOSSplitRole.VALIDATION, TechnicalRiskOOSSplitRole.HOLDOUT))
+    if unsupported:
+        raise TechnicalRiskRealOOSDatasetMaterializationError("Unsupported required_output_split_role.")
+    return tuple(sorted(roles, key=_required_output_split_role_order))
+
+
+def _validate_required_output_splits(
+    dataset_result: TechnicalRiskOOSDatasetResult,
+    required_output_split_roles: tuple[TechnicalRiskOOSSplitRole, ...],
+) -> None:
+    for role in required_output_split_roles:
+        if dataset_result.summary_counts.get(f"{role.value.lower()}_included", 0) <= 0:
+            raise TechnicalRiskRealOOSDatasetMaterializationError(f"No {role.value.lower()} aligned rows were produced.")
+
+
+def _required_output_split_role_order(role: TechnicalRiskOOSSplitRole) -> int:
+    return {
+        TechnicalRiskOOSSplitRole.VALIDATION: 0,
+        TechnicalRiskOOSSplitRole.HOLDOUT: 1,
+    }[role]
 
 
 def _date_in_split_scope(evaluation_date: date, split_specs: tuple[TechnicalRiskOOSSplitSpec, ...]) -> bool:

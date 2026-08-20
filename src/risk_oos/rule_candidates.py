@@ -125,11 +125,13 @@ class TechnicalRiskThresholdDimension:
             object.__setattr__(self, "operator", _coerce_threshold_operator(self.operator))
         if self.operator != TechnicalRiskThresholdOperator.LESS_THAN_OR_EQUAL:
             raise TechnicalRiskRuleCandidateError("Unsupported threshold operator.")
-        object.__setattr__(self, "canonical_value", _canonical_decimal_string(self.canonical_value))
+        canonical_value = _canonical_decimal_string(self.canonical_value)
+        object.__setattr__(self, "canonical_value", canonical_value)
+        object.__setattr__(self, "_decimal_value", Decimal(canonical_value))
 
     @property
     def decimal_value(self) -> Decimal:
-        return Decimal(self.canonical_value)
+        return self._decimal_value
 
 
 @dataclass(frozen=True)
@@ -162,10 +164,26 @@ class TechnicalRiskThresholdSet:
         if self.threshold_set_checksum is not None and self.threshold_set_checksum != checksum:
             raise TechnicalRiskRuleCandidateError("threshold_set_checksum mismatch.")
         object.__setattr__(self, "threshold_set_checksum", checksum)
+        dimensions_by_id = MappingProxyType({dimension.dimension_id: dimension for dimension in dimensions})
+        object.__setattr__(self, "_dimensions_by_id", dimensions_by_id)
+        object.__setattr__(
+            self,
+            "_bound_decimal_values",
+            (
+                dimensions_by_id[TechnicalRiskThresholdDimensionId.CLOSE_VS_SMA20_WEAKNESS_CUTOFF].decimal_value,
+                dimensions_by_id[TechnicalRiskThresholdDimensionId.CLOSE_VS_SMA60_WEAKNESS_CUTOFF].decimal_value,
+                dimensions_by_id[TechnicalRiskThresholdDimensionId.RELATIVE_SMA_SPREAD_WEAKNESS_CUTOFF].decimal_value,
+                dimensions_by_id[TechnicalRiskThresholdDimensionId.RSI14_WEAKNESS_CONFIRMATION_CUTOFF].decimal_value,
+            ),
+        )
 
     @property
     def dimensions_by_id(self) -> Mapping[TechnicalRiskThresholdDimensionId, TechnicalRiskThresholdDimension]:
-        return MappingProxyType({dimension.dimension_id: dimension for dimension in self.dimensions})
+        return self._dimensions_by_id
+
+    @property
+    def bound_decimal_values(self) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+        return self._bound_decimal_values
 
 
 @dataclass(frozen=True)

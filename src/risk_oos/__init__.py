@@ -74,6 +74,20 @@ from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMateria
 from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializationRequest
 from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializationResult
 from risk_oos.real_oos_materialization import TechnicalRiskRealOOSDatasetMaterializer
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_ORCHESTRATOR_V1
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_REQUEST_V1
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_RESULT_V1
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_CANDIDATE_IDS_V1
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_DATASET_SPEC_ID_V1
+from risk_oos.validation_candidate_evaluation import TECH_RISK_VALIDATION_DATASET_SPEC_VERSION_V1
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateEvaluationError
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateEvaluationOrchestrator
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateEvaluationRecord
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateEvaluationRequest
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateEvaluationResult
+from risk_oos.validation_candidate_evaluation import TechnicalRiskValidationCandidateSummary
+from risk_oos.validation_candidate_evaluation import build_default_research_validation_candidate_evaluation_request
+from risk_oos.validation_candidate_evaluation import build_technical_risk_v1_validation_candidate_evaluation_request
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
 from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
@@ -204,6 +218,12 @@ __all__ = [
     "TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1",
     "TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1",
     "TECH_RISK_VALIDATION_SELECTION_INPUT_V1",
+    "TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_ORCHESTRATOR_V1",
+    "TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_REQUEST_V1",
+    "TECH_RISK_VALIDATION_CANDIDATE_EVALUATION_RESULT_V1",
+    "TECH_RISK_VALIDATION_CANDIDATE_IDS_V1",
+    "TECH_RISK_VALIDATION_DATASET_SPEC_ID_V1",
+    "TECH_RISK_VALIDATION_DATASET_SPEC_VERSION_V1",
     "TechnicalRiskCandidateFamily",
     "TechnicalRiskCandidateIdentity",
     "TechnicalRiskCandidateEvaluationError",
@@ -273,6 +293,12 @@ __all__ = [
     "TechnicalRiskValidationCombinationOutcome",
     "TechnicalRiskValidationConsideredCombination",
     "TechnicalRiskValidationSelectionArtifact",
+    "TechnicalRiskValidationCandidateEvaluationError",
+    "TechnicalRiskValidationCandidateEvaluationOrchestrator",
+    "TechnicalRiskValidationCandidateEvaluationRecord",
+    "TechnicalRiskValidationCandidateEvaluationRequest",
+    "TechnicalRiskValidationCandidateEvaluationResult",
+    "TechnicalRiskValidationCandidateSummary",
     "TechnicalRiskValidationSelectionCriteria",
     "TechnicalRiskValidationSelectionDecision",
     "TechnicalRiskValidationSelectionError",
@@ -287,6 +313,8 @@ __all__ = [
     "build_technical_risk_v1_temporal_split_methodology",
     "build_technical_risk_v1_temporal_split_specs",
     "build_technical_risk_v1_threshold_axis_set",
+    "build_default_research_validation_candidate_evaluation_request",
+    "build_technical_risk_v1_validation_candidate_evaluation_request",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
     "materialize_technical_risk_v1_threshold_grid",
