@@ -98,6 +98,21 @@ from risk_oos.validation_evidence_artifact import TechnicalRiskValidationEvidenc
 from risk_oos.validation_evidence_artifact import load_validation_evidence_artifact
 from risk_oos.validation_evidence_artifact import save_validation_evidence_artifact
 from risk_oos.validation_evidence_artifact import validation_evidence_artifact_path
+from risk_oos.validation_selection_methodology import APPROVED_STRUCTURED_EVIDENCE_DIMENSIONS_V1
+from risk_oos.validation_selection_methodology import TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_CHECKSUM
+from risk_oos.validation_selection_methodology import TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_ID
+from risk_oos.validation_selection_methodology import TECHNICAL_RISK_V1_VALIDATION_SELECTION_METHODOLOGY_V1
+from risk_oos.validation_selection_methodology import TECH_RISK_NO_NEW_NUMERIC_ACCEPTANCE_FLOORS_V1
+from risk_oos.validation_selection_methodology import TECH_RISK_ROBUST_REGION_APPROVED_GRID_TOPOLOGY_V1
+from risk_oos.validation_selection_methodology import TechnicalRiskStructuredEvidenceDimension
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationGridPoint
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationRobustRegion
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationSelectionMethodology
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationSelectionMethodologyApprovalStatus
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationSelectionMethodologyError
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationSelectionMethodologyName
+from risk_oos.validation_selection_methodology import TechnicalRiskValidationSelectionMethodologyProvenance
+from risk_oos.validation_selection_methodology import build_technical_risk_v1_validation_selection_methodology
 from risk_oos.rule_candidates import ALLOWED_CANDIDATE_SEVERITIES_V1
 from risk_oos.rule_candidates import ALLOWED_PREDICATES_V1
 from risk_oos.rule_candidates import FIXED_TECH_RISK_DECIMAL_CONTEXT
@@ -175,6 +190,7 @@ __all__ = [
     "AlignedTechnicalRiskOOSRow",
     "ALLOWED_CANDIDATE_SEVERITIES_V1",
     "ALLOWED_PREDICATES_V1",
+    "APPROVED_STRUCTURED_EVIDENCE_DIMENSIONS_V1",
     "DEVELOPMENT_SHORTLIST_ARTIFACT_V1",
     "DEFAULT_TECH_RISK_VALIDATION_EVIDENCE_DIR",
     "DevelopmentEvaluationReference",
@@ -213,6 +229,9 @@ __all__ = [
     "TECHNICAL_RISK_V1_THRESHOLD_AXIS_EVIDENCE_NEAREST_RANK_LOWER_TAIL_V1",
     "TECHNICAL_RISK_V1_THRESHOLD_AXIS_SET_V1",
     "TECHNICAL_RISK_V1_VALIDATION_SEARCH_USAGE",
+    "TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_CHECKSUM",
+    "TECHNICAL_RISK_V1_VALIDATION_EVIDENCE_ARTIFACT_ID",
+    "TECHNICAL_RISK_V1_VALIDATION_SELECTION_METHODOLOGY_V1",
     "TECHNICAL_RISK_V1_FEATURE_SET_ID",
     "TECHNICAL_RISK_V1_TARGET_IDENTITIES",
     "TECH_RISK_DERIVED_EVIDENCE_V1",
@@ -220,8 +239,10 @@ __all__ = [
     "TECH_RISK_FIXED_THRESHOLD_GRID_METHOD_V1",
     "TECH_RISK_LOW_REASON_V1",
     "TECH_RISK_NUMERIC_REPRESENTATION_V1",
+    "TECH_RISK_NO_NEW_NUMERIC_ACCEPTANCE_FLOORS_V1",
     "TECH_RISK_POLICY_FREEZE_ARTIFACT_V1",
     "TECH_RISK_QUANTILE_NEAREST_RANK_V1",
+    "TECH_RISK_ROBUST_REGION_APPROVED_GRID_TOPOLOGY_V1",
     "TECH_RISK_THRESHOLD_CANDIDATE_GENERATION_CONTRACT_V1",
     "TECH_RISK_THRESHOLD_GRID_RESULT_V1",
     "TECH_RISK_THRESHOLD_GRID_SPEC_V1",
@@ -290,6 +311,7 @@ __all__ = [
     "TechnicalRiskRuleCandidateError",
     "TechnicalRiskRuleCandidateSpec",
     "TechnicalRiskSeverityMAEMetrics",
+    "TechnicalRiskStructuredEvidenceDimension",
     "TechnicalRiskThresholdDimension",
     "TechnicalRiskThresholdDimensionId",
     "TechnicalRiskThresholdAxisSetApprovalStatus",
@@ -316,10 +338,17 @@ __all__ = [
     "TechnicalRiskValidationEvidenceArtifactCodec",
     "TechnicalRiskValidationEvidenceArtifactError",
     "TechnicalRiskValidationEvidenceArtifactSaveResult",
+    "TechnicalRiskValidationGridPoint",
+    "TechnicalRiskValidationRobustRegion",
     "TechnicalRiskValidationSelectionCriteria",
     "TechnicalRiskValidationSelectionDecision",
     "TechnicalRiskValidationSelectionError",
     "TechnicalRiskValidationSelectionInput",
+    "TechnicalRiskValidationSelectionMethodology",
+    "TechnicalRiskValidationSelectionMethodologyApprovalStatus",
+    "TechnicalRiskValidationSelectionMethodologyError",
+    "TechnicalRiskValidationSelectionMethodologyName",
+    "TechnicalRiskValidationSelectionMethodologyProvenance",
     "TechnicalRiskValidationSelectionReasonCode",
     "TechnicalRiskValidationSelectionStatus",
     "TechnicalRiskV1TemporalSplitMethodology",
@@ -330,6 +359,7 @@ __all__ = [
     "build_technical_risk_v1_temporal_split_methodology",
     "build_technical_risk_v1_temporal_split_specs",
     "build_technical_risk_v1_threshold_axis_set",
+    "build_technical_risk_v1_validation_selection_methodology",
     "build_default_research_validation_candidate_evaluation_request",
     "build_technical_risk_v1_validation_candidate_evaluation_request",
     "derive_technical_risk_evidence",
