@@ -111,6 +111,11 @@ from risk_oos.threshold_grid import TechnicalRiskThresholdGridError
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridMaterializer
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridResult
 from risk_oos.threshold_grid import TechnicalRiskThresholdGridSpec
+from risk_oos.temporal_split_methodology import TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1
+from risk_oos.temporal_split_methodology import TechnicalRiskTemporalSplitMethodologyError
+from risk_oos.temporal_split_methodology import TechnicalRiskV1TemporalSplitMethodology
+from risk_oos.temporal_split_methodology import build_technical_risk_v1_temporal_split_methodology
+from risk_oos.temporal_split_methodology import build_technical_risk_v1_temporal_split_specs
 from risk_oos.validation_selection import DEVELOPMENT_SHORTLIST_ARTIFACT_V1
 from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_ARTIFACT_V1
 from risk_oos.validation_selection import TECH_RISK_VALIDATION_SELECTION_CRITERIA_V1
@@ -171,6 +176,7 @@ __all__ = [
     "TECH_RISK_HOLDOUT_CONFIRMATION_CRITERIA_V1",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
+    "TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1",
     "TECHNICAL_RISK_V1_FEATURE_SET_ID",
     "TECHNICAL_RISK_V1_TARGET_IDENTITIES",
     "TECH_RISK_DERIVED_EVIDENCE_V1",
@@ -249,6 +255,7 @@ __all__ = [
     "TechnicalRiskThresholdIdentity",
     "TechnicalRiskThresholdOperator",
     "TechnicalRiskThresholdSet",
+    "TechnicalRiskTemporalSplitMethodologyError",
     "TechnicalRiskTiePolicy",
     "TechnicalRiskValidationCombinationOutcome",
     "TechnicalRiskValidationConsideredCombination",
@@ -259,9 +266,12 @@ __all__ = [
     "TechnicalRiskValidationSelectionInput",
     "TechnicalRiskValidationSelectionReasonCode",
     "TechnicalRiskValidationSelectionStatus",
+    "TechnicalRiskV1TemporalSplitMethodology",
     "ThresholdCandidateGenerationContract",
     "DevelopmentEvaluationContext",
     "TECHNICAL_RISK_REAL_OOS_MATERIALIZER_VERSION",
+    "build_technical_risk_v1_temporal_split_methodology",
+    "build_technical_risk_v1_temporal_split_specs",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
     "technical_risk_candidate_a_spec",
