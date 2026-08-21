@@ -147,6 +147,27 @@ from risk_oos.historical_features import HistoricalRiskFeatureMaterializationRes
 from risk_oos.historical_features import HistoricalRiskFeatureMaterializer
 from risk_oos.historical_features import HistoricalRiskFeatureObservation
 from risk_oos.historical_features import HistoricalRiskFeatureStatus
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_ARTIFACT_FILENAME_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_CURRENT_OFFICIAL_INDUSTRY_CLASSIFICATION_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_RESEARCH_DIR
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SCHEMA_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SCOPE_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SOURCE_AUTHORITY_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SOURCE_URL_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_UNIVERSE_ID_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_UNIVERSE_SIZE_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_PRE_2024_HISTORICAL_INDUSTRY_CLASSIFICATION_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_TECHNOLOGY_REVIEW_CANDIDATE_WORKLOAD_PREVIEW_V1
+from risk_oos.official_broad_industry_mapping import TECH_RISK_TECHNOLOGY_RELATED_INDUSTRY_CODES_V1
+from risk_oos.official_broad_industry_mapping import TWSE_INDUSTRY_CODE_NAMES_V1
+from risk_oos.official_broad_industry_mapping import TechnicalRiskBroadIndustryMappingStatus
+from risk_oos.official_broad_industry_mapping import TechnicalRiskOfficialBroadIndustryMappingArtifact
+from risk_oos.official_broad_industry_mapping import TechnicalRiskOfficialBroadIndustryMappingError
+from risk_oos.official_broad_industry_mapping import TechnicalRiskOfficialBroadIndustryRecord
+from risk_oos.official_broad_industry_mapping import build_official_broad_industry_mapping_artifact
+from risk_oos.official_broad_industry_mapping import encode_official_broad_industry_mapping_artifact
+from risk_oos.official_broad_industry_mapping import official_broad_industry_mapping_artifact_path
+from risk_oos.official_broad_industry_mapping import save_official_broad_industry_mapping_artifact
 from risk_oos.research_policy_freeze import TECH_RISK_POLICY_FREEZE_ARTIFACT_V1
 from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeArtifact
 from risk_oos.research_policy_freeze import TechnicalRiskPolicyFreezeError
@@ -350,6 +371,16 @@ __all__ = [
     "TECH_RISK_HOLDOUT_REGION_EVALUATOR_V1",
     "TECH_RISK_HOLDOUT_REGION_FROZEN_THRESHOLD_SET_IDS_V1",
     "TECH_RISK_HOLDOUT_REGION_REVIEW_REQUIRES_POST_REVIEW_DECISION",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_ARTIFACT_FILENAME_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_RESEARCH_DIR",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SCHEMA_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SCOPE_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SOURCE_AUTHORITY_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_SOURCE_URL_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_UNIVERSE_ID_V1",
+    "TECH_RISK_OFFICIAL_BROAD_INDUSTRY_MAPPING_UNIVERSE_SIZE_V1",
+    "TECH_RISK_TECHNOLOGY_RELATED_INDUSTRY_CODES_V1",
+    "TWSE_INDUSTRY_CODE_NAMES_V1",
     "TECH_RISK_AI_COHORT_DIFFERENCE_IN_DIFFERENCES_STYLE_V1",
     "TECH_RISK_AI_COHORT_CLASSIFICATION_AS_OF_DATE_SEMANTICS_V1",
     "TECH_RISK_AI_COHORT_FEATURES_V1",
@@ -415,6 +446,7 @@ __all__ = [
     "TechnicalRiskAIExposureEvidenceSourceType",
     "TechnicalRiskAIExposureMappingReviewStatus",
     "TechnicalRiskPostHoldoutAIExposureCohortMappingSpecification",
+    "TechnicalRiskBroadIndustryMappingStatus",
     "TechnicalRiskCandidateSet",
     "TechnicalRiskCoveragePreference",
     "TechnicalRiskDevelopmentExplorationError",
@@ -472,6 +504,9 @@ __all__ = [
     "TechnicalRiskOOSExclusionRecord",
     "TechnicalRiskOOSSplitRole",
     "TechnicalRiskOOSSplitSpec",
+    "TechnicalRiskOfficialBroadIndustryMappingArtifact",
+    "TechnicalRiskOfficialBroadIndustryMappingError",
+    "TechnicalRiskOfficialBroadIndustryRecord",
     "TechnicalRiskPredicateId",
     "TechnicalRiskPredicateState",
     "TechnicalRiskPolicyFreezeArtifact",
@@ -543,6 +578,7 @@ __all__ = [
     "build_technical_risk_v1_temporal_split_specs",
     "build_technical_risk_v1_holdout_region_confirmation_contract",
     "build_technical_risk_v1_post_holdout_ai_exposure_cohort_mapping_specification",
+    "build_official_broad_industry_mapping_artifact",
     "build_default_research_holdout_region_evaluation_request",
     "build_technical_risk_v1_holdout_region_evaluation_request",
     "build_technical_risk_holdout_region_evidence_review_package_from_artifact",
@@ -555,8 +591,10 @@ __all__ = [
     "build_technical_risk_validation_evidence_shortlist",
     "build_technical_risk_validation_selection_decision_package",
     "derive_technical_risk_evidence",
+    "encode_official_broad_industry_mapping_artifact",
     "evaluate_technical_risk_predicates",
     "holdout_region_evidence_artifact_path",
+    "official_broad_industry_mapping_artifact_path",
     "load_holdout_region_evidence_artifact",
     "load_technical_risk_holdout_confirmation_decision_review_package",
     "load_validation_evidence_artifact",
@@ -564,6 +602,7 @@ __all__ = [
     "load_official_validation_evidence_artifact",
     "materialize_technical_risk_v1_threshold_grid",
     "save_holdout_region_evidence_artifact",
+    "save_official_broad_industry_mapping_artifact",
     "save_validation_evidence_artifact",
     "technical_risk_candidate_a_spec",
     "technical_risk_candidate_b_spec",
