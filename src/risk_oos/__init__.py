@@ -15,6 +15,23 @@ from risk_oos.aligned_dataset import TechnicalRiskOOSExclusionReason
 from risk_oos.aligned_dataset import TechnicalRiskOOSExclusionRecord
 from risk_oos.aligned_dataset import TechnicalRiskOOSSplitRole
 from risk_oos.aligned_dataset import TechnicalRiskOOSSplitSpec
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_DIFFERENCE_IN_DIFFERENCES_STYLE_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_CLASSIFICATION_AS_OF_DATE_SEMANTICS_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_FEATURES_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_POST_HOLDOUT_DIAGNOSTIC
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_PRE_HOLDOUT_CUTOFF_DATE
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_PRIMARY_COMPARISON_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_COHORT_REQUIRED_MAPPING_FIELDS_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_AI_HIGH_CRITERIA_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_POST_HOLDOUT_AI_EXPOSURE_COHORT_MAPPING_SPEC_V1
+from risk_oos.ai_exposure_cohort_mapping import TECH_RISK_TECH_CONTROL_INDUSTRIES_V1
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureCategory
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureCohortMappingError
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureCohortMappingRecord
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureEvidenceSourceType
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureMappingReviewStatus
+from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskPostHoldoutAIExposureCohortMappingSpecification
+from risk_oos.ai_exposure_cohort_mapping import build_technical_risk_v1_post_holdout_ai_exposure_cohort_mapping_specification
 from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATION_INPUT_V1
 from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATOR_V1
 from risk_oos.candidate_evaluator import TECH_RISK_CONTINUOUS_MAE_METRIC_V1
@@ -51,6 +68,16 @@ from risk_oos.holdout_confirmation import TechnicalRiskHoldoutCoverageHandling
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutEvaluationReference
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutMonotonicityHandling
 from risk_oos.holdout_confirmation import TechnicalRiskHoldoutWarningHandling
+from risk_oos.holdout_confirmation_decision_review import TECH_RISK_DESCRIPTIVE_HOLDOUT_CONFIRMATION_DECISION_REVIEW
+from risk_oos.holdout_confirmation_decision_review import TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEWER_V1
+from risk_oos.holdout_confirmation_decision_review import TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEW_PACKAGE_V1
+from risk_oos.holdout_confirmation_decision_review import TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEW_REQUIRES_DECISION
+from risk_oos.holdout_confirmation_decision_review import TechnicalRiskHoldoutConfirmationComparison
+from risk_oos.holdout_confirmation_decision_review import TechnicalRiskHoldoutConfirmationDecisionReviewError
+from risk_oos.holdout_confirmation_decision_review import TechnicalRiskHoldoutConfirmationDecisionReviewPackage
+from risk_oos.holdout_confirmation_decision_review import TechnicalRiskHoldoutConfirmationThresholdStabilityReview
+from risk_oos.holdout_confirmation_decision_review import build_technical_risk_holdout_confirmation_decision_review_package
+from risk_oos.holdout_confirmation_decision_review import load_technical_risk_holdout_confirmation_decision_review_package
 from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CANDIDATE_ID
 from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONFIRMED_NOT_APPROVAL
 from risk_oos.holdout_region_confirmation import TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONTRACT_V1
@@ -71,6 +98,43 @@ from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionSever
 from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionSummary
 from risk_oos.holdout_region_confirmation import TechnicalRiskHoldoutRegionThresholdResult
 from risk_oos.holdout_region_confirmation import build_technical_risk_v1_holdout_region_confirmation_contract
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_DATASET_SPEC_ID_V1
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_DATASET_SPEC_VERSION_V1
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_EVALUATION_REQUEST_V1
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_EVALUATION_RESULT_V1
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_EVALUATOR_V1
+from risk_oos.holdout_region_evaluation import TECH_RISK_HOLDOUT_REGION_FROZEN_THRESHOLD_SET_IDS_V1
+from risk_oos.holdout_region_evaluation import TechnicalRiskHoldoutRegionEvaluationError
+from risk_oos.holdout_region_evaluation import TechnicalRiskHoldoutRegionEvaluationRequest
+from risk_oos.holdout_region_evaluation import TechnicalRiskHoldoutRegionEvaluationResult
+from risk_oos.holdout_region_evaluation import TechnicalRiskHoldoutRegionEvaluator
+from risk_oos.holdout_region_evaluation import TechnicalRiskHoldoutRegionThresholdEvaluationRecord
+from risk_oos.holdout_region_evaluation import build_default_research_holdout_region_evaluation_request
+from risk_oos.holdout_region_evaluation import build_technical_risk_v1_holdout_region_evaluation_request
+from risk_oos.holdout_region_evidence_artifact import DEFAULT_TECH_RISK_HOLDOUT_REGION_EVIDENCE_DIR
+from risk_oos.holdout_region_evidence_artifact import TECH_RISK_HOLDOUT_REGION_EVIDENCE_ARTIFACT_CODEC_V1
+from risk_oos.holdout_region_evidence_artifact import TECH_RISK_HOLDOUT_REGION_EVIDENCE_ARTIFACT_SCHEMA_V1
+from risk_oos.holdout_region_evidence_artifact import TechnicalRiskHoldoutRegionEvidenceArtifact
+from risk_oos.holdout_region_evidence_artifact import TechnicalRiskHoldoutRegionEvidenceArtifactCodec
+from risk_oos.holdout_region_evidence_artifact import TechnicalRiskHoldoutRegionEvidenceArtifactError
+from risk_oos.holdout_region_evidence_artifact import TechnicalRiskHoldoutRegionEvidenceArtifactSaveResult
+from risk_oos.holdout_region_evidence_artifact import holdout_region_evidence_artifact_path
+from risk_oos.holdout_region_evidence_artifact import load_holdout_region_evidence_artifact
+from risk_oos.holdout_region_evidence_artifact import save_holdout_region_evidence_artifact
+from risk_oos.holdout_region_evidence_review import TECH_RISK_DESCRIPTIVE_HOLDOUT_REGION_EVIDENCE_REVIEW
+from risk_oos.holdout_region_evidence_review import TECH_RISK_HOLDOUT_REGION_EVIDENCE_REVIEWER_V1
+from risk_oos.holdout_region_evidence_review import TECH_RISK_HOLDOUT_REGION_EVIDENCE_REVIEW_PACKAGE_V1
+from risk_oos.holdout_region_evidence_review import TECH_RISK_HOLDOUT_REGION_REVIEW_REQUIRES_POST_REVIEW_DECISION
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionDistributionProfile
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionEvidenceReviewError
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionEvidenceReviewPackage
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionEvidenceShiftSummary
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionPeriodEvidenceSummary
+from risk_oos.holdout_region_evidence_review import TechnicalRiskHoldoutRegionThresholdStabilitySummary
+from risk_oos.holdout_region_evidence_review import build_technical_risk_holdout_region_evidence_review_package_from_artifact
+from risk_oos.holdout_region_evidence_review import build_technical_risk_holdout_region_evidence_review_package
+from risk_oos.holdout_region_evidence_review import load_holdout_region_evidence_review_package_from_artifact
+from risk_oos.holdout_region_evidence_review import load_official_validation_evidence_artifact
 from risk_oos.historical_features import EXCLUSION_FEATURE_CALCULATION_FAILED
 from risk_oos.historical_features import EXCLUSION_INSUFFICIENT_REQUIRED_FEATURE_HISTORY
 from risk_oos.historical_features import EXCLUSION_INVALID_PRICE
@@ -227,6 +291,7 @@ __all__ = [
     "ALLOWED_PREDICATES_V1",
     "APPROVED_STRUCTURED_EVIDENCE_DIMENSIONS_V1",
     "DEVELOPMENT_SHORTLIST_ARTIFACT_V1",
+    "DEFAULT_TECH_RISK_HOLDOUT_REGION_EVIDENCE_DIR",
     "DEFAULT_TECH_RISK_VALIDATION_EVIDENCE_DIR",
     "DevelopmentEvaluationReference",
     "DevelopmentShortlistArtifact",
@@ -256,8 +321,12 @@ __all__ = [
     "TECH_RISK_DECIMAL_CONTEXT_ROUNDING_V1",
     "TECH_RISK_DECIMAL_CONTEXT_V1",
     "TECH_RISK_DEVELOPMENT_EVALUATION_CONTEXT_V1",
+    "TECH_RISK_DESCRIPTIVE_HOLDOUT_CONFIRMATION_DECISION_REVIEW",
     "TECH_RISK_HOLDOUT_CONFIRMATION_ARTIFACT_V1",
     "TECH_RISK_HOLDOUT_CONFIRMATION_CRITERIA_V1",
+    "TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEWER_V1",
+    "TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEW_PACKAGE_V1",
+    "TECH_RISK_HOLDOUT_CONFIRMATION_DECISION_REVIEW_REQUIRES_DECISION",
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CANDIDATE_ID",
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONFIRMED_NOT_APPROVAL",
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_CONTRACT_V1",
@@ -269,6 +338,28 @@ __all__ = [
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_LEVEL_V1",
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_REGION_THRESHOLD_COUNT",
     "TECH_RISK_HOLDOUT_REGION_CONFIRMATION_START_DATE",
+    "TECH_RISK_HOLDOUT_REGION_DATASET_SPEC_ID_V1",
+    "TECH_RISK_HOLDOUT_REGION_DATASET_SPEC_VERSION_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVIDENCE_ARTIFACT_CODEC_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVIDENCE_ARTIFACT_SCHEMA_V1",
+    "TECH_RISK_DESCRIPTIVE_HOLDOUT_REGION_EVIDENCE_REVIEW",
+    "TECH_RISK_HOLDOUT_REGION_EVIDENCE_REVIEWER_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVIDENCE_REVIEW_PACKAGE_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVALUATION_REQUEST_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVALUATION_RESULT_V1",
+    "TECH_RISK_HOLDOUT_REGION_EVALUATOR_V1",
+    "TECH_RISK_HOLDOUT_REGION_FROZEN_THRESHOLD_SET_IDS_V1",
+    "TECH_RISK_HOLDOUT_REGION_REVIEW_REQUIRES_POST_REVIEW_DECISION",
+    "TECH_RISK_AI_COHORT_DIFFERENCE_IN_DIFFERENCES_STYLE_V1",
+    "TECH_RISK_AI_COHORT_CLASSIFICATION_AS_OF_DATE_SEMANTICS_V1",
+    "TECH_RISK_AI_COHORT_FEATURES_V1",
+    "TECH_RISK_AI_COHORT_POST_HOLDOUT_DIAGNOSTIC",
+    "TECH_RISK_AI_COHORT_PRE_HOLDOUT_CUTOFF_DATE",
+    "TECH_RISK_AI_COHORT_PRIMARY_COMPARISON_V1",
+    "TECH_RISK_AI_COHORT_REQUIRED_MAPPING_FIELDS_V1",
+    "TECH_RISK_AI_HIGH_CRITERIA_V1",
+    "TECH_RISK_POST_HOLDOUT_AI_EXPOSURE_COHORT_MAPPING_SPEC_V1",
+    "TECH_RISK_TECH_CONTROL_INDUSTRIES_V1",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1",
@@ -318,6 +409,12 @@ __all__ = [
     "TechnicalRiskCandidateRule",
     "TechnicalRiskCandidateRowEvaluation",
     "TechnicalRiskCandidateSeverity",
+    "TechnicalRiskAIExposureCategory",
+    "TechnicalRiskAIExposureCohortMappingError",
+    "TechnicalRiskAIExposureCohortMappingRecord",
+    "TechnicalRiskAIExposureEvidenceSourceType",
+    "TechnicalRiskAIExposureMappingReviewStatus",
+    "TechnicalRiskPostHoldoutAIExposureCohortMappingSpecification",
     "TechnicalRiskCandidateSet",
     "TechnicalRiskCoveragePreference",
     "TechnicalRiskDevelopmentExplorationError",
@@ -329,6 +426,10 @@ __all__ = [
     "TechnicalRiskHoldoutConfirmationError",
     "TechnicalRiskHoldoutConfirmationReasonCode",
     "TechnicalRiskHoldoutConfirmationStatus",
+    "TechnicalRiskHoldoutConfirmationComparison",
+    "TechnicalRiskHoldoutConfirmationDecisionReviewError",
+    "TechnicalRiskHoldoutConfirmationDecisionReviewPackage",
+    "TechnicalRiskHoldoutConfirmationThresholdStabilityReview",
     "TechnicalRiskHoldoutConsistencyRequirement",
     "TechnicalRiskHoldoutContaminationPolicy",
     "TechnicalRiskHoldoutCoverageHandling",
@@ -342,6 +443,21 @@ __all__ = [
     "TechnicalRiskHoldoutRegionSeverityEvidence",
     "TechnicalRiskHoldoutRegionSummary",
     "TechnicalRiskHoldoutRegionThresholdResult",
+    "TechnicalRiskHoldoutRegionEvaluationError",
+    "TechnicalRiskHoldoutRegionEvaluationRequest",
+    "TechnicalRiskHoldoutRegionEvaluationResult",
+    "TechnicalRiskHoldoutRegionEvaluator",
+    "TechnicalRiskHoldoutRegionThresholdEvaluationRecord",
+    "TechnicalRiskHoldoutRegionEvidenceArtifact",
+    "TechnicalRiskHoldoutRegionEvidenceArtifactCodec",
+    "TechnicalRiskHoldoutRegionEvidenceArtifactError",
+    "TechnicalRiskHoldoutRegionEvidenceArtifactSaveResult",
+    "TechnicalRiskHoldoutRegionDistributionProfile",
+    "TechnicalRiskHoldoutRegionEvidenceReviewError",
+    "TechnicalRiskHoldoutRegionEvidenceReviewPackage",
+    "TechnicalRiskHoldoutRegionEvidenceShiftSummary",
+    "TechnicalRiskHoldoutRegionPeriodEvidenceSummary",
+    "TechnicalRiskHoldoutRegionThresholdStabilitySummary",
     "TechnicalRiskHoldoutWarningHandling",
     "TechnicalRiskMedianSeparationPreference",
     "TechnicalRiskMethodologyWarningPolicy",
@@ -426,6 +542,12 @@ __all__ = [
     "build_technical_risk_v1_temporal_split_methodology",
     "build_technical_risk_v1_temporal_split_specs",
     "build_technical_risk_v1_holdout_region_confirmation_contract",
+    "build_technical_risk_v1_post_holdout_ai_exposure_cohort_mapping_specification",
+    "build_default_research_holdout_region_evaluation_request",
+    "build_technical_risk_v1_holdout_region_evaluation_request",
+    "build_technical_risk_holdout_region_evidence_review_package_from_artifact",
+    "build_technical_risk_holdout_region_evidence_review_package",
+    "build_technical_risk_holdout_confirmation_decision_review_package",
     "build_technical_risk_v1_threshold_axis_set",
     "build_technical_risk_v1_validation_selection_methodology",
     "build_default_research_validation_candidate_evaluation_request",
@@ -434,8 +556,14 @@ __all__ = [
     "build_technical_risk_validation_selection_decision_package",
     "derive_technical_risk_evidence",
     "evaluate_technical_risk_predicates",
+    "holdout_region_evidence_artifact_path",
+    "load_holdout_region_evidence_artifact",
+    "load_technical_risk_holdout_confirmation_decision_review_package",
     "load_validation_evidence_artifact",
+    "load_holdout_region_evidence_review_package_from_artifact",
+    "load_official_validation_evidence_artifact",
     "materialize_technical_risk_v1_threshold_grid",
+    "save_holdout_region_evidence_artifact",
     "save_validation_evidence_artifact",
     "technical_risk_candidate_a_spec",
     "technical_risk_candidate_b_spec",
