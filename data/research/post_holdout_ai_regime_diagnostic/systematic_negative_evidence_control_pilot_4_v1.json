@@ -1,0 +1,570 @@
+{
+  "artifact_checksum": "79d3d1f1afed9fd6e67419dc5efec15910c1527d0db6710d584f53c01fc58b1c",
+  "artifact_id": "systematic_negative_evidence_control_pilot_4_v1_79d3d1f1afed9fd6",
+  "artifact_schema_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_PILOT_ARTIFACT_V1",
+  "batch_artifacts_modified": false,
+  "candidate_c_dependency": "NONE",
+  "contract_positive_path_tested": true,
+  "evidence_cutoff_date": "2023-12-31",
+  "frozen_membership": [
+    "2379.TW",
+    "2408.TW",
+    "5269.TW",
+    "2467.TW"
+  ],
+  "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+  "holdout_performance_dependency": "NONE",
+  "methodology_approval": "NOT_APPROVED",
+  "original_cohort_labels_modified": false,
+  "pilot_decision_state": "DRAFT_PROTOCOL_OPERATIONAL_PILOT_ONLY",
+  "pilot_id": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_PILOT_4_V1",
+  "pilot_outcome_count_semantics": {
+    "PILOT_CONTROL_REVIEW_INCOMPLETE": "Counts persisted assessments whose released evaluator output control_review_state is CONTROL_REVIEW_INCOMPLETE; this includes coverage and broad-route completeness gates, not only missing source-class review states.",
+    "PILOT_SOURCE_CLASS_REVIEW_INCOMPLETE": "Counts records that lack exactly one explicit state for every configured source class or contain NOT_REVIEWED."
+  },
+  "pilot_outcome_counts": {
+    "PILOT_AI_EVIDENCE_FOUND": 1,
+    "PILOT_CONFLICT": 0,
+    "PILOT_CONTROL_ELIGIBLE": 0,
+    "PILOT_CONTROL_REVIEW_INCOMPLETE": 3,
+    "PILOT_FAIL_CLOSED": 4,
+    "PILOT_SOURCE_CLASS_REVIEW_INCOMPLETE": 0
+  },
+  "pilot_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY_OPERATIONAL_PILOT",
+  "pilot_success_basis": "operational usability, not control-count maximization",
+  "production_artifact_created": false,
+  "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+  "protocol_usability_assessment": "PILOT_SUPPORTS_PROTOCOL_WITH_LIMITATIONS",
+  "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+  "real_world_control_eligible_case_demonstrated": false,
+  "records": [
+    {
+      "ai_adjacent_evidence_status": "AI_ADJACENT_EVIDENCE_FOUND",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "ROUTE_A",
+      "business_coverage": "BROAD",
+      "company_name": "瑞昱",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_AI_EVIDENCE_FOUND",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2379.TW",
+        "unknown_reason": "AI_ADJACENT_EVIDENCE_DISQUALIFIES_CONTROL"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "AI_ADJACENT_EVIDENCE_DISQUALIFIES_CONTROL"
+      ],
+      "historical_business_identity_supported": true,
+      "pilot_finding": "PILOT_AI_ADJACENT_EVIDENCE_FOUND_FAIL_CLOSED",
+      "publication_integrity": "VERIFIED_PRE_CUTOFF_COMPREHENSIVE_BUSINESS_REPORT",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Final lineage/date review retains the Realtek 2022 Annual Report under COMPREHENSIVE_BUSINESS_REPORT only. That proper source still contains eligible pre-cutoff AI-adjacent disclosures, so the control assessment fails closed without duplicate-source inflation and without changing the existing UNKNOWN cohort label.",
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS/TWSE regulatory search scope",
+              "notes": "Search scope recorded; no pilot-primary AI evidence retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Realtek 2022 Annual Report",
+              "notes": "Official Realtek annual report for fiscal year 2022. It supports broad business identity, but also contains eligible pre-cutoff company-specific AI-adjacent disclosures, so it cannot support negative-evidence control eligibility.",
+              "publication_date": "2023-05-17",
+              "publication_date_verified": true,
+              "url": "https://www.realtek.com/images/ar/Annual_Report_2022____0517.pdf"
+            },
+            {
+              "label": "Realtek 2022 Annual Report AI-adjacent disclosures",
+              "notes": "Report text includes Realtek AI Audio noise cancellation, Edge AI USB Camera Controller, and AI super-resolution multimedia IC discussion; treated as company-specific AI-adjacent evidence.",
+              "publication_date": "2023-05-17",
+              "publication_date_verified": true,
+              "url": "https://www.realtek.com/images/ar/Annual_Report_2022____0517.pdf"
+            }
+          ],
+          "is_required": true,
+          "publication_date": "2023-05-17",
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": true,
+          "review_state": "REVIEWED_ELIGIBLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": true
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Realtek official quarterly earning release API",
+              "notes": "Official API lists 2023 Q1-Q4 earning-release video entries; no retained eligible AI evidence.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.realtek.com/InvestorRelations/GetQuarterlyEarningReleaseData"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Realtek official disclosure channel search",
+              "notes": "Reviewed as a separate official-company-disclosure source class. The Realtek 2022 Annual Report is retained only under COMPREHENSIVE_BUSINESS_REPORT to avoid duplicate-source inflation; no additional eligible source was retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.realtek.com/InvestorRelations/AnnualReports"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible official ecosystem evidence retained for Realtek under the pilot.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.realtek.com/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2379.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "南亞科",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2408.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "pilot_finding": "PILOT_REVIEW_FAIL_CLOSED_PARTIAL_COVERAGE",
+      "publication_integrity": "PARTIAL_PRE_CUTOFF_FINANCIAL_CHANNEL_ONLY",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official 2023 financial-report channel and product taxonomy were reviewed, but retained eligible evidence was partial for systematic negative-evidence control and did not support BROAD coverage.",
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS/TWSE regulatory search scope",
+              "notes": "Search scope recorded; no pilot-primary AI evidence retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "A comprehensive 2023 annual/sustainability report was not retained as pre-cutoff eligible primary evidence; Q1-Q3 financial reports are explicit but not broad business-coverage evidence.",
+          "evidence_references": [
+            {
+              "label": "Nanya 2023 financial reports",
+              "notes": "Official page lists 2023 Q1-Q3 and annual financial reports; retained as financial-report channel, not sufficient broad business evidence.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.nanya.com/tw/IR/39?Year=2023"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Nanya investor relations channel",
+              "notes": "No eligible investor-presentation evidence retained for AI exposure or complete negative control.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.nanya.com/tw/IR/39?Year=2023"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Nanya official news / IR channel",
+              "notes": "Reviewed official channel; post-cutoff 2024 releases not used as eligible primary evidence.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.nanya.com/tw/IR/39?Year=2023"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.nanya.com/tw/IR/39?Year=2023"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2408.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "祥碩",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "5269.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "pilot_finding": "PILOT_REVIEW_FAIL_CLOSED_PARTIAL_COVERAGE",
+      "publication_integrity": "NO_VERIFIED_PRE_CUTOFF_BROAD_BUSINESS_SOURCE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Final lineage/date review removes the prior 2023-01-01 reviewed-eligible metadata because it represented a year-level investor-news channel, not a verified publication date for a specific eligible document. Control remains fail-closed on partial coverage.",
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "ASMedia regulatory disclosure search scope",
+              "notes": "The previously retained ASMedia 2023 investor-news channel is not treated as REGULATORY_MOPS evidence, and 2023-01-01 is not a verified public-availability date for a specific eligible document.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.asmedia.com.tw/investors05.html"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No pre-cutoff comprehensive business report was retained from official channels during the pilot.",
+          "evidence_references": [
+            {
+              "label": "ASMedia investor / corporate channel",
+              "notes": "Official investor page reviewed; retained evidence was not sufficient for broad business coverage.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.asmedia.com.tw/investors05.html"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "ASMedia 2023 investor news channel",
+              "notes": "Official investor/news channel reviewed as investor material context only; no specific eligible pre-cutoff document with verified publication date was retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.asmedia.com.tw/investors05.html"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "ASMedia post-cutoff AI transmission news",
+              "notes": "Official AI/HPC-related disclosure located but treated as post-cutoff diagnostic context only, not eligible primary evidence.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.asmedia.com.tw/news-main/1E9ZZEEyq5sNCshB.html"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible pre-cutoff company-specific ecosystem AI evidence retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.asmedia.com.tw/investors05.html"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "5269.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_AMBIGUOUS",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "ROUTE_B",
+      "business_coverage": "BROAD",
+      "company_name": "志聖",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2467.TW",
+        "unknown_reason": "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED",
+        "AI_ADJACENT_REVIEW_NOT_SYSTEMATIC_NEGATIVE"
+      ],
+      "historical_business_identity_supported": true,
+      "pilot_finding": "PILOT_AI_ADJACENT_EVIDENCE_AMBIGUOUS_FAIL_CLOSED_WITH_SOURCE_COMPLETENESS_LIMITATION",
+      "publication_integrity": "VERIFIED_PRE_CUTOFF_INVESTOR_MATERIAL_WITH_UNVERIFIED_FINANCIAL_CHANNEL_DATE_REMOVED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Final lineage/date review preserves the eligible 2023-11-02 official investor-presentation ambiguity evidence, but removes the weak 2023-12-31 financial-channel date. The released contract now fails first on the broad-source completeness gate while retaining AI-adjacent ambiguity as a recorded failed gate.",
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS/TWSE regulatory search scope",
+              "notes": "Search scope recorded; no pilot-primary AI evidence retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "2023 annual-report channel exists, but the pilot did not retain a verified pre-cutoff comprehensive report as eligible evidence.",
+          "evidence_references": [
+            {
+              "label": "C SUN shareholder meeting reports",
+              "notes": "Official page lists 2023 shareholder-meeting materials and annual report download.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.csun.com.tw/investor-relations/shareholder-information/shareholders-meeting/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "C SUN 2023 investor conference material",
+              "notes": "Official 2023-11-02 investor presentation. It supports broad business route evidence, but also contains company business-opportunity discussion tied to AI/HPC convergence, AI Chip, HPC, advanced packaging, and HBM packaging; therefore treated as AI-adjacent ambiguous rather than systematic negative evidence.",
+              "publication_date": "2023-11-02",
+              "publication_date_verified": true,
+              "url": "https://www.csun.com.tw/corporate-presentation/"
+            },
+            {
+              "label": "C SUN 2023 investor presentation AI/HPC opportunity discussion",
+              "notes": "The presentation agenda and market trend pages discuss growing HPC/AI convergence, AI Chip, HPC, advanced packaging, and HBM packaging in relation to company opportunity tracking.",
+              "publication_date": "2023-11-02",
+              "publication_date_verified": true,
+              "url": "https://www.csun.com.tw/corporate-presentation/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": "2023-11-02",
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": true,
+          "review_state": "REVIEWED_ELIGIBLE",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": true
+        },
+        {
+          "audit_reason": "The 2023 financial-information channel was reviewed, but 2023-12-31 was not retained as a verified publication/public-availability date for a specific eligible document.",
+          "evidence_references": [
+            {
+              "label": "C SUN 2023 financial information channel",
+              "notes": "Reviewed as official company disclosure context only. Year-level financial channel evidence must not borrow the protocol cutoff date as a synthetic publication date.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.csun.com.tw/investor-relations/financial-reports/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.csun.com.tw/corporate-presentation/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2467.TW"
+    }
+  ],
+  "source_classes_required": [
+    "REGULATORY_MOPS",
+    "COMPREHENSIVE_BUSINESS_REPORT",
+    "INVESTOR_MATERIAL",
+    "OFFICIAL_COMPANY_DISCLOSURE",
+    "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE"
+  ]
+}
