@@ -1069,6 +1069,58 @@ class SwingResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(set(row["股票"] for row in projection.formal_v1_rows), {"2330.TW", "6789.TW"})
         self.assertEqual(projection.formal_v1_rows[0]["Production V1"], "正式命中")
 
+    def test_stale_swing_result_identity_mismatch_is_detected_without_relaxing_invariant(self):
+        import app as app_module
+
+        formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        stale_result = self.result(
+            config=self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1),
+            candidates=tuple(),
+            current_signal_details=(formal,),
+        )
+
+        error = app_module.swing_research_result_compatibility_error(stale_result)
+
+        self.assertEqual(
+            error,
+            "Condition Coverage 5/5 identity set must equal Production Scanner V1 hits.",
+        )
+
+    def test_compatible_swing_result_is_not_marked_stale(self):
+        import app as app_module
+
+        formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)
+        result = self.result(
+            config=self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1),
+            candidates=(SimpleNamespace(symbol="2330.TW"),),
+            current_signal_details=(formal,),
+        )
+
+        self.assertIsNone(app_module.swing_research_result_compatibility_error(result))
+
+    def test_clear_swing_result_state_preserves_unrelated_session_state(self):
+        import app as app_module
+
+        state = {
+            "swing_research_result": object(),
+            "swing_research_config_fingerprint": "old",
+            "swing_research_price_series_by_symbol": {"2330.TW": object()},
+            "swing_research_source_context": {"source_type": "manual"},
+            "swing_research_result_mode": CURRENT_SCAN_MODE,
+            "swing_research_replay_date": date(2025, 1, 3),
+            "research_stock": object(),
+        }
+
+        app_module.clear_swing_research_result_state(state)
+
+        self.assertIsNone(state["swing_research_result"])
+        self.assertIsNone(state["swing_research_config_fingerprint"])
+        self.assertEqual(state["swing_research_price_series_by_symbol"], {})
+        self.assertIsNone(state["swing_research_source_context"])
+        self.assertIsNone(state["swing_research_result_mode"])
+        self.assertIsNone(state["swing_research_replay_date"])
+        self.assertIsNotNone(state["research_stock"])
+
     def test_candidate_display_dashboard_projection_empty_groups_are_safe(self):
         config = self.config(signal_definition=TECHNICAL_EXAMPLE_SIGNAL_V1)
         formal = evaluate_signal_conditions(self.snapshot(symbol="2330.TW"), TECHNICAL_EXAMPLE_SIGNAL_V1)

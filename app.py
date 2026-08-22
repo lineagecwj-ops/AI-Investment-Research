@@ -142,6 +142,7 @@ from research_context_selector import ResearchSelectionRequest
 from research_context_selector import select_research_context
 from research_glossary import get_research_glossary
 from research_service import build_research_report
+from scanner_condition_coverage_service import ScannerConditionCoverageError
 from symbol_utils import normalize_stock_symbol
 from symbol_utils import parse_stock_symbols
 from technical_indicator_service import build_technical_indicator_series
@@ -231,6 +232,12 @@ DAILY_RESEARCH_COMPANY_CONTEXT_PATH = (
 DAILY_RESEARCH_STATUS_WITH_DATA = "有資料"
 DAILY_RESEARCH_STATUS_EMPTY = "尚無資料"
 DAILY_RESEARCH_STATUS_AVAILABLE = "可前往建立"
+SWING_RESEARCH_INCOMPATIBLE_RESULT_MESSAGE = (
+    "先前的波段研究結果與目前掃描條件版本不相容，請重新執行波段研究。"
+)
+SWING_RESEARCH_STALE_RESULT_MESSAGE = (
+    "目前波段研究結果來自上一組設定，請重新執行波段研究。"
+)
 RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS = (
     "長期研究",
     "歷史趨勢",
@@ -580,6 +587,23 @@ def build_research_candidate_rows(
             }
         )
     return sorted(rows, key=lambda row: row["股票代號"])
+
+
+def swing_research_result_compatibility_error(result) -> str | None:
+    try:
+        swing_dashboard.build_scanner_condition_coverage_view(result)
+    except ScannerConditionCoverageError as error:
+        return str(error)
+    return None
+
+
+def clear_swing_research_result_state(session_state) -> None:
+    session_state["swing_research_result"] = None
+    session_state["swing_research_config_fingerprint"] = None
+    session_state["swing_research_price_series_by_symbol"] = {}
+    session_state["swing_research_source_context"] = None
+    session_state["swing_research_result_mode"] = None
+    session_state["swing_research_replay_date"] = None
 
 
 def filter_research_candidate_rows(
@@ -2761,11 +2785,10 @@ def render_swing_research() -> None:
         return
 
     if st.session_state["swing_research_config_fingerprint"] != current_fingerprint:
-        stored_mode = st.session_state.get("swing_research_result_mode")
-        if stored_mode and stored_mode != scan_mode:
-            st.warning(f"stored result came from {stored_mode} mode；若要更新，請重新執行目前模式。")
-        else:
-            st.warning("目前結果來自上一組設定；若要更新，請重新按「執行波段掃描」。")
+        clear_swing_research_result_state(st.session_state)
+        st.warning(SWING_RESEARCH_STALE_RESULT_MESSAGE)
+        st.info("重新按「執行波段掃描」後，系統會用目前股票來源與設定產生新的結果。")
+        return
 
     if st.session_state.get("swing_research_result_mode") == swing_dashboard.WALK_FORWARD_REPLAY_MODE:
         render_swing_research_walk_forward_result(
@@ -2778,6 +2801,13 @@ def render_swing_research() -> None:
             st.session_state.get("swing_research_source_context"),
         )
     else:
+        compatibility_error = swing_research_result_compatibility_error(result)
+        if compatibility_error:
+            clear_swing_research_result_state(st.session_state)
+            st.warning(SWING_RESEARCH_INCOMPATIBLE_RESULT_MESSAGE)
+            with st.expander("相容性檢查", expanded=False):
+                st.caption(compatibility_error)
+            return
         render_swing_research_result(
             result,
             st.session_state.get("swing_research_source_context"),
