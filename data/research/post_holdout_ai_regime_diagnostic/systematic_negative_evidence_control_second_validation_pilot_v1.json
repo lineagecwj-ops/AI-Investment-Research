@@ -1,0 +1,1101 @@
+{
+  "artifact_checksum": "2bc5289d73cd00832f0e3e58b62d58b85dec4958bacfabe96a5eedfb612588b7",
+  "artifact_id": "systematic_negative_evidence_control_second_validation_pilot_v1_2bc5289d73cd0083",
+  "artifact_schema_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_SECOND_VALIDATION_PILOT_ARTIFACT_V1",
+  "batch_artifacts_modified": false,
+  "blind_counters": {
+    "BLIND_AI_EVIDENCE_FOUND": 0,
+    "BLIND_CASE_COUNT": 6,
+    "BLIND_CONFLICT": 0,
+    "BLIND_CONTROL_ELIGIBLE": 0,
+    "BLIND_CONTROL_REVIEW_INCOMPLETE": 6,
+    "BLIND_SOURCE_CLASS_REVIEW_INCOMPLETE": 0
+  },
+  "blind_membership": [
+    "2302.TW",
+    "2449.TW",
+    "2313.TW",
+    "2316.TW",
+    "2305.TW",
+    "2324.TW"
+  ],
+  "blind_selection_methodology": "Committed UNKNOWN records only; exclude Pilot 1; require committed source trace; stratify by Semiconductor, Electronic Components, Computer & Peripheral Equipment; sort symbol ascending; take first two per industry.",
+  "blind_selection_set_id": "SECOND_VALIDATION_PILOT_BLIND_SET_V1",
+  "calibration_counters": {
+    "CALIBRATION_CASE_COUNT": 2,
+    "CALIBRATION_CONTROL_ELIGIBLE": 0,
+    "CALIBRATION_MISMATCH": 2
+  },
+  "calibration_membership": [
+    "2337.TW",
+    "8261.TW"
+  ],
+  "candidate_c_dependency": "NONE",
+  "evidence_cutoff_date": "2023-12-31",
+  "existing_cohort_labels_modified": false,
+  "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+  "holdout_performance_dependency": "NONE",
+  "method_decision": "CONDITIONALLY_APPROVED_FOR_SECOND_VALIDATION_PILOT",
+  "methodology_approval": "NOT_APPROVED",
+  "pilot_conclusion": "SECOND_PILOT_REVEALS_CALIBRATION_MISMATCH",
+  "pilot_id": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_SECOND_VALIDATION_PILOT_V1",
+  "pilot_scope": "POST_HOLDOUT_DIAGNOSTIC_SECOND_VALIDATION_PILOT",
+  "positive_path_flags": {
+    "BLIND_REAL_WORLD_CONTROL_ELIGIBLE_DEMONSTRATED": false,
+    "REAL_WORLD_POSITIVE_PATH_REPRODUCED": false
+  },
+  "production_artifact_created": false,
+  "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+  "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+  "records": [
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "BROAD",
+      "company_name": "旺宏",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2337.TW",
+        "unknown_reason": "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "NON_AI_TECH_CONTROL",
+      "failed_gates": [
+        "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Semiconductor",
+      "pilot_finding": "CALIBRATION_MISMATCH",
+      "pilot_role": "POSITIVE_CALIBRATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Known prior control. New protocol finds one eligible broad official disclosure but no eligible comprehensive report or second broad source, so calibration mismatch is preserved if evaluator fails the route gate.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "Macronix regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "Official annual-report channel lists 2022 Annual Reports, but the pilot did not retain a verified pre-cutoff publication/public-availability date for the comprehensive report.",
+          "evidence_references": [
+            {
+              "label": "Macronix official annual reports channel",
+              "notes": "Official annual reports channel reviewed; not retained as eligible because exact pre-cutoff publication date was not verified.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.macronix.com/en-us/about/investor-relations/Pages/annual-reports.aspx"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Macronix investor relations channel",
+              "notes": "Investor channel reviewed; no separate additional eligible broad-supporting investor material retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.macronix.com/en-us/about/investor-relations/Pages/financial-reports.aspx"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Macronix Q4 2022 results release",
+              "notes": "Official dated results release describes NVM products across consumer, communication, computing, automotive, networking and other markets; retained as broad business context but not a comprehensive report.",
+              "publication_date": "2023-02-14",
+              "publication_date_verified": true,
+              "url": "https://www.macronix.com/en-us/about/news/Pages/20230214E.aspx"
+            }
+          ],
+          "is_required": true,
+          "publication_date": "2023-02-14",
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": true,
+          "review_state": "REVIEWED_ELIGIBLE",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": true
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for Macronix.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.macronix.com/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2337.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "BROAD",
+      "company_name": "富鼎",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "8261.TW",
+        "unknown_reason": "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "NON_AI_TECH_CONTROL",
+      "failed_gates": [
+        "COMPREHENSIVE_REPORT_OR_MULTIPLE_BROAD_SOURCES_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Semiconductor",
+      "pilot_finding": "CALIBRATION_MISMATCH",
+      "pilot_role": "POSITIVE_CALIBRATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Known prior control. New protocol does not force pass; broad context exists but comprehensive/multiple broad-source route is not sufficiently established.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "APEC regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive annual/business report was retained during this pilot.",
+          "evidence_references": [
+            {
+              "label": "APEC financial report channel",
+              "notes": "Official financial-report channel reviewed as context only; not retained as comprehensive broad business evidence.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.anpec.com.tw/en/investors/finance-detail/finance-2023/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "APEC investor channel",
+              "notes": "Investor/financial channel reviewed; no separate eligible broad investor material retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.anpec.com.tw/en/investors/finance-detail/finance-2023/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "APEC May 2023 official news release",
+              "notes": "Official dated release describes Power MOSFET specialization, EV entry and power-semiconductor supply-chain positioning; retained as broad business context but not a comprehensive report.",
+              "publication_date": "2023-05-18",
+              "publication_date_verified": true,
+              "url": "https://www.a-power.com.tw/cn/article/296-%E5%AF%8C%E9%BC%8E%E5%85%88%E8%BF%9B%E7%94%B5%E5%AD%90%E6%96%B0%E9%97%BB%E7%A8%BF?path=latest-news"
+            }
+          ],
+          "is_required": true,
+          "publication_date": "2023-05-18",
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": true,
+          "review_state": "REVIEWED_ELIGIBLE",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": true
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for APEC.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.a-power.com.tw/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "8261.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "麗正",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2302.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Semiconductor",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official product and annual-report channels establish semiconductor product scope, but no verified pre-cutoff broad source was retained.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "麗正 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "麗正 committed historical source trace",
+              "notes": "Official product and annual-report channels establish semiconductor product scope, but no verified pre-cutoff broad source was retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://rt.rectron.com.tw/web/information/information_year.jsp"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "麗正 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://rt.rectron.com.tw/web/information/information_year.jsp"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "麗正 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://rt.rectron.com.tw/web/information/information_year.jsp"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 麗正.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://rt.rectron.com.tw/web/information/information_year.jsp"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2302.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "京元電子",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2449.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Semiconductor",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official IR/product-service channel confirms semiconductor test-service scope, but no verified pre-cutoff broad source was retained.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "京元電子 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "京元電子 committed historical source trace",
+              "notes": "Official IR/product-service channel confirms semiconductor test-service scope, but no verified pre-cutoff broad source was retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.kyec.com.tw/en/Ir/Price"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "京元電子 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.kyec.com.tw/en/Ir/Price"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "京元電子 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.kyec.com.tw/en/Ir/Price"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 京元電子.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.kyec.com.tw/en/Ir/Price"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2449.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "華通",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2313.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Electronic Components",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official product page establishes PCB product breadth, but publication date and broad pre-cutoff source route remain unverified.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "華通 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "華通 committed historical source trace",
+              "notes": "Official product page establishes PCB product breadth, but publication date and broad pre-cutoff source route remain unverified.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compeq.com.tw/product01.php"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "華通 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compeq.com.tw/product01.php"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "華通 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compeq.com.tw/product01.php"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 華通.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compeq.com.tw/product01.php"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2313.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_AMBIGUOUS",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "楠梓電",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2316.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE",
+        "AI_ADJACENT_REVIEW_NOT_SYSTEMATIC_NEGATIVE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Electronic Components",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official current page mentions AI/HPC and high-speed computing accelerator boards, but timing could not be verified as pre-2024; ambiguity remains fail-closed.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "楠梓電 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "楠梓電 committed historical source trace",
+              "notes": "Official current page mentions AI/HPC and high-speed computing accelerator boards, but timing could not be verified as pre-2024; ambiguity remains fail-closed.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.wus.com.tw/index.php/en/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "楠梓電 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.wus.com.tw/index.php/en/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "楠梓電 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.wus.com.tw/index.php/en/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 楠梓電.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.wus.com.tw/index.php/en/"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2316.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "全友",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2305.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Computer & Peripheral Equipment",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official shareholder and annual-report channels establish scanner / imaging-device context, but broad pre-cutoff coverage was not retained.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "全友 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "全友 committed historical source trace",
+              "notes": "Official shareholder and annual-report channels establish scanner / imaging-device context, but broad pre-cutoff coverage was not retained.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://microtek.com/tw/meetings"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "全友 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://microtek.com/tw/meetings"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "全友 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://microtek.com/tw/meetings"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 全友.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://microtek.com/tw/meetings"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2305.TW"
+    },
+    {
+      "ai_adjacent_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "ai_high_evidence_status": "AI_EVIDENCE_NOT_FOUND_UNDER_COMPLETED_REVIEW",
+      "broad_coverage_route": "NO_VALID_BROAD_ROUTE",
+      "business_coverage": "PARTIAL",
+      "company_name": "仁寶",
+      "conflict_status": "NO_CONFLICT",
+      "contract_assessment": {
+        "control_eligibility": false,
+        "control_review_state": "CONTROL_REVIEW_INCOMPLETE",
+        "evidence_cutoff_date": "2023-12-31",
+        "governance_scope": "POST_HOLDOUT_DIAGNOSTIC_METHODOLOGY",
+        "protocol_status": "DRAFT_FOR_METHOD_REVIEW",
+        "protocol_version": "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
+        "symbol": "2324.TW",
+        "unknown_reason": "BROAD_BUSINESS_COVERAGE_REQUIRED"
+      },
+      "ecosystem_evidence_status": "NO_ELIGIBLE_ECOSYSTEM_AI_EVIDENCE",
+      "existing_cohort_label_preserved": "UNKNOWN",
+      "failed_gates": [
+        "BROAD_BUSINESS_COVERAGE_REQUIRED",
+        "NO_VALID_BROAD_ROUTE"
+      ],
+      "historical_business_identity_supported": true,
+      "industry": "Computer & Peripheral Equipment",
+      "pilot_finding": "BLIND_CONTROL_REVIEW_INCOMPLETE",
+      "pilot_role": "OUTCOME_BLIND_VALIDATION",
+      "publication_integrity": "NO_VERIFIED_COMPREHENSIVE_BROAD_ROUTE_RETAINED",
+      "review_completeness": "CONTROL_REVIEW_COMPLETE",
+      "reviewer_notes": "Official 2023 financial-results and 5G materials were identified, but pre-2024 source coverage was insufficient for broad control package.",
+      "source_class_review_complete": true,
+      "source_class_reviews": [
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "MOPS / exchange regulatory search scope",
+              "notes": "仁寶 regulatory history search scope recorded; no pilot-primary eligible source retained from snippets.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://mops.twse.com.tw/mops/web/index"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "REGULATORY_MOPS",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": "No verified pre-cutoff comprehensive business report was retained during second-pilot execution.",
+          "evidence_references": [
+            {
+              "label": "仁寶 committed historical source trace",
+              "notes": "Official 2023 financial-results and 5G materials were identified, but pre-2024 source coverage was insufficient for broad control package.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compal.com/en-us/media/?category=quarterly_financial_results&page=2"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "UNAVAILABLE_OR_UNRECOVERABLE",
+          "source_class": "COMPREHENSIVE_BUSINESS_REPORT",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "仁寶 investor / official source trace",
+              "notes": "Committed local artifact source trace reviewed; no eligible investor material retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compal.com/en-us/media/?category=quarterly_financial_results&page=2"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "INVESTOR_MATERIAL",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "仁寶 official disclosure / product source trace",
+              "notes": "Committed local artifact source trace reviewed; no verified eligible official disclosure retained for this class.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compal.com/en-us/media/?category=quarterly_financial_results&page=2"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "OFFICIAL_COMPANY_DISCLOSURE",
+          "supports_broad_business_coverage": false
+        },
+        {
+          "audit_reason": null,
+          "evidence_references": [
+            {
+              "label": "Official ecosystem source search",
+              "notes": "No eligible company-specific official ecosystem AI evidence retained for 仁寶.",
+              "publication_date": null,
+              "publication_date_verified": false,
+              "url": "https://www.compal.com/en-us/media/?category=quarterly_financial_results&page=2"
+            }
+          ],
+          "is_required": true,
+          "publication_date": null,
+          "publication_date_is_synthetic_fallback": false,
+          "publication_date_verified": false,
+          "review_state": "SEARCHED_NOT_FOUND",
+          "source_class": "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE",
+          "supports_broad_business_coverage": false
+        }
+      ],
+      "symbol": "2324.TW"
+    }
+  ],
+  "return_dependency": "NONE",
+  "source_classes_required": [
+    "REGULATORY_MOPS",
+    "COMPREHENSIVE_BUSINESS_REPORT",
+    "INVESTOR_MATERIAL",
+    "OFFICIAL_COMPANY_DISCLOSURE",
+    "APPROVED_OFFICIAL_ECOSYSTEM_SOURCE"
+  ]
+}
