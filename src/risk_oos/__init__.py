@@ -32,6 +32,25 @@ from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureEvidenceS
 from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskAIExposureMappingReviewStatus
 from risk_oos.ai_exposure_cohort_mapping import TechnicalRiskPostHoldoutAIExposureCohortMappingSpecification
 from risk_oos.ai_exposure_cohort_mapping import build_technical_risk_v1_post_holdout_ai_exposure_cohort_mapping_specification
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_CUTOFF_DATE
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_GOVERNANCE_POST_HOLDOUT
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_INDUSTRY_MATCHING_POLICY
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_SENTINEL_DATE
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_STATUS_DRAFT_FOR_METHOD_REVIEW
+from risk_oos.systematic_negative_evidence_control import SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceAIStatus
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceBusinessCoverage
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceConflictStatus
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceControlAssessment
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceControlError
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceControlInput
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceControlReviewState
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceEcosystemStatus
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceReviewCompleteness
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceSourceClass
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceSourceReview
+from risk_oos.systematic_negative_evidence_control import SystematicNegativeEvidenceSourceReviewState
+from risk_oos.systematic_negative_evidence_control import assess_systematic_negative_evidence_control
 from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATION_INPUT_V1
 from risk_oos.candidate_evaluator import TECH_RISK_CANDIDATE_EVALUATOR_V1
 from risk_oos.candidate_evaluator import TECH_RISK_CONTINUOUS_MAE_METRIC_V1
@@ -391,6 +410,12 @@ __all__ = [
     "TECH_RISK_AI_HIGH_CRITERIA_V1",
     "TECH_RISK_POST_HOLDOUT_AI_EXPOSURE_COHORT_MAPPING_SPEC_V1",
     "TECH_RISK_TECH_CONTROL_INDUSTRIES_V1",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_CUTOFF_DATE",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_GOVERNANCE_POST_HOLDOUT",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_INDUSTRY_MATCHING_POLICY",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_SENTINEL_DATE",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_STATUS_DRAFT_FOR_METHOD_REVIEW",
+    "SYSTEMATIC_NEGATIVE_EVIDENCE_CONTROL_V1",
     "TECHNICAL_RISK_OOS_DATASET_BUILDER_VERSION",
     "TECHNICAL_RISK_OOS_DATASET_SCHEMA_VERSION",
     "TECHNICAL_RISK_V1_TEMPORAL_SPLIT_V1",
@@ -446,6 +471,18 @@ __all__ = [
     "TechnicalRiskAIExposureEvidenceSourceType",
     "TechnicalRiskAIExposureMappingReviewStatus",
     "TechnicalRiskPostHoldoutAIExposureCohortMappingSpecification",
+    "SystematicNegativeEvidenceAIStatus",
+    "SystematicNegativeEvidenceBusinessCoverage",
+    "SystematicNegativeEvidenceConflictStatus",
+    "SystematicNegativeEvidenceControlAssessment",
+    "SystematicNegativeEvidenceControlError",
+    "SystematicNegativeEvidenceControlInput",
+    "SystematicNegativeEvidenceControlReviewState",
+    "SystematicNegativeEvidenceEcosystemStatus",
+    "SystematicNegativeEvidenceReviewCompleteness",
+    "SystematicNegativeEvidenceSourceClass",
+    "SystematicNegativeEvidenceSourceReview",
+    "SystematicNegativeEvidenceSourceReviewState",
     "TechnicalRiskBroadIndustryMappingStatus",
     "TechnicalRiskCandidateSet",
     "TechnicalRiskCoveragePreference",
@@ -590,6 +627,7 @@ __all__ = [
     "build_technical_risk_v1_validation_candidate_evaluation_request",
     "build_technical_risk_validation_evidence_shortlist",
     "build_technical_risk_validation_selection_decision_package",
+    "assess_systematic_negative_evidence_control",
     "derive_technical_risk_evidence",
     "encode_official_broad_industry_mapping_artifact",
     "evaluate_technical_risk_predicates",
