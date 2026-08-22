@@ -1,4 +1,5 @@
 import sys
+import inspect
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -158,6 +159,91 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
 
         self.assertIn("符合航運業產業", reason)
         self.assertIn("尚未建立研究資料", reason)
+
+    def test_candidate_handoff_actions_use_pending_keys_not_target_widget_keys(self):
+        import app as app_module
+
+        source = inspect.getsource(app_module.research_candidate_action_buttons)
+
+        self.assertIn("queue_research_symbol_handoff", source)
+        self.assertNotIn('["research_input"]', source)
+        self.assertNotIn('["historical_trends_input"]', source)
+        self.assertNotIn('["ai_research_symbol_input"]', source)
+        self.assertNotIn('["swing_research_symbol_input"]', source)
+        self.assertNotIn('["swing_research_symbol_source"]', source)
+        self.assertNotIn('["comparison_input"]', source)
+
+    def test_candidate_explorer_to_swing_handoff_does_not_mutate_instantiated_widget(self):
+        script = """
+from pathlib import Path
+import sys
+import streamlit as st
+
+project_root = Path("/Users/hankmacmini/Documents/Projects/AI-Investment-Research")
+src_path = project_root / "src"
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+import app
+import universe_dashboard as universe_ui
+
+app.initialize_session_state()
+st.selectbox(
+    "股票來源",
+    [universe_ui.MANUAL_SOURCE, universe_ui.WATCHLIST_SOURCE],
+    key="swing_research_symbol_source",
+)
+st.text_area("股票池", key="swing_research_symbol_input")
+app.research_candidate_action_buttons("2337.TW", key_prefix="handoff_regression")
+st.write(st.session_state.get("pending_swing_research_symbol", "NO_PENDING"))
+"""
+        app_test = AppTest.from_string(script)
+        app_test.run()
+
+        self.assertFalse(app_test.exception)
+        swing_buttons = [
+            button
+            for button in app_test.button
+            if button.key == "handoff_regression_swing"
+        ]
+        self.assertEqual(len(swing_buttons), 1)
+
+        swing_buttons[0].click().run()
+
+        self.assertFalse(app_test.exception)
+        output_text = "\n".join(str(item.value) for item in app_test.markdown)
+        self.assertIn("2337.TW", output_text)
+
+    def test_pending_handoff_consumes_latest_symbol_before_target_widget(self):
+        script = """
+from pathlib import Path
+import sys
+import streamlit as st
+
+project_root = Path("/Users/hankmacmini/Documents/Projects/AI-Investment-Research")
+src_path = project_root / "src"
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+import app
+
+app.initialize_session_state()
+app.queue_research_symbol_handoff("swing", "2337.TW", rerun=False)
+app.queue_research_symbol_handoff("swing", "2454.TW", rerun=False)
+app.consume_research_symbol_handoff("swing")
+st.text_area("股票池", key="swing_research_symbol_input")
+st.write(st.session_state["swing_research_symbol_input"])
+"""
+        app_test = AppTest.from_string(script)
+        app_test.run()
+
+        self.assertFalse(app_test.exception)
+        output_text = "\n".join(str(item.value) for item in app_test.markdown)
+        self.assertIn("2454.TW", output_text)
 
 
 def build_rows(**overrides):

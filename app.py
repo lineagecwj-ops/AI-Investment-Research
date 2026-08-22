@@ -238,6 +238,14 @@ SWING_RESEARCH_INCOMPATIBLE_RESULT_MESSAGE = (
 SWING_RESEARCH_STALE_RESULT_MESSAGE = (
     "目前波段研究結果來自上一組設定，請重新執行波段研究。"
 )
+RESEARCH_HANDOFF_TARGETS = {
+    "daily": ("pending_daily_research_symbol", "daily_research_manual_symbol"),
+    "research": ("pending_research_symbol", "research_input"),
+    "historical": ("pending_historical_trends_symbol", "historical_trends_input"),
+    "ai": ("pending_ai_research_symbol", "ai_research_symbol_input"),
+    "swing": ("pending_swing_research_symbol", "swing_research_symbol_input"),
+    "comparison": ("pending_comparison_symbol", "comparison_input"),
+}
 RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS = (
     "長期研究",
     "歷史趨勢",
@@ -606,6 +614,21 @@ def clear_swing_research_result_state(session_state) -> None:
     session_state["swing_research_replay_date"] = None
 
 
+def queue_research_symbol_handoff(target: str, symbol: str, *, rerun: bool = True) -> None:
+    pending_key, _widget_key = RESEARCH_HANDOFF_TARGETS[target]
+    st.session_state[pending_key] = normalize_stock_symbol(symbol)
+    if rerun:
+        st.rerun()
+
+
+def consume_research_symbol_handoff(target: str) -> str | None:
+    pending_key, widget_key = RESEARCH_HANDOFF_TARGETS[target]
+    symbol = st.session_state.pop(pending_key, None)
+    if symbol:
+        st.session_state[widget_key] = symbol
+    return symbol
+
+
 def filter_research_candidate_rows(
     rows: list[dict[str, str]],
     *,
@@ -657,24 +680,17 @@ def build_research_candidate_reason(
 def research_candidate_action_buttons(selected_symbol: str, *, key_prefix: str) -> None:
     action_cols = st.columns(6)
     if action_cols[0].button("帶入每日研究首頁", key=f"{key_prefix}_daily"):
-        st.session_state["daily_research_prefill_symbol"] = selected_symbol
-        st.success("已帶入每日研究首頁。")
+        queue_research_symbol_handoff("daily", selected_symbol)
     if action_cols[1].button("Research", key=f"{key_prefix}_research"):
-        st.session_state["research_input"] = selected_symbol
-        st.success("已帶入 Research 頁的股票欄位。")
+        queue_research_symbol_handoff("research", selected_symbol)
     if action_cols[2].button("Historical Trends", key=f"{key_prefix}_historical"):
-        st.session_state["historical_trends_input"] = selected_symbol
-        st.success("已帶入 Historical Trends 頁的股票欄位。")
+        queue_research_symbol_handoff("historical", selected_symbol)
     if action_cols[3].button("AI Research", key=f"{key_prefix}_ai"):
-        st.session_state["ai_research_symbol_input"] = selected_symbol
-        st.success("已帶入 AI Research 頁的股票欄位。")
+        queue_research_symbol_handoff("ai", selected_symbol)
     if action_cols[4].button("Swing Research", key=f"{key_prefix}_swing"):
-        st.session_state["swing_research_symbol_input"] = selected_symbol
-        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
-        st.success("已帶入 Swing Research 頁的股票池欄位。")
+        queue_research_symbol_handoff("swing", selected_symbol)
     if action_cols[5].button("Comparison", key=f"{key_prefix}_comparison"):
-        st.session_state["comparison_input"] = selected_symbol
-        st.success("已帶入 Comparison 頁的股票欄位。")
+        queue_research_symbol_handoff("comparison", selected_symbol)
 
 
 def render_research_candidate_explorer(
@@ -779,10 +795,9 @@ def render_daily_research_dashboard() -> None:
         source_options.append("Frozen TWSE 研究股票池")
     source_options.append("手動輸入")
 
-    pending_symbol = st.session_state.pop("daily_research_prefill_symbol", None)
+    pending_symbol = consume_research_symbol_handoff("daily")
     if pending_symbol:
         st.session_state["daily_research_source"] = "手動輸入"
-        st.session_state["daily_research_manual_symbol"] = pending_symbol
 
     source = st.selectbox("研究標的來源", source_options, key="daily_research_source")
     selected_symbol = ""
@@ -854,21 +869,15 @@ def render_daily_research_dashboard() -> None:
     st.markdown("### 繼續研究")
     action_cols = st.columns(5)
     if action_cols[0].button("帶入 Research", key="daily_go_research"):
-        st.session_state["research_input"] = selected_symbol
-        st.success("已帶入 Research 頁的股票欄位。")
+        queue_research_symbol_handoff("research", selected_symbol)
     if action_cols[1].button("帶入歷史趨勢", key="daily_go_historical"):
-        st.session_state["historical_trends_input"] = selected_symbol
-        st.success("已帶入 Historical Trends 頁的股票欄位。")
+        queue_research_symbol_handoff("historical", selected_symbol)
     if action_cols[2].button("帶入 AI 研究", key="daily_go_ai"):
-        st.session_state["ai_research_symbol_input"] = selected_symbol
-        st.success("已帶入 AI Research 頁的股票欄位。")
+        queue_research_symbol_handoff("ai", selected_symbol)
     if action_cols[3].button("帶入波段研究", key="daily_go_swing"):
-        st.session_state["swing_research_symbol_input"] = selected_symbol
-        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
-        st.success("已帶入 Swing Research 頁的股票池欄位。")
+        queue_research_symbol_handoff("swing", selected_symbol)
     if action_cols[4].button("帶入比較", key="daily_go_comparison"):
-        st.session_state["comparison_input"] = selected_symbol
-        st.success("已帶入 Comparison 頁的股票欄位。")
+        queue_research_symbol_handoff("comparison", selected_symbol)
 
     st.markdown("### 邊界說明")
     st.info("Technical Risk V1 仍是 REVIEW_REQUIRED，未作為 production risk score 或投資警示。")
@@ -1071,6 +1080,7 @@ def render_company_summary(stock) -> None:
 def render_research() -> None:
     st.header("Research（研究）")
     st.caption("以固定研究流程整理目前可取得的基本面資料；本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。")
+    consume_research_symbol_handoff("research")
 
     with st.form("research_form"):
         input_text = st.text_input(
@@ -1200,6 +1210,7 @@ def render_historical_trends() -> None:
         "使用 Yahoo Finance annual financial statements 呈現歷史基本面資料；"
         "本頁不使用 AI，也不產生 Buy / Sell / Hold recommendation。"
     )
+    consume_research_symbol_handoff("historical")
 
     with st.form("historical_trends_form"):
         input_text = st.text_input(
@@ -1470,6 +1481,7 @@ def build_ai_research_error_result(
 def render_ai_research() -> None:
     st.header("AI Research（AI 研究）")
     st.caption("AI 依系統目前可取得的資料與快取狀態回答；回答不是即時分析，也不是投資建議。")
+    consume_research_symbol_handoff("ai")
 
     if openai_api_configured():
         st.success("OpenAI API：Configured")
@@ -2381,6 +2393,10 @@ def render_swing_research() -> None:
     )
     render_historical_condition_dashboard()
     render_v1_1_shadow_dashboard_comparison()
+    pending_swing_symbol = consume_research_symbol_handoff("swing")
+    if pending_swing_symbol:
+        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
+        clear_swing_research_result_state(st.session_state)
 
     universes = read_universes_for_ui()
     watchlist_symbols = read_watchlist_for_ui(show_error=False)
@@ -4299,6 +4315,7 @@ def render_watchlist() -> None:
 def render_comparison() -> None:
     st.header("多股票比較")
     symbols = read_watchlist_for_ui()
+    consume_research_symbol_handoff("comparison")
 
     with st.form("comparison_form"):
         input_text = st.text_input(
