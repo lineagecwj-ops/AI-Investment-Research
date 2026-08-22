@@ -1,6 +1,7 @@
 import sys
 import importlib
 import html
+import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -220,6 +221,17 @@ HISTORICAL_CASE_X_MODE_LABELS = {
     "Actual Dates": "實際交易日期",
 }
 
+DAILY_RESEARCH_COMPANY_CONTEXT_PATH = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "research"
+    / "post_holdout_ai_regime_diagnostic"
+    / "technical_risk_official_broad_industry_mapping_218_twse_v1.json"
+)
+DAILY_RESEARCH_STATUS_WITH_DATA = "有資料"
+DAILY_RESEARCH_STATUS_EMPTY = "尚無資料"
+DAILY_RESEARCH_STATUS_AVAILABLE = "可前往建立"
+
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
     "STALE_TECHNICAL_DETAIL_RESULT_MESSAGE",
@@ -398,6 +410,246 @@ def render_stock_search() -> None:
 
     render_query_failures(st.session_state["stock_search_failures"])
     render_stock_cards(st.session_state["stock_search_stocks"])
+
+
+@st.cache_data(show_spinner=False)
+def load_daily_research_company_context() -> dict[str, dict[str, str]]:
+    if not DAILY_RESEARCH_COMPANY_CONTEXT_PATH.exists():
+        return {}
+    try:
+        payload = json.loads(DAILY_RESEARCH_COMPANY_CONTEXT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    context = {}
+    for record in payload.get("records", []):
+        symbol = record.get("symbol")
+        if not isinstance(symbol, str):
+            continue
+        normalized_symbol = normalize_stock_symbol(symbol)
+        if not normalized_symbol:
+            continue
+        context[normalized_symbol] = {
+            "company_name": record.get("company_name") or "N/A",
+            "broad_industry": record.get("broad_industry") or "N/A",
+            "classification_as_of_date": record.get("classification_as_of_date") or "N/A",
+            "source": payload.get("artifact_id") or "本地研究資料",
+        }
+    return context
+
+
+def daily_research_stock_label(symbol: str, company_context: dict[str, dict[str, str]]) -> str:
+    company_name = company_context.get(symbol, {}).get("company_name")
+    return f"{symbol} · {company_name}" if company_name and company_name != "N/A" else symbol
+
+
+def stock_object_symbol_matches(stock, selected_symbol: str) -> bool:
+    if stock is None:
+        return False
+    symbol = normalize_stock_symbol(getattr(stock, "symbol", "") or "")
+    return bool(symbol and symbol == selected_symbol)
+
+
+def ai_research_session_matches(session, selected_symbol: str) -> bool:
+    if session is None:
+        return False
+    symbol = normalize_stock_symbol(getattr(session, "symbol", "") or "")
+    return bool(symbol and symbol == selected_symbol and getattr(session, "turns", None))
+
+
+def swing_research_result_matches(result, selected_symbol: str) -> bool:
+    if result is None:
+        return False
+    symbol_groups = (
+        getattr(result, "match_symbols", ()),
+        getattr(result, "no_match_symbols", ()),
+        getattr(result, "not_evaluable_symbols", ()),
+        getattr(result, "failed_symbols", ()),
+    )
+    for group in symbol_groups:
+        if selected_symbol in {normalize_stock_symbol(symbol) for symbol in group or ()}:
+            return True
+    for candidate in getattr(result, "candidates", ()) or ():
+        if normalize_stock_symbol(getattr(candidate, "symbol", "") or "") == selected_symbol:
+            return True
+    return False
+
+
+def daily_research_status(has_data: bool, *, available_without_data: bool = True) -> str:
+    if has_data:
+        return DAILY_RESEARCH_STATUS_WITH_DATA
+    return DAILY_RESEARCH_STATUS_AVAILABLE if available_without_data else DAILY_RESEARCH_STATUS_EMPTY
+
+
+def build_daily_research_overview_rows(
+    selected_symbol: str,
+    *,
+    watchlist_symbols: list[str],
+    research_stock=None,
+    historical_stock=None,
+    historical_series=None,
+    ai_research_session=None,
+    swing_research_result=None,
+    comparison_stocks=None,
+) -> list[dict[str, str]]:
+    in_watchlist = selected_symbol in {normalize_stock_symbol(symbol) for symbol in watchlist_symbols}
+    comparison_stocks = comparison_stocks or []
+    return [
+        {
+            "研究區塊": "長期研究",
+            "狀態": daily_research_status(stock_object_symbol_matches(research_stock, selected_symbol)),
+            "目前資料": "本次頁面已建立研究摘要" if stock_object_symbol_matches(research_stock, selected_symbol) else "尚無本次 session 研究摘要",
+            "下一步": "前往 Research",
+        },
+        {
+            "研究區塊": "歷史趨勢",
+            "狀態": daily_research_status(
+                stock_object_symbol_matches(historical_stock, selected_symbol) and historical_series is not None
+            ),
+            "目前資料": "本次頁面已有 historical series" if stock_object_symbol_matches(historical_stock, selected_symbol) and historical_series is not None else "尚無本次 session 歷史趨勢",
+            "下一步": "前往 Historical Trends",
+        },
+        {
+            "研究區塊": "AI 研究",
+            "狀態": daily_research_status(ai_research_session_matches(ai_research_session, selected_symbol)),
+            "目前資料": "本次 AI research session 有資料" if ai_research_session_matches(ai_research_session, selected_symbol) else "尚無本次 session AI 研究",
+            "下一步": "前往 AI Research",
+        },
+        {
+            "研究區塊": "波段研究",
+            "狀態": daily_research_status(swing_research_result_matches(swing_research_result, selected_symbol)),
+            "目前資料": "本次 Swing Research 結果包含此股票" if swing_research_result_matches(swing_research_result, selected_symbol) else "尚無本次 session 波段結果",
+            "下一步": "前往 Swing Research",
+        },
+        {
+            "研究區塊": "比較分析",
+            "狀態": daily_research_status(
+                any(stock_object_symbol_matches(stock, selected_symbol) for stock in comparison_stocks)
+            ),
+            "目前資料": "本次 Comparison 已包含此股票" if any(stock_object_symbol_matches(stock, selected_symbol) for stock in comparison_stocks) else "尚無本次 session 比較資料",
+            "下一步": "前往 Comparison",
+        },
+        {
+            "研究區塊": "觀察清單",
+            "狀態": DAILY_RESEARCH_STATUS_WITH_DATA if in_watchlist else DAILY_RESEARCH_STATUS_EMPTY,
+            "目前資料": "已在觀察清單" if in_watchlist else "不在觀察清單",
+            "下一步": "前往觀察清單",
+        },
+    ]
+
+
+def render_daily_research_dashboard() -> None:
+    st.header("每日研究首頁")
+    st.caption("整理既有研究入口與本次 session 已有資料；不產生分數、排名或買賣建議。")
+
+    company_context = load_daily_research_company_context()
+    watchlist_symbols = read_watchlist_for_ui(show_error=False)
+    universes = read_universes_for_ui()
+    frozen_universe = None
+    frozen_error = None
+    try:
+        frozen_universe = universe_ui.load_frozen_twse_research_source()
+    except FrozenTWSEResearchUniverseError as error:
+        frozen_error = str(error)
+
+    source_options = []
+    if watchlist_symbols:
+        source_options.append("觀察清單")
+    if universes:
+        source_options.append("研究股票池")
+    if frozen_universe is not None:
+        source_options.append("Frozen TWSE 研究股票池")
+    source_options.append("手動輸入")
+
+    source = st.selectbox("研究標的來源", source_options, key="daily_research_source")
+    selected_symbol = ""
+    source_caption = ""
+
+    if source == "觀察清單":
+        labels = [daily_research_stock_label(symbol, company_context) for symbol in watchlist_symbols]
+        label = st.selectbox("研究標的", labels, key="daily_research_watchlist_symbol")
+        selected_symbol = watchlist_symbols[labels.index(label)]
+        source_caption = f"觀察清單共 {len(watchlist_symbols)} 檔。"
+    elif source == "研究股票池":
+        universe_labels = [universe_ui.universe_selector_label(universe) for universe in universes]
+        universe_label = st.selectbox("股票池", universe_labels, key="daily_research_universe")
+        universe = universes[universe_labels.index(universe_label)]
+        labels = [daily_research_stock_label(symbol, company_context) for symbol in universe.symbols]
+        label = st.selectbox("研究標的", labels, key=f"daily_research_universe_symbol_{universe.id}")
+        selected_symbol = universe.symbols[labels.index(label)]
+        source_caption = f"{universe.name} · {universe.symbol_count} 檔股票。"
+    elif source == "Frozen TWSE 研究股票池":
+        symbols = list(frozen_universe.symbols)
+        labels = [daily_research_stock_label(symbol, company_context) for symbol in symbols]
+        label = st.selectbox("研究標的", labels, key="daily_research_frozen_symbol")
+        selected_symbol = symbols[labels.index(label)]
+        source_caption = (
+            f"{frozen_universe.universe_version} · "
+            f"{len(symbols)} 檔；這是研究 universe，不是推薦清單。"
+        )
+    else:
+        selected_symbol = normalize_stock_symbol(
+            st.text_input("研究標的", placeholder="2330 或 NVDA", key="daily_research_manual_symbol")
+        )
+        if frozen_error:
+            st.caption(f"Frozen TWSE 研究股票池目前無法載入：{frozen_error}")
+
+    if source_caption:
+        st.caption(source_caption)
+
+    if not selected_symbol:
+        st.info("請選擇或輸入一檔研究標的。")
+        return
+
+    context = company_context.get(selected_symbol, {})
+    company_name = context.get("company_name") or "N/A"
+    broad_industry = context.get("broad_industry") or "N/A"
+    context_date = context.get("classification_as_of_date") or "N/A"
+
+    st.subheader(f"{selected_symbol} · {company_name}")
+    header_cols = st.columns(4)
+    header_cols[0].metric("研究標的", selected_symbol)
+    header_cols[1].metric("公司名稱", company_name)
+    header_cols[2].metric("產業", broad_industry)
+    header_cols[3].metric("本地資料日期", context_date)
+    st.caption("本頁只彙整既有研究資料與入口；不新增即時報價、排名或投資建議。")
+
+    overview_rows = build_daily_research_overview_rows(
+        selected_symbol,
+        watchlist_symbols=watchlist_symbols,
+        research_stock=st.session_state["research_stock"],
+        historical_stock=st.session_state["historical_stock"],
+        historical_series=st.session_state["historical_series"],
+        ai_research_session=st.session_state["ai_research_session"],
+        swing_research_result=st.session_state["swing_research_result"],
+        comparison_stocks=st.session_state["comparison_stocks"],
+    )
+
+    st.markdown("### 研究可用狀態")
+    st.dataframe(overview_rows, width="stretch", hide_index=True)
+
+    st.markdown("### 繼續研究")
+    action_cols = st.columns(5)
+    if action_cols[0].button("帶入 Research", key="daily_go_research"):
+        st.session_state["research_input"] = selected_symbol
+        st.success("已帶入 Research 頁的股票欄位。")
+    if action_cols[1].button("帶入歷史趨勢", key="daily_go_historical"):
+        st.session_state["historical_trends_input"] = selected_symbol
+        st.success("已帶入 Historical Trends 頁的股票欄位。")
+    if action_cols[2].button("帶入 AI 研究", key="daily_go_ai"):
+        st.session_state["ai_research_symbol_input"] = selected_symbol
+        st.success("已帶入 AI Research 頁的股票欄位。")
+    if action_cols[3].button("帶入波段研究", key="daily_go_swing"):
+        st.session_state["swing_research_symbol_input"] = selected_symbol
+        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
+        st.success("已帶入 Swing Research 頁的股票池欄位。")
+    if action_cols[4].button("帶入比較", key="daily_go_comparison"):
+        st.session_state["comparison_input"] = selected_symbol
+        st.success("已帶入 Comparison 頁的股票欄位。")
+
+    st.markdown("### 邊界說明")
+    st.info("Technical Risk V1 仍是 REVIEW_REQUIRED，未作為 production risk score 或投資警示。")
+    st.caption("本頁不建立 Opportunity Score、Stock Ranking、Buy / Sell / Hold recommendation。")
 
 
 def render_research_metric_grid(metrics: list[tuple[str, str, str | None]], columns: int = 3) -> None:
@@ -3860,7 +4112,9 @@ def main() -> None:
     )
 
     with dashboard_tab:
-        render_stock_search()
+        render_daily_research_dashboard()
+        with st.expander("快速股票查詢（原 Dashboard）", expanded=False):
+            render_stock_search()
 
     with research_tab:
         render_research()
