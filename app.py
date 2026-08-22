@@ -231,6 +231,13 @@ DAILY_RESEARCH_COMPANY_CONTEXT_PATH = (
 DAILY_RESEARCH_STATUS_WITH_DATA = "有資料"
 DAILY_RESEARCH_STATUS_EMPTY = "尚無資料"
 DAILY_RESEARCH_STATUS_AVAILABLE = "可前往建立"
+RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS = (
+    "長期研究",
+    "歷史趨勢",
+    "AI 研究",
+    "波段研究",
+)
+RESEARCH_CANDIDATE_SORT_OPTIONS = ("股票代號", "公司名稱", "產業")
 
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
@@ -538,6 +545,193 @@ def build_daily_research_overview_rows(
     ]
 
 
+def build_research_candidate_rows(
+    symbols,
+    *,
+    source_label: str,
+    company_context: dict[str, dict[str, str]],
+    research_stock=None,
+    historical_stock=None,
+    historical_series=None,
+    ai_research_session=None,
+    swing_research_result=None,
+) -> list[dict[str, str]]:
+    rows = []
+    seen_symbols = set()
+    for raw_symbol in symbols:
+        symbol = normalize_stock_symbol(raw_symbol)
+        if not symbol or symbol in seen_symbols:
+            continue
+        seen_symbols.add(symbol)
+        context = company_context.get(symbol, {})
+        rows.append(
+            {
+                "股票代號": symbol,
+                "公司名稱": context.get("company_name") or "N/A",
+                "產業": context.get("broad_industry") or "N/A",
+                "來源": source_label,
+                "長期研究": daily_research_status(stock_object_symbol_matches(research_stock, symbol), available_without_data=False),
+                "歷史趨勢": daily_research_status(
+                    stock_object_symbol_matches(historical_stock, symbol) and historical_series is not None,
+                    available_without_data=False,
+                ),
+                "AI 研究": daily_research_status(ai_research_session_matches(ai_research_session, symbol), available_without_data=False),
+                "波段研究": daily_research_status(swing_research_result_matches(swing_research_result, symbol), available_without_data=False),
+            }
+        )
+    return sorted(rows, key=lambda row: row["股票代號"])
+
+
+def filter_research_candidate_rows(
+    rows: list[dict[str, str]],
+    *,
+    query: str = "",
+    industry: str = "全部",
+    required_availability: tuple[str, ...] = (),
+    sort_by: str = "股票代號",
+) -> list[dict[str, str]]:
+    normalized_query = query.strip().lower()
+    filtered_rows = []
+    for row in rows:
+        if normalized_query and normalized_query not in row["股票代號"].lower() and normalized_query not in row["公司名稱"].lower():
+            continue
+        if industry != "全部" and row["產業"] != industry:
+            continue
+        if any(row.get(column) != DAILY_RESEARCH_STATUS_WITH_DATA for column in required_availability):
+            continue
+        filtered_rows.append(row)
+    sort_key = sort_by if sort_by in RESEARCH_CANDIDATE_SORT_OPTIONS else "股票代號"
+    return sorted(filtered_rows, key=lambda row: (row[sort_key], row["股票代號"]))
+
+
+def build_research_candidate_reason(
+    row: dict[str, str],
+    *,
+    query: str = "",
+    industry: str = "全部",
+    required_availability: tuple[str, ...] = (),
+) -> str:
+    reasons = [f"來自{row['來源']}"]
+    if query.strip():
+        reasons.append("符合股票代號 / 公司名稱搜尋")
+    if industry != "全部":
+        reasons.append(f"符合{industry}產業")
+    available_columns = [
+        column
+        for column in RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS
+        if row.get(column) == DAILY_RESEARCH_STATUS_WITH_DATA
+    ]
+    if required_availability:
+        reasons.extend(f"已有{column}資料" for column in required_availability)
+    elif available_columns:
+        reasons.extend(f"已有{column}資料" for column in available_columns)
+    else:
+        reasons.append("尚未建立研究資料")
+    return "符合：" + "、".join(reasons)
+
+
+def research_candidate_action_buttons(selected_symbol: str, *, key_prefix: str) -> None:
+    action_cols = st.columns(6)
+    if action_cols[0].button("帶入每日研究首頁", key=f"{key_prefix}_daily"):
+        st.session_state["daily_research_prefill_symbol"] = selected_symbol
+        st.success("已帶入每日研究首頁。")
+    if action_cols[1].button("Research", key=f"{key_prefix}_research"):
+        st.session_state["research_input"] = selected_symbol
+        st.success("已帶入 Research 頁的股票欄位。")
+    if action_cols[2].button("Historical Trends", key=f"{key_prefix}_historical"):
+        st.session_state["historical_trends_input"] = selected_symbol
+        st.success("已帶入 Historical Trends 頁的股票欄位。")
+    if action_cols[3].button("AI Research", key=f"{key_prefix}_ai"):
+        st.session_state["ai_research_symbol_input"] = selected_symbol
+        st.success("已帶入 AI Research 頁的股票欄位。")
+    if action_cols[4].button("Swing Research", key=f"{key_prefix}_swing"):
+        st.session_state["swing_research_symbol_input"] = selected_symbol
+        st.session_state["swing_research_symbol_source"] = universe_ui.MANUAL_SOURCE
+        st.success("已帶入 Swing Research 頁的股票池欄位。")
+    if action_cols[5].button("Comparison", key=f"{key_prefix}_comparison"):
+        st.session_state["comparison_input"] = selected_symbol
+        st.success("已帶入 Comparison 頁的股票欄位。")
+
+
+def render_research_candidate_explorer(
+    *,
+    watchlist_symbols: list[str],
+    universes: list,
+    frozen_universe,
+    company_context: dict[str, dict[str, str]],
+) -> None:
+    st.markdown("### 研究標的探索")
+    st.caption("用既有本地資料篩選研究標的；這是研究探索，不是分數、排名或投資建議。")
+
+    source_options: list[tuple[str, tuple[str, ...]]] = []
+    if watchlist_symbols:
+        source_options.append(("觀察清單", tuple(watchlist_symbols)))
+    for universe in universes:
+        source_options.append((f"研究股票池 - {universe.name}", tuple(universe.symbols)))
+    if frozen_universe is not None:
+        source_options.append(("Frozen TWSE 研究股票池", tuple(frozen_universe.symbols)))
+
+    if not source_options:
+        st.info("目前沒有可探索的股票來源。")
+        return
+
+    source_labels = [label for label, _symbols in source_options]
+    selected_source = st.selectbox("股票來源", source_labels, key="research_candidate_source")
+    source_label, symbols = source_options[source_labels.index(selected_source)]
+    rows = build_research_candidate_rows(
+        symbols,
+        source_label=source_label,
+        company_context=company_context,
+        research_stock=st.session_state["research_stock"],
+        historical_stock=st.session_state["historical_stock"],
+        historical_series=st.session_state["historical_series"],
+        ai_research_session=st.session_state["ai_research_session"],
+        swing_research_result=st.session_state["swing_research_result"],
+    )
+
+    filter_cols = st.columns(4)
+    query = filter_cols[0].text_input("股票代號 / 公司名稱搜尋", key="research_candidate_query")
+    industries = sorted({row["產業"] for row in rows if row["產業"] != "N/A"})
+    industry = filter_cols[1].selectbox("產業", ["全部", *industries], key="research_candidate_industry")
+    required_availability = tuple(
+        filter_cols[2].multiselect(
+            "研究資料狀態",
+            RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS,
+            key="research_candidate_availability",
+        )
+    )
+    sort_by = filter_cols[3].selectbox("排序", RESEARCH_CANDIDATE_SORT_OPTIONS, key="research_candidate_sort")
+
+    filtered_rows = filter_research_candidate_rows(
+        rows,
+        query=query,
+        industry=industry,
+        required_availability=required_availability,
+        sort_by=sort_by,
+    )
+    st.caption(f"顯示 {len(filtered_rows)} / {len(rows)} 檔。缺少研究資料的股票仍會保留，方便前往建立。")
+    st.dataframe(filtered_rows, width="stretch", hide_index=True)
+
+    if not filtered_rows:
+        st.info("目前沒有符合條件的研究標的。")
+        return
+
+    labels = [daily_research_stock_label(row["股票代號"], company_context) for row in filtered_rows]
+    selected_label = st.selectbox("檢視標的", labels, key="research_candidate_selected_symbol")
+    selected_row = filtered_rows[labels.index(selected_label)]
+    st.markdown("#### 符合條件原因")
+    st.info(
+        build_research_candidate_reason(
+            selected_row,
+            query=query,
+            industry=industry,
+            required_availability=required_availability,
+        )
+    )
+    st.markdown("#### 前往研究")
+    research_candidate_action_buttons(selected_row["股票代號"], key_prefix="research_candidate_go")
+
+
 def render_daily_research_dashboard() -> None:
     st.header("每日研究首頁")
     st.caption("整理既有研究入口與本次 session 已有資料；不產生分數、排名或買賣建議。")
@@ -560,6 +754,11 @@ def render_daily_research_dashboard() -> None:
     if frozen_universe is not None:
         source_options.append("Frozen TWSE 研究股票池")
     source_options.append("手動輸入")
+
+    pending_symbol = st.session_state.pop("daily_research_prefill_symbol", None)
+    if pending_symbol:
+        st.session_state["daily_research_source"] = "手動輸入"
+        st.session_state["daily_research_manual_symbol"] = pending_symbol
 
     source = st.selectbox("研究標的來源", source_options, key="daily_research_source")
     selected_symbol = ""
@@ -3880,6 +4079,22 @@ def render_universe_management() -> None:
     st.caption(universe_ui.UNIVERSE_SEMANTICS_CAPTION)
 
     universes = read_universes_for_ui()
+    watchlist_symbols = read_watchlist_for_ui(show_error=False)
+    frozen_universe = None
+    frozen_error = None
+    try:
+        frozen_universe = universe_ui.load_frozen_twse_research_source()
+    except FrozenTWSEResearchUniverseError as error:
+        frozen_error = str(error)
+
+    render_research_candidate_explorer(
+        watchlist_symbols=watchlist_symbols,
+        universes=universes,
+        frozen_universe=frozen_universe,
+        company_context=load_daily_research_company_context(),
+    )
+    if frozen_error:
+        st.caption(f"Frozen TWSE 研究股票池目前無法載入：{frozen_error}")
 
     create_col, edit_col = st.columns(2)
     with create_col:
