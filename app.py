@@ -104,9 +104,15 @@ from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
 from historical_price_service import get_historical_prices
+from historical_price_service import HistoricalPriceError
 from frozen_twse_research_universe_service import FrozenTWSEResearchUniverseError
 from live_data_store import LiveDataStore
-from research_data_store import ResearchDataStore
+from forward_research_observation_service import ForwardResearchObservationError
+from forward_research_observation_service import BENCHMARK_SYMBOL
+from forward_research_observation_service import ForwardResearchObservationRepository
+from forward_research_observation_service import build_local_observation_context
+from forward_research_observation_service import live_market_data_status
+from forward_research_observation_service import load_live_historical_price_series
 from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import build_diagnostic_technical_series
@@ -842,14 +848,27 @@ def render_daily_research_dashboard() -> None:
     context = company_context.get(selected_symbol, {})
     company_name = context.get("company_name") or "N/A"
     broad_industry = context.get("broad_industry") or "N/A"
-    context_date = context.get("classification_as_of_date") or "N/A"
+    industry_context_date = context.get("classification_as_of_date") or "N/A"
+    market_data_status = live_market_data_status(selected_symbol)
+    market_data_date = (
+        market_data_status.selected_market_date.isoformat()
+        if market_data_status.selected_market_date is not None
+        else "N/A"
+    )
+    benchmark_data_date = (
+        market_data_status.benchmark_market_date.isoformat()
+        if market_data_status.benchmark_market_date is not None
+        else "N/A"
+    )
 
     st.subheader(f"{selected_symbol} · {company_name}")
-    header_cols = st.columns(4)
+    header_cols = st.columns(5)
     header_cols[0].metric("研究標的", selected_symbol)
     header_cols[1].metric("公司名稱", company_name)
     header_cols[2].metric("產業", broad_industry)
-    header_cols[3].metric("本地資料日期", context_date)
+    header_cols[3].metric("產業分類日期", industry_context_date)
+    header_cols[4].metric("市場資料日期", market_data_date)
+    st.caption(f"0050 基準資料日期：{benchmark_data_date}")
     st.caption("本頁只彙整既有研究資料與入口；不新增即時報價、排名或投資建議。")
 
     overview_rows = build_daily_research_overview_rows(
@@ -865,6 +884,15 @@ def render_daily_research_dashboard() -> None:
 
     st.markdown("### 研究可用狀態")
     st.dataframe(overview_rows, width="stretch", hide_index=True)
+
+    render_forward_research_observation_control(
+        selected_symbol=selected_symbol,
+        company_name=None if company_name == "N/A" else company_name,
+        industry=None if broad_industry == "N/A" else broad_industry,
+        watchlist_symbols=watchlist_symbols,
+        overview_rows=overview_rows,
+        market_data_is_fresh=market_data_status.selected_market_data_is_fresh,
+    )
 
     st.markdown("### 繼續研究")
     action_cols = st.columns(5)
@@ -882,6 +910,102 @@ def render_daily_research_dashboard() -> None:
     st.markdown("### 邊界說明")
     st.info("Technical Risk V1 仍是 REVIEW_REQUIRED，未作為 production risk score 或投資警示。")
     st.caption("本頁不建立 Opportunity Score、Stock Ranking、Buy / Sell / Hold recommendation。")
+
+
+def render_forward_research_observation_control(
+    *,
+    selected_symbol: str,
+    company_name: str | None,
+    industry: str | None,
+    watchlist_symbols: list[str],
+    overview_rows: list[dict[str, str]],
+    market_data_is_fresh: bool,
+) -> None:
+    """Render the manual-only forward observation control without fetching data."""
+    repository = ForwardResearchObservationRepository()
+    st.markdown("### 前瞻研究快照")
+    st.caption("手動保存當下本地研究內容；這是觀察紀錄，不是分數、預測或投資建議。")
+    if market_data_is_fresh:
+        st.success("市場資料已更新，可儲存。")
+    else:
+        st.warning("市場資料過舊，請先更新。")
+
+    if st.button("更新本地市場資料", key="daily_research_refresh_local_market_data"):
+        failures = refresh_forward_observation_market_data(selected_symbol)
+        if failures:
+            st.warning("市場資料更新失敗，目前仍使用既有本地資料。")
+        else:
+            st.success("已更新選定股票與 0050 的本地市場資料。")
+        st.rerun()
+
+    if st.button("儲存今日研究快照", key="daily_research_save_forward_observation"):
+        try:
+            context = build_local_observation_context(
+                stock_series=load_live_historical_price_series(selected_symbol),
+                benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL),
+                company_name=company_name,
+                industry=industry,
+                in_watchlist=selected_symbol in watchlist_symbols,
+                long_term_research_available=_daily_status_available(overview_rows, "長期研究"),
+                historical_trends_available=_daily_status_available(overview_rows, "歷史趨勢"),
+                ai_research_available=_daily_status_available(overview_rows, "AI 研究"),
+                swing_research_available=_daily_status_available(overview_rows, "波段研究"),
+            )
+            result = repository.capture(context)
+        except ForwardResearchObservationError as error:
+            st.warning(f"目前本地研究資料不足，請先更新／執行相關研究後再儲存快照。\n\n原因：{error}")
+        else:
+            if result.created:
+                st.success(
+                    f"已儲存 {result.observation.symbol} 的研究快照；"
+                    f"資料日期為 {result.observation.as_of_date.isoformat()}。"
+                )
+            else:
+                st.info(
+                    f"此交易日的研究快照已存在；資料日期為 {result.observation.as_of_date.isoformat()}。"
+                )
+
+    count = repository.count()
+    st.caption(f"已累積研究快照：{count} 筆")
+    recent = repository.recent()
+    if recent:
+        st.dataframe(
+            [
+                {
+                    "擷取時間": observation.captured_at.isoformat(),
+                    "股票": observation.symbol,
+                    "資料日期": observation.as_of_date.isoformat(),
+                }
+                for observation in recent
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+
+def _daily_status_available(rows: list[dict[str, str]], section: str) -> bool:
+    return any(
+        row.get("研究區塊") == section and row.get("狀態") == DAILY_RESEARCH_STATUS_WITH_DATA
+        for row in rows
+    )
+
+
+def refresh_forward_observation_market_data(
+    selected_symbol: str,
+    *,
+    price_loader=get_historical_prices,
+) -> tuple[str, ...]:
+    """Refresh only after an explicit button click; saving observations never calls this."""
+    failures = []
+    for symbol in dict.fromkeys((selected_symbol, BENCHMARK_SYMBOL)):
+        try:
+            series = price_loader(symbol, force_refresh=True)
+        except HistoricalPriceError:
+            failures.append(symbol)
+        else:
+            if series.is_stale:
+                failures.append(symbol)
+    return tuple(failures)
 
 
 def render_research_metric_grid(metrics: list[tuple[str, str, str | None]], columns: int = 3) -> None:

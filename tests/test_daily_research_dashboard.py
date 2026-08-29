@@ -42,6 +42,13 @@ def daily_dashboard_app():
                 "source": "test",
             }
         },
+    ), patch(
+        "app.live_market_data_status",
+        return_value=SimpleNamespace(
+            selected_market_date=__import__("datetime").date(2026, 8, 28),
+            benchmark_market_date=__import__("datetime").date(2026, 8, 28),
+            selected_market_data_is_fresh=True,
+        ),
     ):
         app_module.initialize_session_state()
         app_module.render_daily_research_dashboard()
@@ -96,6 +103,43 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
         self.assertIn("2330.TW · 台積電", subheader_text)
         self.assertIn("研究可用狀態", markdown_text)
         self.assertIn("不產生分數、排名或買賣建議", caption_text)
+        self.assertTrue(any(metric.label == "產業分類日期" for metric in app_test.metric))
+        self.assertTrue(any(metric.label == "市場資料日期" for metric in app_test.metric))
+        self.assertTrue(
+            any(button.label == "儲存今日研究快照" for button in app_test.button)
+        )
+        self.assertTrue(
+            any(button.label == "更新本地市場資料" for button in app_test.button)
+        )
+
+    def test_explicit_market_refresh_targets_selected_symbol_and_0050_only(self):
+        import app as app_module
+
+        calls = []
+
+        def loader(symbol, *, force_refresh):
+            calls.append((symbol, force_refresh))
+            return SimpleNamespace(is_stale=False)
+
+        failures = app_module.refresh_forward_observation_market_data("2454.TW", price_loader=loader)
+
+        self.assertEqual(failures, ())
+        self.assertEqual(calls, [("2454.TW", True), ("0050.TW", True)])
+
+    def test_refresh_failure_is_reported_without_automatic_retry(self):
+        import app as app_module
+        from historical_price_service import HistoricalPriceSourceError
+
+        calls = []
+
+        def loader(symbol, *, force_refresh):
+            calls.append((symbol, force_refresh))
+            raise HistoricalPriceSourceError("offline")
+
+        failures = app_module.refresh_forward_observation_market_data("2454.TW", price_loader=loader)
+
+        self.assertEqual(failures, ("2454.TW", "0050.TW"))
+        self.assertEqual(calls, [("2454.TW", True), ("0050.TW", True)])
 
     def test_candidate_rows_use_selected_source_and_neutral_symbol_order(self):
         import app as app_module
