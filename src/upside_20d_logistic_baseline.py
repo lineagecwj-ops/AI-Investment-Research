@@ -148,7 +148,10 @@ def canonical_research_price_series(series: HistoricalPriceSeries) -> Historical
 
 def build_symbol_dataset_rows(
     series: HistoricalPriceSeries,
-) -> tuple[tuple[Upside20DDatasetRow, ...], Counter[str]]:
+    *,
+    target_value_resolver=None,
+    row_factory=None,
+) -> tuple[tuple[object, ...], Counter[str]]:
     bars = tuple(sorted(series.bars, key=lambda bar: bar.trading_date))
     if len({bar.trading_date for bar in bars}) != len(bars):
         return (), Counter({"DUPLICATE_TRADING_DATE": 1})
@@ -184,10 +187,18 @@ def build_symbol_dataset_rows(
             exclusions[f"{split}_TARGET_CROSSES_SPLIT"] += 1
             continue
 
-        target = up_20d_target(bars, index)
-        if target is None:
-            exclusions["MISSING_OR_INVALID_RESEARCH_PRICE"] += 1
-            continue
+        if target_value_resolver is None:
+            target = up_20d_target(bars, index)
+            if target is None:
+                exclusions["MISSING_OR_INVALID_RESEARCH_PRICE"] += 1
+                continue
+            target_value, target_date = target
+        else:
+            target_value, exclusion_reason = target_value_resolver(bars, index, target_index)
+            if exclusion_reason is not None:
+                exclusions[exclusion_reason] += 1
+                continue
+            target_date = target_bar.trading_date
         snapshot = snapshots.get(bar.trading_date)
         if snapshot is None:
             exclusions["MISSING_TECHNICAL_SNAPSHOT"] += 1
@@ -196,9 +207,8 @@ def build_symbol_dataset_rows(
         if features is None:
             exclusions["INCOMPLETE_OR_NONFINITE_FEATURES"] += 1
             continue
-        target_value, target_date = target
-        rows.append(
-            Upside20DDatasetRow(
+        if row_factory is None:
+            row = Upside20DDatasetRow(
                 symbol=series.symbol,
                 as_of_date=bar.trading_date,
                 features=features,
@@ -206,7 +216,16 @@ def build_symbol_dataset_rows(
                 target_date=target_date,
                 split=split,
             )
-        )
+        else:
+            row = row_factory(
+                series.symbol,
+                bar.trading_date,
+                features,
+                target_value,
+                target_date,
+                split,
+            )
+        rows.append(row)
     return tuple(rows), exclusions
 
 
@@ -262,14 +281,14 @@ def assemble_upside_20d_dataset(
     )
 
 
-def fit_logistic_baseline(dataset: Upside20DDataset) -> dict[str, object]:
+def fit_logistic_baseline(dataset: Upside20DDataset, *, target_getter=None) -> dict[str, object]:
     train_rows = dataset.rows_for(TRAIN)
     validation_rows = dataset.rows_for(VALIDATION)
     if not train_rows or not validation_rows:
         raise ValueError("TRAIN and VALIDATION rows are required.")
 
-    x_train, y_train = _matrix(train_rows)
-    x_validation, y_validation = _matrix(validation_rows)
+    x_train, y_train = _matrix(train_rows, target_getter=target_getter)
+    x_validation, y_validation = _matrix(validation_rows, target_getter=target_getter)
     model = Pipeline(
         steps=(
             ("standard_scaler", StandardScaler()),
@@ -475,11 +494,12 @@ def _feature_values(snapshot) -> tuple[float, ...] | None:
     return tuple(float(value) for value in values)
 
 
-def _matrix(rows: Iterable[Upside20DDatasetRow]) -> tuple[np.ndarray, np.ndarray]:
+def _matrix(rows: Iterable[Upside20DDatasetRow], *, target_getter=None) -> tuple[np.ndarray, np.ndarray]:
     materialized = tuple(rows)
+    read_target = target_getter or (lambda row: row.up_20d)
     return (
         np.asarray([row.features for row in materialized], dtype=float),
-        np.asarray([row.up_20d for row in materialized], dtype=int),
+        np.asarray([read_target(row) for row in materialized], dtype=int),
     )
 
 
