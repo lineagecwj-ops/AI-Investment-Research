@@ -1,0 +1,346 @@
+{
+  "artifact_checksum": "75a0737cd5b8d72eae254c94ffa5c0e37e36f62bf334111605653dac38897403",
+  "artifact_id": "RELATIVE_STRENGTH_20D_0050_LOGISTIC_V0",
+  "benchmark": {
+    "benchmark_is_candidate": false,
+    "development_feature_snapshot_count": 3918,
+    "development_price_count": 1701,
+    "exact_date_alignment_required": true,
+    "forward_fill": false,
+    "role": "TAIWAN_LARGE_CAP_ETF_MARKET_PROXY",
+    "symbol": "0050.TW"
+  },
+  "dataset": {
+    "development_rows": 98853,
+    "development_symbols": 217,
+    "exclusion_counts": {
+      "BENCHMARK_EXACT_DATE_ALIGNMENT_MISSING": 0,
+      "BENCHMARK_FEATURE_EXACT_DATE_ALIGNMENT_MISSING": 0,
+      "DEVELOPMENT_EVALUATION_TARGET_CROSSES_SPLIT": 4360,
+      "INCOMPLETE_OR_NONFINITE_RELATIVE_FEATURES": 1146,
+      "SYMBOL_NO_USABLE_ROWS": 1,
+      "TRAIN_TARGET_CROSSES_SPLIT": 4265
+    },
+    "ordering": "symbol,as_of_date",
+    "total_usable_rows": 344815,
+    "train_rows": 245962,
+    "train_symbols": 212
+  },
+  "dependency": {
+    "scikit_learn_version": "1.9.0"
+  },
+  "feature_set": {
+    "absolute_features_included": false,
+    "alignment_rule": "Stock and 0050 feature snapshots must have the exact same as_of_date.",
+    "definitions": {
+      "REL_RETURN_20D": "stock RETURN_20D minus 0050 RETURN_20D",
+      "REL_RETURN_5D": "stock RETURN_5D minus 0050 RETURN_5D",
+      "REL_RETURN_60D": "stock RETURN_60D minus 0050 RETURN_60D",
+      "REL_RSI14": "stock RSI14 minus 0050 RSI14",
+      "REL_TREND_20": "stock close/SMA20 minus 0050 close/SMA20",
+      "REL_TREND_60": "stock close/SMA60 minus 0050 close/SMA60"
+    },
+    "feature_set_id": "RELATIVE_STRENGTH_0050_FIXED_6_FEATURES_V0",
+    "ordered_features": [
+      "REL_RETURN_5D",
+      "REL_RETURN_20D",
+      "REL_RETURN_60D",
+      "REL_TREND_20",
+      "REL_TREND_60",
+      "REL_RSI14"
+    ],
+    "timing_rule": "All stock and benchmark feature inputs are available on or before as_of_date."
+  },
+  "generated_at": "2026-08-29T05:07:16.490399+00:00",
+  "hypothesis": "Past relative technical strength versus 0050 may predict future 20-stock-bar outperformance versus 0050.",
+  "limitations": [
+    "SURVIVORSHIP_BIAS_HANDLING=NOT_IMPLEMENTED / UNKNOWN.",
+    "BENCHMARK_LIMITATION=0050 is a large-cap ETF proxy, not the full Taiwan equity market.",
+    "Adjusted historical prices may reflect subsequently known corporate-action adjustments.",
+    "The Frozen TWSE universe is not a historical point-in-time universe.",
+    "2023-2024 is DEVELOPMENT_EVALUATION, not pristine validation.",
+    "Coefficients are associations only, not causal effects.",
+    "No 2025 WORKFLOW_FROZEN_OOS performance was inspected."
+  ],
+  "metrics": {
+    "annual_development": {
+      "2023": {
+        "brier_score": 0.2529749638099225,
+        "mean_predicted_probability": 0.4761733538347049,
+        "observed_outperform_rate": 0.4890489518701924,
+        "roc_auc": 0.4818418076620513,
+        "rows": 51091,
+        "symbols": 214
+      },
+      "2024": {
+        "brier_score": 0.24172948121652968,
+        "mean_predicted_probability": 0.46132987052346885,
+        "observed_outperform_rate": 0.3438088857250534,
+        "roc_auc": 0.4865631983640255,
+        "rows": 47762,
+        "symbols": 217
+      }
+    },
+    "calibration_bands": [
+      {
+        "actual_minus_predicted": -0.08242121462768504,
+        "actual_outperform_rate": 0.0,
+        "band": "[0.0,0.1)",
+        "count": 1,
+        "mean_predicted_probability": 0.08242121462768504
+      },
+      {
+        "actual_minus_predicted": 0.016051724682402707,
+        "actual_outperform_rate": 0.19230769230769232,
+        "band": "[0.1,0.2)",
+        "count": 26,
+        "mean_predicted_probability": 0.1762559676252896
+      },
+      {
+        "actual_minus_predicted": 0.14279604880748342,
+        "actual_outperform_rate": 0.4128787878787879,
+        "band": "[0.2,0.3)",
+        "count": 264,
+        "mean_predicted_probability": 0.2700827390713045
+      },
+      {
+        "actual_minus_predicted": 0.040838157669737196,
+        "actual_outperform_rate": 0.41780986762936223,
+        "band": "[0.3,0.4)",
+        "count": 4155,
+        "mean_predicted_probability": 0.37697170995962503
+      },
+      {
+        "actual_minus_predicted": -0.042483026017608005,
+        "actual_outperform_rate": 0.41764426663050114,
+        "band": "[0.4,0.5)",
+        "count": 73735,
+        "mean_predicted_probability": 0.46012729264810914
+      },
+      {
+        "actual_minus_predicted": -0.09811909328194462,
+        "actual_outperform_rate": 0.4234080848372817,
+        "band": "[0.5,0.6)",
+        "count": 20557,
+        "mean_predicted_probability": 0.5215271781192263
+      },
+      {
+        "actual_minus_predicted": -0.09443726343915881,
+        "actual_outperform_rate": 0.5225225225225225,
+        "band": "[0.6,0.7)",
+        "count": 111,
+        "mean_predicted_probability": 0.6169597859616813
+      },
+      {
+        "actual_minus_predicted": -0.7307655234648867,
+        "actual_outperform_rate": 0.0,
+        "band": "[0.7,0.8)",
+        "count": 4,
+        "mean_predicted_probability": 0.7307655234648867
+      }
+    ],
+    "constant_baseline": {
+      "brier_score": 0.24702698589073088,
+      "logistic_minus_constant_brier": 0.0005145895584375004,
+      "probability": 0.4789439019035461
+    },
+    "development": {
+      "accuracy_at_0_50": 0.5492802444033059,
+      "brier_score": 0.24754157544916838,
+      "confusion_at_0_50": {
+        "fn": 32645,
+        "fp": 11910,
+        "tn": 45536,
+        "tp": 8762
+      },
+      "mean_predicted_probability": 0.4690015487310534,
+      "observed_outperform_rate": 0.41887449040494473,
+      "roc_auc": 0.49934589317770706,
+      "row_count": 98853
+    },
+    "development_target_rate": 0.41887449040494473,
+    "high_minus_low_outperform_rate": 0.0366624230440476,
+    "probability_deciles": [
+      {
+        "actual_outperform_rate": 0.4080517904106818,
+        "count": 9886,
+        "decile": 1,
+        "mean_predicted_probability": 0.3919719974772105
+      },
+      {
+        "actual_outperform_rate": 0.4204936273518106,
+        "count": 9886,
+        "decile": 2,
+        "mean_predicted_probability": 0.4283560662420679
+      },
+      {
+        "actual_outperform_rate": 0.43394699575156787,
+        "count": 9886,
+        "decile": 3,
+        "mean_predicted_probability": 0.4438135728172255
+      },
+      {
+        "actual_outperform_rate": 0.4262013151239251,
+        "count": 9885,
+        "decile": 4,
+        "mean_predicted_probability": 0.45594730013152696
+      },
+      {
+        "actual_outperform_rate": 0.4368234699038948,
+        "count": 9885,
+        "decile": 5,
+        "mean_predicted_probability": 0.46648999487946596
+      },
+      {
+        "actual_outperform_rate": 0.40192210419828023,
+        "count": 9885,
+        "decile": 6,
+        "mean_predicted_probability": 0.47623520014143256
+      },
+      {
+        "actual_outperform_rate": 0.4137582195245321,
+        "count": 9885,
+        "decile": 7,
+        "mean_predicted_probability": 0.48561047781332134
+      },
+      {
+        "actual_outperform_rate": 0.4012139605462822,
+        "count": 9885,
+        "decile": 8,
+        "mean_predicted_probability": 0.4954790255220047
+      },
+      {
+        "actual_outperform_rate": 0.4016186140617097,
+        "count": 9885,
+        "decile": 9,
+        "mean_predicted_probability": 0.5084258517828342
+      },
+      {
+        "actual_outperform_rate": 0.4447142134547294,
+        "count": 9885,
+        "decile": 10,
+        "mean_predicted_probability": 0.5377004530082155
+      }
+    ],
+    "train_target_rate": 0.4789439019035461
+  },
+  "model_parameters": {
+    "intercept": -0.08539755367646192,
+    "scaler_mean": [
+      0.0014112722728133991,
+      0.0060286238125241125,
+      0.02075505088857516,
+      0.0012054765378748087,
+      0.004830111292728404,
+      -2.222476503393512
+    ],
+    "scaler_scale": [
+      0.054168152156592896,
+      0.11218902514538201,
+      0.22289180965121372,
+      0.05594929464222716,
+      0.10422673235973315,
+      13.752777883544997
+    ],
+    "standardized_coefficients": [
+      {
+        "coefficient": 0.262845916467274,
+        "feature": "REL_RSI14"
+      },
+      {
+        "coefficient": -0.1868921244706518,
+        "feature": "REL_TREND_20"
+      },
+      {
+        "coefficient": -0.07743223513115359,
+        "feature": "REL_TREND_60"
+      },
+      {
+        "coefficient": 0.04659473089428743,
+        "feature": "REL_RETURN_5D"
+      },
+      {
+        "coefficient": 0.02187795829702712,
+        "feature": "REL_RETURN_60D"
+      },
+      {
+        "coefficient": -0.01712507315566106,
+        "feature": "REL_RETURN_20D"
+      }
+    ]
+  },
+  "pipeline": {
+    "configuration": {
+      "C": 1.0,
+      "class_weight": null,
+      "hyperparameter_tuning": false,
+      "max_iter": 1000,
+      "penalty": "l2",
+      "solver": "lbfgs"
+    },
+    "converged": true,
+    "convergence_warnings": [],
+    "n_iter": 10,
+    "steps": [
+      "StandardScaler",
+      "LogisticRegression"
+    ]
+  },
+  "price_semantics": {
+    "definition": "adjusted_close when present and finite, otherwise raw close, for stock and 0050",
+    "version": "RELATIVE_20D_ADJUSTED_CLOSE_FIRST_V1"
+  },
+  "research_scope": "RESEARCH_EXPERIMENTAL_ONLY",
+  "research_snapshot": {
+    "active_db_mode": "physical_split",
+    "active_research_db_path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/snapshots/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_materialization_v2.db",
+    "active_research_db_sha": "3417b34a11660e672d75c5879d0d8f9e177c574b603b540274bad7acb2215de0",
+    "active_research_manifest_path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/manifests/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_materialization_v2_manifest.json",
+    "active_research_materialization_version": "v2",
+    "active_research_semantic_checksum": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "active_research_snapshot_id": "research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1",
+    "active_research_snapshot_version": "v1"
+  },
+  "schema_version": "relative_strength_20d_0050_logistic_artifact_v1",
+  "target": {
+    "definition": "1 when stock return exceeds 0050 return over identical stock start and target dates, otherwise 0",
+    "equal_return_target": 0,
+    "horizon_stock_trading_bars": 20,
+    "target_id": "RELATIVE_OUTPERFORM_20D_0050_V0"
+  },
+  "temporal_workflow": {
+    "data_from_2026_used": false,
+    "evaluated_splits": [
+      "TRAIN",
+      "DEVELOPMENT_EVALUATION"
+    ],
+    "purge_rule": "stock as_of_date and target_date must remain in the same split; 0050 endpoints must exist exactly",
+    "splits": {
+      "DEVELOPMENT_EVALUATION": {
+        "end": "2024-12-31",
+        "start": "2023-01-01"
+      },
+      "TRAIN": {
+        "end": "2022-12-31",
+        "start": "2018-01-01"
+      },
+      "WORKFLOW_FROZEN_OOS": {
+        "end": "2025-12-31",
+        "start": "2025-01-01"
+      }
+    },
+    "workflow_frozen_oos_evaluated": false
+  },
+  "universe": {
+    "excluded_symbols": [
+      "7769.TW"
+    ],
+    "requested_symbols": 218,
+    "symbol_exclusion_reasons": {
+      "7769.TW": "NO_USABLE_ROWS"
+    },
+    "universe_id": "frozen_twse_research_universe_2026_08_09",
+    "universe_version": "2026-08-current-etf-constituent-v1",
+    "usable_symbols": 217
+  }
+}
