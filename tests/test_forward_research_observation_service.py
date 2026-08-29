@@ -24,6 +24,7 @@ from forward_research_observation_service import POINT_IN_TIME_CLASSIFICATION
 from forward_research_observation_service import RELATIVE_ALIGNMENT_AVAILABLE
 from forward_research_observation_service import RELATIVE_ALIGNMENT_UNAVAILABLE
 from forward_research_observation_service import build_local_observation_context
+from forward_research_observation_service import capture_local_forward_observation
 from forward_research_observation_service import deterministic_observation_id
 from forward_research_observation_service import live_market_data_status
 from forward_research_observation_service import load_live_historical_price_series
@@ -161,6 +162,40 @@ class ForwardResearchObservationServiceTestCase(unittest.TestCase):
         loaded = load_live_historical_price_series("2330.TW", db_path=live_path)
         self.assertEqual(loaded.bars[-1].trading_date, date(2026, 8, 28))
         self.assertEqual(loaded.bars[-1].adjusted_close, 169.0)
+
+    def test_local_capture_helper_uses_only_local_cache_and_preserves_idempotency(self):
+        live_path = Path(self.temp_dir.name) / "stocks_live.db"
+        save_historical_prices(self.series("2330.TW"), db_path=live_path, full_history_fetched=True)
+        save_historical_prices(self.series("0050.TW"), db_path=live_path, full_history_fetched=True)
+
+        first = capture_local_forward_observation(
+            symbol="2330.TW",
+            company_name="台積電",
+            industry="半導體業",
+            in_watchlist=False,
+            long_term_research_available=False,
+            historical_trends_available=False,
+            ai_research_available=False,
+            swing_research_available=False,
+            repository=self.repository(),
+            live_db_path=live_path,
+        )
+        second = capture_local_forward_observation(
+            symbol="2330.TW",
+            company_name="台積電",
+            industry="半導體業",
+            in_watchlist=False,
+            long_term_research_available=False,
+            historical_trends_available=False,
+            ai_research_available=False,
+            swing_research_available=False,
+            repository=self.repository(),
+            live_db_path=live_path,
+        )
+
+        self.assertTrue(first.created)
+        self.assertFalse(second.created)
+        self.assertEqual(self.repository().count(), 1)
 
     def test_weekend_freshness_accepts_latest_friday_bar(self):
         live_path = Path(self.temp_dir.name) / "stocks_live.db"

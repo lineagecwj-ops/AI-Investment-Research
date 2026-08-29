@@ -111,6 +111,8 @@ from forward_research_observation_service import ForwardResearchObservationError
 from forward_research_observation_service import BENCHMARK_SYMBOL
 from forward_research_observation_service import ForwardResearchObservationRepository
 from forward_research_observation_service import build_local_observation_context
+from forward_research_observation_service import capture_local_forward_observation
+from forward_research_observation_service import deterministic_observation_id
 from forward_research_observation_service import live_market_data_status
 from forward_research_observation_service import load_live_historical_price_series
 from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
@@ -259,6 +261,8 @@ RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS = (
     "波段研究",
 )
 RESEARCH_CANDIDATE_SORT_OPTIONS = ("股票代號", "公司名稱", "產業")
+RESEARCH_SHORTLIST_SESSION_KEY = "research_shortlist_v0"
+RESEARCH_SHORTLIST_MAX_SIZE = 20
 
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
@@ -346,6 +350,7 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("historical_condition_dashboard_error_details", None)
     st.session_state.setdefault("v1_1_shadow_dashboard_view", None)
     st.session_state.setdefault("v1_1_shadow_dashboard_last_error", None)
+    st.session_state.setdefault(RESEARCH_SHORTLIST_SESSION_KEY, [])
 
 
 def render_query_failures(failures) -> None:
@@ -699,6 +704,215 @@ def research_candidate_action_buttons(selected_symbol: str, *, key_prefix: str) 
         queue_research_symbol_handoff("comparison", selected_symbol)
 
 
+def add_research_shortlist_rows(
+    existing_rows: list[dict[str, str]],
+    selected_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Keep the V0 shortlist session-only, deduplicated, and neutrally ordered."""
+    rows_by_symbol = {
+        normalize_stock_symbol(row.get("股票代號", "")): dict(row)
+        for row in [*existing_rows, *selected_rows]
+        if normalize_stock_symbol(row.get("股票代號", ""))
+    }
+    if len(rows_by_symbol) > RESEARCH_SHORTLIST_MAX_SIZE:
+        raise ValueError("本次研究清單最多 20 檔，請先縮小選取範圍。")
+    return [rows_by_symbol[symbol] for symbol in sorted(rows_by_symbol)]
+
+
+def remove_research_shortlist_symbols(
+    rows: list[dict[str, str]],
+    symbols: list[str],
+) -> list[dict[str, str]]:
+    remove_symbols = {normalize_stock_symbol(symbol) for symbol in symbols}
+    return [row for row in rows if row["股票代號"] not in remove_symbols]
+
+
+def refresh_research_shortlist_market_data(
+    rows: list[dict[str, str]],
+    *,
+    price_loader=get_historical_prices,
+) -> tuple[dict[str, str], ...]:
+    """Refresh each shortlisted symbol and the benchmark once after explicit user action."""
+    symbols = sorted(
+        {
+            normalize_stock_symbol(row["股票代號"])
+            for row in rows
+            if normalize_stock_symbol(row["股票代號"]) != BENCHMARK_SYMBOL
+        }
+    )
+    results = []
+    for symbol in [*symbols, BENCHMARK_SYMBOL]:
+        try:
+            series = price_loader(symbol, force_refresh=True)
+        except HistoricalPriceError:
+            status = "FAILED"
+        else:
+            status = "UPDATED" if not series.is_stale else "FAILED"
+        results.append({"股票代號": symbol, "更新狀態": status})
+    return tuple(results)
+
+
+def save_research_shortlist_observations(
+    rows: list[dict[str, str]],
+    *,
+    watchlist_symbols: list[str],
+    repository: ForwardResearchObservationRepository | None = None,
+    capture_observation=capture_local_forward_observation,
+) -> tuple[dict[str, str], ...]:
+    """Capture shortlist observations through the local-only Forward Observation service."""
+    repository = repository or ForwardResearchObservationRepository()
+    watchlist = {normalize_stock_symbol(symbol) for symbol in watchlist_symbols}
+    results = []
+    for row in sorted(rows, key=lambda item: item["股票代號"]):
+        symbol = normalize_stock_symbol(row["股票代號"])
+        try:
+            result = capture_observation(
+                symbol=symbol,
+                company_name=None if row.get("公司名稱") == "N/A" else row.get("公司名稱"),
+                industry=None if row.get("產業") == "N/A" else row.get("產業"),
+                in_watchlist=symbol in watchlist,
+                long_term_research_available=row.get("長期研究") == DAILY_RESEARCH_STATUS_WITH_DATA,
+                historical_trends_available=row.get("歷史趨勢") == DAILY_RESEARCH_STATUS_WITH_DATA,
+                ai_research_available=row.get("AI 研究") == DAILY_RESEARCH_STATUS_WITH_DATA,
+                swing_research_available=row.get("波段研究") == DAILY_RESEARCH_STATUS_WITH_DATA,
+                repository=repository,
+            )
+        except ForwardResearchObservationError as error:
+            message = str(error)
+            if "市場資料過舊" in message:
+                status = "STALE_DATA"
+            elif "市場資料" in message or "至少需要" in message:
+                status = "INSUFFICIENT_DATA"
+            else:
+                status = "FAILED"
+            results.append({"股票代號": symbol, "儲存狀態": status, "原因": message})
+        else:
+            status = "CREATED" if result.created else "ALREADY_EXISTS"
+            results.append({"股票代號": symbol, "儲存狀態": status, "原因": ""})
+    return tuple(results)
+
+
+def build_research_shortlist_status_rows(
+    rows: list[dict[str, str]],
+    *,
+    repository: ForwardResearchObservationRepository | None = None,
+) -> list[dict[str, str]]:
+    """Read-only readiness view for the session shortlist."""
+    repository = repository or ForwardResearchObservationRepository()
+    status_rows = []
+    for row in sorted(rows, key=lambda item: item["股票代號"]):
+        symbol = normalize_stock_symbol(row["股票代號"])
+        market_status = live_market_data_status(symbol)
+        market_date = market_status.selected_market_date
+        alignment = "N/A"
+        observation_status = "資料不足"
+        if market_date is not None:
+            existing = repository.get(deterministic_observation_id(symbol, market_date))
+            if existing is not None:
+                observation_status = "已儲存"
+                alignment = "0050 已對齊" if existing.relative_alignment_status == "EXACT_DATE_ALIGNED" else "0050 未對齊"
+            elif not market_status.selected_market_data_is_fresh:
+                observation_status = "資料過舊"
+            else:
+                try:
+                    context = build_local_observation_context(
+                        stock_series=load_live_historical_price_series(symbol),
+                        benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL),
+                        company_name=None,
+                        industry=None,
+                        in_watchlist=False,
+                        long_term_research_available=False,
+                        historical_trends_available=False,
+                        ai_research_available=False,
+                        swing_research_available=False,
+                    )
+                except ForwardResearchObservationError:
+                    observation_status = "資料不足"
+                else:
+                    observation_status = "可儲存"
+                    alignment = "0050 已對齊" if context.relative_alignment_status == "EXACT_DATE_ALIGNED" else "0050 未對齊"
+        status_rows.append(
+            {
+                "股票代號": symbol,
+                "公司名稱": row.get("公司名稱") or "N/A",
+                "產業": row.get("產業") or "N/A",
+                "市場資料日期": market_date.isoformat() if market_date is not None else "N/A",
+                "0050 對齊狀態": alignment,
+                "前瞻研究快照狀態": observation_status,
+            }
+        )
+    return status_rows
+
+
+def render_research_shortlist_controls(
+    filtered_rows: list[dict[str, str]],
+    *,
+    company_context: dict[str, dict[str, str]],
+    watchlist_symbols: list[str],
+) -> None:
+    """Render the session-only shortlist and explicit batch actions in Candidate Explorer."""
+    shortlist = st.session_state[RESEARCH_SHORTLIST_SESSION_KEY]
+    st.markdown("#### 本次研究清單")
+    if filtered_rows:
+        labels = [daily_research_stock_label(row["股票代號"], company_context) for row in filtered_rows]
+        selected_labels = st.multiselect(
+            "從目前篩選結果選取",
+            labels,
+            key="research_shortlist_candidates",
+        )
+        if st.button("加入本次研究清單", key="research_shortlist_add"):
+            selected_rows = [filtered_rows[labels.index(label)] for label in selected_labels]
+            try:
+                st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = add_research_shortlist_rows(shortlist, selected_rows)
+            except ValueError as error:
+                st.warning(str(error))
+            else:
+                st.rerun()
+
+    shortlist = st.session_state[RESEARCH_SHORTLIST_SESSION_KEY]
+    if not shortlist:
+        st.caption("目前尚未加入研究標的。清單只保留於本次 session。")
+        return
+
+    status_rows = build_research_shortlist_status_rows(shortlist)
+    st.dataframe(status_rows, width="stretch", hide_index=True)
+    shortlist_labels = [daily_research_stock_label(row["股票代號"], company_context) for row in shortlist]
+    management_cols = st.columns(2)
+    remove_labels = management_cols[0].multiselect(
+        "移除標的",
+        shortlist_labels,
+        key="research_shortlist_remove_symbols",
+    )
+    if management_cols[0].button("移除選取標的", key="research_shortlist_remove"):
+        remove_symbols = [shortlist[shortlist_labels.index(label)]["股票代號"] for label in remove_labels]
+        st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = remove_research_shortlist_symbols(shortlist, remove_symbols)
+        st.rerun()
+    if management_cols[1].button("清空本次研究清單", key="research_shortlist_clear"):
+        st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = []
+        st.rerun()
+
+    action_cols = st.columns(2)
+    if action_cols[0].button("更新研究清單市場資料", key="research_shortlist_refresh"):
+        refresh_results = refresh_research_shortlist_market_data(shortlist)
+        success_count = sum(result["更新狀態"] != "FAILED" for result in refresh_results if result["股票代號"] != BENCHMARK_SYMBOL)
+        failed_count = sum(result["更新狀態"] == "FAILED" for result in refresh_results if result["股票代號"] != BENCHMARK_SYMBOL)
+        benchmark_result = next(result for result in refresh_results if result["股票代號"] == BENCHMARK_SYMBOL)
+        if failed_count:
+            st.warning(f"更新成功：{success_count}；更新失敗：{failed_count}；0050：{benchmark_result['更新狀態']}。")
+        else:
+            st.success(f"更新成功：{success_count}；更新失敗：0；0050：{benchmark_result['更新狀態']}。")
+        st.dataframe(list(refresh_results), width="stretch", hide_index=True)
+
+    if action_cols[1].button("儲存本日研究快照", key="research_shortlist_save"):
+        save_results = save_research_shortlist_observations(shortlist, watchlist_symbols=watchlist_symbols)
+        created_count = sum(result["儲存狀態"] == "CREATED" for result in save_results)
+        existing_count = sum(result["儲存狀態"] == "ALREADY_EXISTS" for result in save_results)
+        unsaved = [result for result in save_results if result["儲存狀態"] not in {"CREATED", "ALREADY_EXISTS"}]
+        st.info(f"本次研究快照\n\n新建立：{created_count}\n\n已存在：{existing_count}\n\n未儲存：{len(unsaved)}")
+        if unsaved:
+            st.dataframe(unsaved, width="stretch", hide_index=True)
+
+
 def render_research_candidate_explorer(
     *,
     watchlist_symbols: list[str],
@@ -757,6 +971,11 @@ def render_research_candidate_explorer(
     )
     st.caption(f"顯示 {len(filtered_rows)} / {len(rows)} 檔。缺少研究資料的股票仍會保留，方便前往建立。")
     st.dataframe(filtered_rows, width="stretch", hide_index=True)
+    render_research_shortlist_controls(
+        filtered_rows,
+        company_context=company_context,
+        watchlist_symbols=watchlist_symbols,
+    )
 
     if not filtered_rows:
         st.info("目前沒有符合條件的研究標的。")
@@ -940,9 +1159,8 @@ def render_forward_research_observation_control(
 
     if st.button("儲存今日研究快照", key="daily_research_save_forward_observation"):
         try:
-            context = build_local_observation_context(
-                stock_series=load_live_historical_price_series(selected_symbol),
-                benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL),
+            result = capture_local_forward_observation(
+                symbol=selected_symbol,
                 company_name=company_name,
                 industry=industry,
                 in_watchlist=selected_symbol in watchlist_symbols,
@@ -950,8 +1168,8 @@ def render_forward_research_observation_control(
                 historical_trends_available=_daily_status_available(overview_rows, "歷史趨勢"),
                 ai_research_available=_daily_status_available(overview_rows, "AI 研究"),
                 swing_research_available=_daily_status_available(overview_rows, "波段研究"),
+                repository=repository,
             )
-            result = repository.capture(context)
         except ForwardResearchObservationError as error:
             st.warning(f"目前本地研究資料不足，請先更新／執行相關研究後再儲存快照。\n\n原因：{error}")
         else:

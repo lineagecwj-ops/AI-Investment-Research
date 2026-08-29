@@ -209,6 +209,34 @@ def build_local_observation_context(
     )
 
 
+def capture_local_forward_observation(
+    *,
+    symbol: str,
+    company_name: str | None,
+    industry: str | None,
+    in_watchlist: bool,
+    long_term_research_available: bool,
+    historical_trends_available: bool,
+    ai_research_available: bool,
+    swing_research_available: bool,
+    repository: "ForwardResearchObservationRepository | None" = None,
+    live_db_path: Path | str | None = None,
+) -> CaptureResult:
+    """Capture one immutable observation from already-local market data only."""
+    context = build_local_observation_context(
+        stock_series=load_live_historical_price_series(symbol, db_path=live_db_path),
+        benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL, db_path=live_db_path),
+        company_name=company_name,
+        industry=industry,
+        in_watchlist=in_watchlist,
+        long_term_research_available=long_term_research_available,
+        historical_trends_available=historical_trends_available,
+        ai_research_available=ai_research_available,
+        swing_research_available=swing_research_available,
+    )
+    return (repository or ForwardResearchObservationRepository()).capture(context)
+
+
 def load_live_historical_price_series(
     symbol: str,
     *,
@@ -323,6 +351,22 @@ class ForwardResearchObservationRepository:
                 (limit,),
             ).fetchall()
             return tuple(self._row_to_observation(row) for row in rows)
+        finally:
+            connection.close()
+
+    def get(self, observation_id: str) -> ForwardResearchObservation | None:
+        """Read an existing immutable observation without creating local storage."""
+        if not self._db_path.exists():
+            return None
+        connection = sqlite3.connect(self._db_path.as_uri() + "?mode=ro", uri=True)
+        try:
+            row = connection.execute(
+                "SELECT * FROM forward_research_observations WHERE observation_id = ?",
+                (observation_id,),
+            ).fetchone()
+            return self._row_to_observation(row) if row is not None else None
+        except sqlite3.OperationalError:
+            return None
         finally:
             connection.close()
 

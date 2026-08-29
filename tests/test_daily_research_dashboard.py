@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
+from forward_research_observation_service import ForwardResearchObservationError
+from historical_price_service import HistoricalPriceError
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
@@ -52,6 +55,25 @@ def daily_dashboard_app():
     ):
         app_module.initialize_session_state()
         app_module.render_daily_research_dashboard()
+
+
+def candidate_explorer_app():
+    import app as app_module
+    from unittest.mock import patch
+
+    with patch("app.build_research_shortlist_status_rows", return_value=[]):
+        app_module.initialize_session_state()
+        app_module.render_research_candidate_explorer(
+            watchlist_symbols=["2330.TW"],
+            universes=[],
+            frozen_universe=None,
+            company_context={
+                "2330.TW": {
+                    "company_name": "台積電",
+                    "broad_industry": "半導體業",
+                }
+            },
+        )
 
 
 class DailyResearchDashboardTestCase(unittest.TestCase):
@@ -140,6 +162,87 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
 
         self.assertEqual(failures, ("2454.TW", "0050.TW"))
         self.assertEqual(calls, [("2454.TW", True), ("0050.TW", True)])
+
+    def test_shortlist_add_deduplicates_and_keeps_neutral_symbol_order(self):
+        import app as app_module
+
+        existing = [candidate_row("2454.TW")]
+        shortlist = app_module.add_research_shortlist_rows(existing, [candidate_row("2330.TW"), candidate_row("2454.TW")])
+
+        self.assertEqual([row["股票代號"] for row in shortlist], ["2330.TW", "2454.TW"])
+
+    def test_shortlist_rejects_more_than_twenty_symbols_without_truncation(self):
+        import app as app_module
+
+        rows = [candidate_row(f"{index:04d}.TW") for index in range(21)]
+        with self.assertRaisesRegex(ValueError, "最多 20 檔"):
+            app_module.add_research_shortlist_rows([], rows)
+
+    def test_shortlist_remove_and_clear_are_session_only_operations(self):
+        import app as app_module
+
+        shortlist = [candidate_row("2330.TW"), candidate_row("2454.TW")]
+        remaining = app_module.remove_research_shortlist_symbols(shortlist, ["2454.TW"])
+
+        self.assertEqual([row["股票代號"] for row in remaining], ["2330.TW"])
+        self.assertEqual(app_module.remove_research_shortlist_symbols(remaining, ["2330.TW"]), [])
+
+    def test_batch_refresh_processes_each_shortlist_symbol_and_0050_once(self):
+        import app as app_module
+
+        calls = []
+
+        def loader(symbol, *, force_refresh):
+            calls.append((symbol, force_refresh))
+            if symbol == "2454.TW":
+                raise HistoricalPriceError("offline")
+            return SimpleNamespace(is_stale=False)
+
+        results = app_module.refresh_research_shortlist_market_data(
+            [candidate_row("2454.TW"), candidate_row("2330.TW"), candidate_row("2330.TW"), candidate_row("0050.TW")],
+            price_loader=loader,
+        )
+
+        self.assertEqual(calls, [("2330.TW", True), ("2454.TW", True), ("0050.TW", True)])
+        self.assertEqual(
+            [(row["股票代號"], row["更新狀態"]) for row in results],
+            [("2330.TW", "UPDATED"), ("2454.TW", "FAILED"), ("0050.TW", "UPDATED")],
+        )
+
+    def test_batch_save_is_local_only_and_reports_created_existing_and_stale(self):
+        import app as app_module
+
+        calls = []
+
+        def capture(**kwargs):
+            calls.append(kwargs)
+            if kwargs["symbol"] == "2330.TW":
+                return SimpleNamespace(created=True)
+            if kwargs["symbol"] == "2454.TW":
+                return SimpleNamespace(created=False)
+            raise ForwardResearchObservationError("市場資料過舊，請先更新本地市場資料後再儲存。")
+
+        results = app_module.save_research_shortlist_observations(
+            [candidate_row("2454.TW"), candidate_row("2330.TW"), candidate_row("2603.TW")],
+            watchlist_symbols=["2330.TW"],
+            capture_observation=capture,
+        )
+
+        self.assertEqual([call["symbol"] for call in calls], ["2330.TW", "2454.TW", "2603.TW"])
+        self.assertTrue(calls[0]["in_watchlist"])
+        self.assertFalse(calls[1]["in_watchlist"])
+        self.assertEqual(
+            [(row["股票代號"], row["儲存狀態"]) for row in results],
+            [("2330.TW", "CREATED"), ("2454.TW", "ALREADY_EXISTS"), ("2603.TW", "STALE_DATA")],
+        )
+
+    def test_candidate_explorer_renders_shortlist_controls_without_session_state_error(self):
+        app_test = AppTest.from_function(candidate_explorer_app)
+        app_test.run()
+
+        self.assertFalse(app_test.exception)
+        self.assertTrue(any(button.label == "加入本次研究清單" for button in app_test.button))
+        self.assertTrue(any("本次研究清單" in element.value for element in app_test.markdown))
 
     def test_candidate_rows_use_selected_source_and_neutral_symbol_order(self):
         import app as app_module
@@ -330,6 +433,18 @@ def company_context():
             "classification_as_of_date": "2026-08-20",
             "source": "test",
         },
+    }
+
+
+def candidate_row(symbol: str) -> dict[str, str]:
+    return {
+        "股票代號": symbol,
+        "公司名稱": "測試公司",
+        "產業": "測試產業",
+        "長期研究": "尚無資料",
+        "歷史趨勢": "尚無資料",
+        "AI 研究": "尚無資料",
+        "波段研究": "尚無資料",
     }
 
 
