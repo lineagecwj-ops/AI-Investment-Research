@@ -3,3 +3,4 @@ streamlit
 openai>=1.99.0
 reportlab
 pypdf
+scikit-learn

@@ -1,0 +1,324 @@
+{
+  "artifact_checksum": "ad61143b91df21138720d93460491d4557c55850a7ac37052846d8e83ed70ef9",
+  "artifact_id": "UPSIDE_20D_LOGISTIC_BASELINE_V0",
+  "dataset": {
+    "exclusion_counts": {
+      "INCOMPLETE_OR_NONFINITE_FEATURES": 2631,
+      "SYMBOL_NO_USABLE_ROWS": 1,
+      "TRAIN_TARGET_CROSSES_SPLIT": 4265,
+      "VALIDATION_TARGET_CROSSES_SPLIT": 4360
+    },
+    "ordering": "symbol,as_of_date",
+    "total_usable_rows": 343330,
+    "train_rows": 244477,
+    "train_symbols": 212,
+    "validation_rows": 98853,
+    "validation_symbols": 217
+  },
+  "dependency": {
+    "scikit_learn_version": "1.9.0"
+  },
+  "feature_set": {
+    "feature_set_id": "UPSIDE_20D_FIXED_8_FEATURES_V0",
+    "ordered_features": [
+      "RETURN_5D",
+      "RETURN_20D",
+      "RETURN_60D",
+      "CLOSE_VS_SMA20",
+      "CLOSE_VS_SMA60",
+      "RSI14",
+      "VOLATILITY_20D",
+      "VOLUME_RATIO20"
+    ],
+    "timing_rule": "Each feature uses observations available on or before as_of_date."
+  },
+  "generated_at": "2026-08-29T04:29:37.961630+00:00",
+  "limitations": [
+    "Adjusted historical prices may reflect subsequently known corporate-action adjustments; perfect point-in-time corporate-action reconstruction is not claimed.",
+    "SURVIVORSHIP_BIAS_HANDLING=NOT_IMPLEMENTED / UNKNOWN.",
+    "The evaluation population is the Frozen TWSE research universe, not the complete historical Taiwan equity market.",
+    "Model coefficients are descriptive associations, not causal effects.",
+    "No 2025 WORKFLOW_FROZEN_OOS performance was inspected in Sprint 1."
+  ],
+  "metrics": {
+    "annual_validation": {
+      "2023": {
+        "brier_score": 0.24654203734812027,
+        "mean_predicted_probability": 0.5311833680900439,
+        "observed_up_rate": 0.5797890039341567,
+        "roc_auc": 0.5020286475805342,
+        "rows": 51091,
+        "symbols": 214
+      },
+      "2024": {
+        "brier_score": 0.2519934876015726,
+        "mean_predicted_probability": 0.5393579413449835,
+        "observed_up_rate": 0.5191156149239982,
+        "roc_auc": 0.47562963753407494,
+        "rows": 47762,
+        "symbols": 217
+      }
+    },
+    "calibration_bands": [
+      {
+        "actual_minus_predicted": -0.030555527038209962,
+        "actual_up_rate": 0.25,
+        "band": "[0.2,0.3)",
+        "count": 40,
+        "mean_predicted_probability": 0.28055552703820996
+      },
+      {
+        "actual_minus_predicted": 0.17565487396084023,
+        "actual_up_rate": 0.5424657534246575,
+        "band": "[0.3,0.4)",
+        "count": 365,
+        "mean_predicted_probability": 0.3668108794638173
+      },
+      {
+        "actual_minus_predicted": 0.0772372338182844,
+        "actual_up_rate": 0.5520990132129119,
+        "band": "[0.4,0.5)",
+        "count": 5979,
+        "mean_predicted_probability": 0.4748617793946275
+      },
+      {
+        "actual_minus_predicted": 0.013569713030846309,
+        "actual_up_rate": 0.5519329655688787,
+        "band": "[0.5,0.6)",
+        "count": 90819,
+        "mean_predicted_probability": 0.5383632525380324
+      },
+      {
+        "actual_minus_predicted": -0.14038526381663663,
+        "actual_up_rate": 0.47619047619047616,
+        "band": "[0.6,0.7)",
+        "count": 1617,
+        "mean_predicted_probability": 0.6165757400071128
+      },
+      {
+        "actual_minus_predicted": -0.4115599599446785,
+        "actual_up_rate": 0.3333333333333333,
+        "band": "[0.7,0.8)",
+        "count": 33,
+        "mean_predicted_probability": 0.7448932932780118
+      }
+    ],
+    "constant_baseline": {
+      "brier_score": 0.24758432441305722,
+      "logistic_minus_constant_brier": 0.001591645815252729,
+      "probability": 0.5389873075994879
+    },
+    "high_minus_low_decile_actual_up_rate": -0.03170995069641158,
+    "probability_deciles": [
+      {
+        "actual_up_rate": 0.5471373659720817,
+        "count": 9886,
+        "decile": 1,
+        "mean_predicted_probability": 0.480897174979823
+      },
+      {
+        "actual_up_rate": 0.567367995144649,
+        "count": 9886,
+        "decile": 2,
+        "mean_predicted_probability": 0.516247990206502
+      },
+      {
+        "actual_up_rate": 0.5727291118753793,
+        "count": 9886,
+        "decile": 3,
+        "mean_predicted_probability": 0.5234651745496188
+      },
+      {
+        "actual_up_rate": 0.5653009610520991,
+        "count": 9885,
+        "decile": 4,
+        "mean_predicted_probability": 0.5277974109006094
+      },
+      {
+        "actual_up_rate": 0.5624683864441072,
+        "count": 9885,
+        "decile": 5,
+        "mean_predicted_probability": 0.5317652267147672
+      },
+      {
+        "actual_up_rate": 0.5579160343955488,
+        "count": 9885,
+        "decile": 6,
+        "mean_predicted_probability": 0.5361984311409268
+      },
+      {
+        "actual_up_rate": 0.5458775923115832,
+        "count": 9885,
+        "decile": 7,
+        "mean_predicted_probability": 0.5416223530845147
+      },
+      {
+        "actual_up_rate": 0.5306019221041983,
+        "count": 9885,
+        "decile": 8,
+        "mean_predicted_probability": 0.5487281715437105
+      },
+      {
+        "actual_up_rate": 0.5399089529590289,
+        "count": 9885,
+        "decile": 9,
+        "mean_predicted_probability": 0.5591892573723
+      },
+      {
+        "actual_up_rate": 0.5154274152756702,
+        "count": 9885,
+        "decile": 10,
+        "mean_predicted_probability": 0.5854274886440815
+      }
+    ],
+    "train_up_rate": 0.5389873075994879,
+    "validation": {
+      "accuracy_at_0_50": 0.5440603724722568,
+      "brier_score": 0.24917597022830995,
+      "confusion_at_0_50": {
+        "fn": 3509,
+        "fp": 41562,
+        "tn": 2875,
+        "tp": 50907
+      },
+      "mean_predicted_probability": 0.5351330101626409,
+      "observed_up_rate": 0.5504739360464528,
+      "roc_auc": 0.4844159573275863,
+      "row_count": 98853
+    },
+    "validation_up_rate": 0.5504739360464528
+  },
+  "model_identity": "UPSIDE_20D_LOGISTIC_BASELINE_V0",
+  "model_parameters": {
+    "intercept": 0.15562853863944653,
+    "scaler_mean": [
+      0.003965590240483235,
+      0.015936386731330666,
+      0.047060967234685766,
+      0.005547075652434805,
+      0.016303193359981816,
+      51.62767780550389,
+      0.01984964979422926,
+      1.1686174320409635
+    ],
+    "scaler_scale": [
+      0.05741141771486547,
+      0.11979037275144096,
+      0.23234730556636024,
+      0.06073244337416023,
+      0.11034343588477512,
+      12.432534364792847,
+      0.015649668677531956,
+      40.47096441477642
+    ],
+    "standardized_coefficients": [
+      {
+        "coefficient": -0.7599840495389955,
+        "feature": "VOLUME_RATIO20"
+      },
+      {
+        "coefficient": -0.10915557622057284,
+        "feature": "RETURN_20D"
+      },
+      {
+        "coefficient": 0.07785321729902106,
+        "feature": "VOLATILITY_20D"
+      },
+      {
+        "coefficient": -0.03627309400550722,
+        "feature": "CLOSE_VS_SMA60"
+      },
+      {
+        "coefficient": -0.030442478270946097,
+        "feature": "RETURN_60D"
+      },
+      {
+        "coefficient": 0.029603416715700853,
+        "feature": "RSI14"
+      },
+      {
+        "coefficient": 0.0272547569846309,
+        "feature": "RETURN_5D"
+      },
+      {
+        "coefficient": -0.005562339631837214,
+        "feature": "CLOSE_VS_SMA20"
+      }
+    ]
+  },
+  "pipeline": {
+    "configuration": {
+      "C": 1.0,
+      "class_weight": null,
+      "hyperparameter_tuning": false,
+      "max_iter": 1000,
+      "penalty": "l2",
+      "solver": "lbfgs"
+    },
+    "converged": true,
+    "convergence_warnings": [],
+    "n_iter": 24,
+    "steps": [
+      "StandardScaler",
+      "LogisticRegression"
+    ]
+  },
+  "price_semantics": {
+    "definition": "adjusted_close when present and finite, otherwise raw close",
+    "version": "UPSIDE_20D_ADJUSTED_CLOSE_FIRST_V1"
+  },
+  "research_scope": "RESEARCH_EXPERIMENTAL_ONLY",
+  "research_snapshot": {
+    "active_db_mode": "physical_split",
+    "active_research_db_path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/snapshots/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_materialization_v2.db",
+    "active_research_db_sha": "3417b34a11660e672d75c5879d0d8f9e177c574b603b540274bad7acb2215de0",
+    "active_research_manifest_path": "/Users/hankmacmini/Documents/Projects/AI-Investment-Research/data/research/manifests/research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1_materialization_v2_manifest.json",
+    "active_research_materialization_version": "v2",
+    "active_research_semantic_checksum": "a1f793b520766ab94f7b2234b54773cee78424f1a2efbf6b9de5379d0ff01f91",
+    "active_research_snapshot_id": "research_snapshot_candidate_a_composite_twse_validation_2018_2025_v1",
+    "active_research_snapshot_version": "v1"
+  },
+  "schema_version": "upside_20d_logistic_baseline_artifact_v1",
+  "target": {
+    "definition": "1 when research_price[t+20] > research_price[t], otherwise 0",
+    "equal_price_target": 0,
+    "horizon_trading_bars": 20,
+    "target_id": "UP_20D_V0"
+  },
+  "temporal_workflow": {
+    "data_from_2026_used": false,
+    "evaluated_splits": [
+      "TRAIN",
+      "VALIDATION"
+    ],
+    "purge_rule": "as_of_date and target_date must be in the same split",
+    "splits": {
+      "TRAIN": {
+        "end": "2022-12-31",
+        "start": "2018-01-01"
+      },
+      "VALIDATION": {
+        "end": "2024-12-31",
+        "start": "2023-01-01"
+      },
+      "WORKFLOW_FROZEN_OOS": {
+        "end": "2025-12-31",
+        "start": "2025-01-01"
+      }
+    },
+    "workflow_frozen_oos_evaluated": false
+  },
+  "universe": {
+    "excluded_symbols": [
+      "7769.TW"
+    ],
+    "population_description": "Frozen TWSE research universe",
+    "requested_symbols": 218,
+    "symbol_exclusion_reasons": {
+      "7769.TW": "NO_USABLE_ROWS"
+    },
+    "universe_id": "frozen_twse_research_universe_2026_08_09",
+    "universe_version": "2026-08-current-etf-constituent-v1",
+    "usable_symbols": 217
+  }
+}
