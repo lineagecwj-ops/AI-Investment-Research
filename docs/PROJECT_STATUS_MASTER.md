@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-16, after Productionization P1A / P1B persistence preparation.
+Last updated: 2026-08-30, after Opportunity Radar V0 + AI Analyst V0 release.
 
 ## Project Purpose
 
@@ -40,16 +40,17 @@ This status document is based on:
 - Sprint 6C-3 Technical Portfolio Persistence Coordinator + Portfolio-Level Atomic Persistence release validation evidence
 - Productionization P1A Production Persistence Config + Bootstrap / Backup source and test inspection
 - Productionization P1B Read-Only Health Check + Operator Verify Command source and test inspection
+- Opportunity Radar V0 + AI Analyst V0 release validation and final manual acceptance evidence
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `e6ef1b0 feat: add production risk persistence health check`
-- Current full HEAD: `e6ef1b01d77a87018e06f33087381ac6070cfa78`
-- Remote baseline at synchronization time: `origin/main` points to `e6ef1b01d77a87018e06f33087381ac6070cfa78`
-- Documentation status: this file is being synchronized after Productionization P1A / P1B release pushes.
+- Implementation baseline: `788bb6c feat: add opportunity radar and ai analyst review`
+- Current full HEAD: `788bb6ccafde47a90c00d31caad87478ea06e764`
+- Remote baseline at synchronization time: `origin/main` points to `788bb6ccafde47a90c00d31caad87478ea06e764`
+- Documentation status: this file is being synchronized after the Opportunity Radar V0 + AI Analyst V0 release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -2018,6 +2019,80 @@ Known warnings during full unittest:
 
 These warnings did not fail the test suite.
 
+## Opportunity Radar V0 + AI Analyst V0 Release (2026-08-30)
+
+This release section supersedes earlier current-state and next-planning statements where they differ. Earlier sections remain historical records.
+
+### Released Baseline
+
+- `OPPORTUNITY_RADAR_V0 = RELEASED`
+- `AI_ANALYST_V0 = RELEASED`
+- Release commit: `788bb6ccafde47a90c00d31caad87478ea06e764`
+- Released scope: exactly seven product files: `app.py`, `src/opportunity_radar_service.py`, `src/ai_analyst_shortlist.py`, `src/ai_research_service.py`, `tests/test_opportunity_radar_service.py`, `tests/test_ai_analyst_shortlist.py`, and `tests/test_daily_research_dashboard.py`.
+- Focused suites: `163 OK`; Dashboard / Analyst AppTest: PASS; `compileall`: PASS; `git diff --check`: PASS.
+- Runtime research data was not committed. Production was not touched and `data/production/` is not present.
+
+### Opportunity Radar V0
+
+Released capability:
+
+- frozen TWSE research universe;
+- official current monthly-revenue snapshot, Revenue YoY, and Revenue MoM;
+- `REL_RETURN_20D` and `REL_RETURN_60D` versus 0050 only where exact local alignment exists;
+- transparent filters, session shortlist integration, and canonical Radar evidence resolution by symbol.
+
+Opportunity Radar V0 does not assign a score or probability and does not produce Buy / Sell / Hold, a price target, or any investment recommendation. Monthly revenue period may remain unavailable for older local snapshots when the source period was not captured. This release does not claim that historical PIT monthly revenue has been solved.
+
+### AI Analyst V0
+
+Released workflow:
+
+`Opportunity Radar -> Research Shortlist -> AI Analyst Stage 1 -> validated Analyst Cards -> Stage 2 cross-company research-priority comparison`
+
+Stage 1 provides deterministic evidence rendering, grounded qualitative interpretation, sparse-evidence company support, opportunity interpretation, fundamental quality, valuation interpretation, market confirmation, risks, contradictions, missing evidence, next checks, and a research-priority label. The only labels are `優先深入研究`, `值得觀察`, and `證據不足`; they are research-attention labels, not investment recommendations.
+
+Safety and reliability boundaries:
+
+- deterministic structured evidence renders facts; AI interpretation must remain grounded to canonical evidence IDs;
+- unknown evidence fails closed; typed numeric grounding, metric-aware percentage normalization, deterministic currency/display equivalence, and structural 50 / 200 / 52 window-number handling remain enforced;
+- valuation classification requires a peer or historical comparator;
+- Buy / Sell / Hold, investment-action language, expected return, and target price are prohibited;
+- one bounded repair / regeneration is allowed only for explicitly classified format or policy wording cases;
+- Stage 2 accepts validated cards only, and failed Stage-1 cards are excluded from comparison.
+
+### Final Manual Acceptance
+
+- `1216.TW` 統一: Stage 1 PASS, `值得觀察`.
+- `1608.TW` 華榮: Stage 1 PASS, `優先深入研究`.
+- `2027.TW` 大成鋼: Stage 1 PASS, `優先深入研究`.
+- Stage 2 PASS: all three validated cards were included in the cross-company research-priority comparison.
+
+These observed validation results are not current investment recommendations.
+
+### Preserved Research Boundaries
+
+- Forward Research Observation V0 remains an evidence-collection capability for future similar-condition outcomes. It has no historical backfill, mature outcome claim, or probability productionization.
+- `TECHNICAL_ONLY_PROBABILITY_RESEARCH = STOP`. Do not reopen technical-only ML, XGBoost, random forest, or further technical-feature experiments without a separately approved scope.
+- Preserve the documented unopened 2025 frozen OOS boundary, the unavailable / major-pipeline-required historical PIT fundamental path, and the paused T86 historical materialization caused by official route blocking.
+
+### Next Roadmap Priority
+
+`RESEARCH_EVIDENCE_EXPANSION_V1 = PLANNED / NOT STARTED`
+
+Goal: increase trustworthy evidence automatically available to AI Analyst for shortlist companies. The final acceptance showed that sparse Analyst Cards can be useful for 1216.TW and 1608.TW, but most fundamental, valuation, cash-flow, and market evidence was unavailable. The current practical bottleneck is evidence availability, not AI reasoning architecture.
+
+Initial target evidence categories only, not an implementation decision:
+
+- Fundamental: Revenue Growth, Earnings Growth, ROE, Gross Margin, Operating Margin, Net Margin, and EPS.
+- Balance Sheet / Cash Flow: Total Cash, Total Debt, Debt to Equity, Operating Cash Flow, and Free Cash Flow.
+- Valuation: Trailing P/E, Forward P/E, and P/B.
+- Market: Current Price, 52-week High / Low, 50-day Average, and 200-day Average.
+- Relative Market Confirmation: `REL_RETURN_20D` versus 0050 and `REL_RETURN_60D` versus 0050.
+
+V1 design principles: reuse existing trusted project services first; explicit user-triggered refresh; no hidden network fetch or silent fallback; no nearest-date benchmark substitution; fail closed for missing evidence; canonical symbol identity and deterministic evidence provenance; preserve the research / production boundary; no historical PIT backfill unless separately approved; no new external provider unless a later audit proves necessary; no new ML; and no production investment recommendation.
+
+Immediate next task: `RESEARCH EVIDENCE EXPANSION V1 FOUNDATION AUDIT`. It must determine which target metrics already exist in current services, which can refresh through existing authorized data paths, why 1216.TW / 1608.TW lacked them in final acceptance, the exact gap category, and whether expansion is possible without a new data pipeline. No implementation has been approved.
+
 ## Current Working State
 
 Current state:
@@ -2031,7 +2106,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Next planned Technical Risk phase after documentation review / commit / validation / push: Productionization P2 Prerequisite / Runtime Input Source Specification Review, unless a narrower sprint is explicitly scoped
+- Current product roadmap priority: Research Evidence Expansion V1 Foundation Audit. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2099,7 +2174,7 @@ Completed:
 
 Next planning candidate:
 
-- PROJECT_STATUS_MASTER document review, documentation commit, release validation, and push
+- Research Evidence Expansion V1 Foundation Audit
 
 Future:
 
@@ -2371,11 +2446,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `e6ef1b01d77a87018e06f33087381ac6070cfa78` or inspect any newer commits.
+2. Confirm HEAD is still `788bb6ccafde47a90c00d31caad87478ea06e764` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Complete PROJECT_STATUS_MASTER review / commit / release validation / push before starting the next implementation sprint.
-9. If starting the next Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
+8. Complete PROJECT_STATUS_MASTER review / commit / release validation / push before starting the Research Evidence Expansion V1 Foundation Audit.
+9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
