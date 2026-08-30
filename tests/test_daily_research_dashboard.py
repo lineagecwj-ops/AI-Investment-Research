@@ -7,10 +7,6 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
-from forward_research_observation_service import ForwardResearchObservationError
-from historical_price_service import HistoricalPriceError
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
 
@@ -18,6 +14,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
+
+from forward_research_observation_service import ForwardResearchObservationError
+from historical_price_service import HistoricalPriceError
 
 
 def daily_dashboard_app():
@@ -76,7 +75,332 @@ def candidate_explorer_app():
         )
 
 
+def opportunity_radar_fixture_app():
+    from datetime import datetime
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    import app as app_module
+    from opportunity_radar_service import MonthlyRevenueRecord
+
+    frozen = SimpleNamespace(symbols=("2330.TW", "2454.TW", "2603.TW"))
+    records = (
+        MonthlyRevenueRecord("2330.TW", "台積電", "2026-08", 120, 100, 80, 0.5, 0.2),
+        MonthlyRevenueRecord("2454.TW", "聯發科", "2026-08", 100, 110, 80, 0.25, -0.09),
+        MonthlyRevenueRecord("2603.TW", "長榮", "2026-08", 90, 80, 100, -0.1, 0.125),
+    )
+    def local_context(*, stock_series, **_kwargs):
+        values = {"2330.TW": (0.1, 0.2), "2454.TW": (0.1, -0.1), "2603.TW": (None, None)}
+        return SimpleNamespace(rel_return_20d=values[stock_series][0], rel_return_60d=values[stock_series][1])
+    with patch("app.load_latest_monthly_revenue_snapshot", return_value=({"retrieved_at": datetime(2026, 8, 29).isoformat()}, records)), patch("app.load_live_historical_price_series", side_effect=lambda symbol: symbol), patch("app.build_local_observation_context", side_effect=local_context):
+        app_module.initialize_session_state()
+        app_module.render_opportunity_radar(frozen, {"2330.TW": {"company_name": "台積電", "broad_industry": "半導體業"}, "2454.TW": {"company_name": "聯發科", "broad_industry": "半導體業"}, "2603.TW": {"company_name": "長榮", "broad_industry": "航運業"}}, ["2330.TW"])
+
+
+def ai_analyst_shortlist_fixture_app():
+    from unittest.mock import patch
+    import app as app_module
+
+    cards = [
+        {
+            "symbol": "2330.TW",
+            "company_name": "台積電",
+            "research_priority": "優先深入研究",
+            "verified_evidence": [
+                {"section": "Opportunity Radar", "metric": "revenue_yoy", "label": "Revenue YoY", "display_value": "50.00%", "status": "available", "evidence_id": "radar:2330.TW:revenue_yoy"},
+                {"section": "Opportunity Radar", "metric": "rel_return_20d", "label": "20D 相對 0050", "display_value": "資料不足", "status": "missing", "evidence_id": None},
+                {"section": "基本面", "metric": "net_margin", "label": "Net Margin", "display_value": "25.00%", "status": "available", "evidence_id": "current:net_margin"},
+                {"section": "基本面", "metric": "trailing_eps", "label": "EPS", "display_value": "TWD 2.50", "status": "available", "evidence_id": "current:trailing_eps"},
+                {"section": "基本面", "metric": "total_cash", "label": "Total Cash", "display_value": "TWD 10.00B", "status": "available", "evidence_id": "current:total_cash"},
+                {"section": "基本面", "metric": "total_debt", "label": "Total Debt", "display_value": "TWD 20.00B", "status": "available", "evidence_id": "current:total_debt"},
+                {"section": "基本面", "metric": "debt_to_equity", "label": "Debt to Equity", "display_value": "50.00", "status": "available", "evidence_id": "current:debt_to_equity"},
+                {"section": "基本面", "metric": "operating_cash_flow", "label": "Operating Cash Flow", "display_value": "TWD 5.00B", "status": "available", "evidence_id": "current:operating_cash_flow"},
+                {"section": "基本面", "metric": "free_cash_flow", "label": "Free Cash Flow", "display_value": "TWD 3.00B", "status": "available", "evidence_id": "current:free_cash_flow"},
+                {"section": "估值", "metric": "trailing_pe", "label": "Trailing P/E", "display_value": "20.00", "status": "available", "evidence_id": "current:trailing_pe"},
+                {"section": "估值", "metric": "forward_pe", "label": "Forward P/E", "display_value": "18.00", "status": "available", "evidence_id": "current:forward_pe"},
+                {"section": "估值", "metric": "price_to_book", "label": "P/B", "display_value": "4.00", "status": "available", "evidence_id": "current:price_to_book"},
+                {"section": "市場", "metric": "current_price", "label": "Current Price", "display_value": "TWD 100.00", "status": "available", "evidence_id": "current:current_price"},
+                {"section": "市場", "metric": "fifty_two_week_high", "label": "52-week High", "display_value": "TWD 110.00", "status": "available", "evidence_id": "current:fifty_two_week_high"},
+                {"section": "市場", "metric": "fifty_two_week_low", "label": "52-week Low", "display_value": "TWD 70.00", "status": "available", "evidence_id": "current:fifty_two_week_low"},
+                {"section": "市場", "metric": "fifty_day_average", "label": "50-day Average", "display_value": "TWD 98.00", "status": "available", "evidence_id": "current:fifty_day_average"},
+                {"section": "市場", "metric": "two_hundred_day_average", "label": "200-day Average", "display_value": "TWD 90.00", "status": "available", "evidence_id": "current:two_hundred_day_average"},
+                {"section": "估值", "metric": "net_margin", "label": "Net Margin", "display_value": "25.00%", "status": "available", "evidence_id": "current:net_margin"},
+                {"section": "估值", "metric": "trailing_eps", "label": "EPS", "display_value": "TWD 2.50", "status": "available", "evidence_id": "current:trailing_eps"},
+                {"section": "估值", "metric": "total_cash", "label": "Total Cash", "display_value": "TWD 10.00B", "status": "available", "evidence_id": "current:total_cash"},
+                {"section": "估值", "metric": "total_debt", "label": "Total Debt", "display_value": "TWD 20.00B", "status": "available", "evidence_id": "current:total_debt"},
+                {"section": "估值", "metric": "debt_to_equity", "label": "Debt to Equity", "display_value": "50.00", "status": "available", "evidence_id": "current:debt_to_equity"},
+                {"section": "估值", "metric": "operating_cash_flow", "label": "Operating Cash Flow", "display_value": "TWD 5.00B", "status": "available", "evidence_id": "current:operating_cash_flow"},
+                {"section": "估值", "metric": "free_cash_flow", "label": "Free Cash Flow", "display_value": "TWD 3.00B", "status": "available", "evidence_id": "current:free_cash_flow"},
+            ],
+            "opportunity_interpretation": ["營收方向提供研究線索。"],
+            "fundamental_quality": "基本面資料目前較完整。",
+            "valuation_context": "估值仍需同業比較。",
+            "market_confirmation": "市場確認存在但仍需追蹤。",
+            "risks": ["資料時點仍需確認。"],
+            "contradictions": ["Revenue YoY 為正，但 Revenue MoM 為負。"],
+            "missing_evidence": ["missing:current:market_cap", "context:unmapped_internal_gap"],
+            "next_checks": ["確認 global:unmapped_internal_limit。"],
+            "evidence_refs": ["radar:2330.TW:revenue_yoy"],
+            "evidence_dates": {"revenue_yoy": "2026-08-01"},
+        },
+        {
+            "symbol": "2454.TW",
+            "company_name": "聯發科",
+            "research_priority": "值得觀察",
+            "verified_evidence": [],
+            "opportunity_interpretation": ["相對強弱提供觀察線索。"],
+            "fundamental_quality": "目前證據不足。",
+            "valuation_context": "目前證據不足。",
+            "market_confirmation": "目前證據不足。",
+            "risks": [],
+            "contradictions": [],
+            "missing_evidence": ["缺少本機基本面快照。"],
+            "next_checks": ["補齊本機資料。"],
+            "evidence_refs": [],
+            "evidence_dates": {},
+        },
+        {
+            "symbol": "2603.TW",
+            "company_name": "長榮",
+            "research_priority": "證據不足",
+            "verified_evidence": [],
+            "opportunity_interpretation": [],
+            "fundamental_quality": "目前證據不足。",
+            "valuation_context": "目前證據不足。",
+            "market_confirmation": "目前證據不足。",
+            "risks": [],
+            "contradictions": [],
+            "missing_evidence": ["缺少本機基本面快照。"],
+            "next_checks": ["補齊本機資料。"],
+            "evidence_refs": [],
+            "evidence_dates": {},
+        },
+    ]
+    result = {
+        "cards": cards,
+        "synthesis": {
+            "priority_deep_dive": [{"symbol": "2330.TW", "reason": "目前證據較完整。", "main_unresolved_risk": "資料時點仍待確認。"}],
+            "cross_company_observations": ["兩家公司證據完整度不同。", "missing:current:market_cap"],
+            "overall_note": "僅供研究注意力安排。",
+        },
+        "synthesis_error": None,
+        "provider_call_count": 4,
+    }
+    with patch("app.build_research_shortlist_status_rows", return_value=[]), patch(
+        "app.analyze_research_shortlist", return_value=result
+    ):
+        app_module.initialize_session_state()
+        app_module.st.session_state[app_module.RESEARCH_SHORTLIST_SESSION_KEY] = [
+            {"股票代號": "2330.TW", "公司名稱": "台積電", "產業": "半導體業"},
+            {"股票代號": "2454.TW", "公司名稱": "聯發科", "產業": "半導體業"},
+            {"股票代號": "2603.TW", "公司名稱": "長榮", "產業": "航運業"},
+        ]
+        app_module.render_research_shortlist_controls(
+            [],
+            company_context={
+                "2330.TW": {"company_name": "台積電", "broad_industry": "半導體業"},
+                "2454.TW": {"company_name": "聯發科", "broad_industry": "半導體業"},
+                "2603.TW": {"company_name": "長榮", "broad_industry": "航運業"},
+            },
+            watchlist_symbols=["2330.TW"],
+        )
+
+
+def _renderer_card(symbol, *, rich):
+    from ai_analyst_shortlist import VERIFIED_EVIDENCE_FIELDS
+
+    available_values = {
+        "revenue_period": "2026-08",
+        "revenue_yoy": "8.85%" if symbol == "1216.TW" else "46.12%",
+        "revenue_mom": "6.63%" if symbol == "1216.TW" else "5.97%",
+    }
+    if rich:
+        available_values.update({
+            metric: f"{index}.00"
+            for index, (_section, metric, _label) in enumerate(VERIFIED_EVIDENCE_FIELDS, start=1)
+        })
+    rows = [
+        {
+            "section": section,
+            "metric": metric,
+            "label": label,
+            "display_value": available_values.get(metric, "資料不足"),
+            "status": "available" if metric in available_values else "missing",
+            "evidence_id": f"fixture:{symbol}:{metric}" if metric in available_values else None,
+        }
+        for section, metric, label in VERIFIED_EVIDENCE_FIELDS
+    ]
+    rows[:0] = [
+        {
+            **rows[1],
+            "section": "估值",
+            "display_value": "STALE DUPLICATE",
+        },
+        {
+            **rows[-1],
+            "section": "基本面",
+            "display_value": "STALE DUPLICATE",
+        },
+    ]
+    return {
+        "symbol": symbol,
+        "company_name": "統一" if symbol == "1216.TW" else "大成鋼",
+        "research_priority": "值得觀察",
+        "verified_evidence": rows,
+        "opportunity_interpretation": ["月營收方向提供研究線索。"],
+        "fundamental_quality": "基本面資料可供研究。" if rich else "目前證據不足。",
+        "valuation_context": "估值倍數可供比較。" if rich else "目前證據不足。",
+        "market_confirmation": "市場位置可供確認。" if rich else "目前證據不足。",
+        "risks": ["資料完整性仍需確認。"],
+        "contradictions": [],
+        "missing_evidence": ["missing:current:market_cap"],
+        "next_checks": ["確認 context:no_historical_series。"],
+        "evidence_refs": [],
+        "evidence_dates": {},
+    }
+
+
+def _render_single_analyst_card(symbol, *, rich):
+    import app as app_module
+
+    card = _renderer_card(symbol, rich=rich)
+    app_module.render_ai_analyst_shortlist_result({
+        "cards": [card],
+        "stage1_success_count": 1,
+        "synthesis": {
+            "priority_deep_dive": [],
+            "cross_company_observations": [],
+            "overall_note": "僅供研究注意力安排。",
+        },
+    })
+
+
+def ai_analyst_sparse_renderer_fixture_app():
+    from tests.test_daily_research_dashboard import _render_single_analyst_card
+
+    _render_single_analyst_card("1216.TW", rich=False)
+
+
+def ai_analyst_rich_renderer_fixture_app():
+    from tests.test_daily_research_dashboard import _render_single_analyst_card
+
+    _render_single_analyst_card("2027.TW", rich=True)
+
+
+def ai_analyst_malformed_synthesis_fixture_app():
+    from unittest.mock import patch
+    import app as app_module
+
+    failed_result = {
+        "cards": [{
+            "symbol": "2330.TW",
+            "company_name": "台積電",
+            "research_priority": "證據不足",
+            "verified_evidence": [],
+            "opportunity_interpretation": [],
+            "fundamental_quality": "AI 初步審查未完成。",
+            "valuation_context": "AI 初步審查未完成。",
+            "market_confirmation": "AI 初步審查未完成。",
+            "risks": [],
+            "contradictions": [],
+            "missing_evidence": ["AI 輸出格式不正確。"],
+            "next_checks": ["稍後重試。"],
+            "evidence_refs": [],
+            "evidence_dates": {},
+        }],
+        "synthesis": None,
+        "synthesis_error": "malformed",
+        "stage2_diagnostic": {
+            "code": "STRUCTURED_OUTPUT_SCHEMA_ERROR",
+            "exception_class": "AIAnalystShortlistError",
+            "input_length": 123,
+            "prompt_length": 456,
+        },
+        "provider_call_count": 2,
+    }
+    with patch("app.build_research_shortlist_status_rows", return_value=[]), patch(
+        "app.analyze_research_shortlist", return_value=failed_result
+    ):
+        app_module.initialize_session_state()
+        app_module.st.session_state[app_module.RESEARCH_SHORTLIST_SESSION_KEY] = [
+            {"股票代號": "2330.TW", "公司名稱": "台積電", "產業": "半導體業"}
+        ]
+        app_module.render_research_shortlist_controls(
+            [],
+            company_context={"2330.TW": {"company_name": "台積電", "broad_industry": "半導體業"}},
+            watchlist_symbols=["2330.TW"],
+        )
+
+
+def _render_acceptance_pipeline():
+    from functools import partial
+    from ai_analyst_shortlist import analyze_research_shortlist
+    from tests.test_ai_analyst_shortlist import (
+        NOW, acceptance_answer, acceptance_stock, shortlist_row, valid_synthesis,
+    )
+    import app as app_module
+
+    app_module.initialize_session_state()
+    state = app_module.st.session_state
+    symbols = ["1216.TW", "1608.TW", "2027.TW"]
+    valid_count = state.get("fixture_valid_count", 3)
+    state.setdefault("fixture_stage1_calls", [])
+    state.setdefault("fixture_stage2_calls", [])
+    rows = [shortlist_row(symbol) for symbol in symbols]
+    for row in rows:
+        row["公司名稱"] = acceptance_stock(row["股票代號"]).company_name
+
+    def generate(*, selected_context, **kwargs):
+        state["fixture_stage1_calls"].append(selected_context.symbol)
+        if selected_context.symbol not in symbols[:valid_count]:
+            raise RuntimeError("fixture Stage-1 failure")
+        return acceptance_answer(selected_context)
+
+    def synthesize(*, cards):
+        state["fixture_stage2_calls"].append([card["symbol"] for card in cards])
+        answer = valid_synthesis(cards)
+        answer["priority_deep_dive"] = [{
+            "symbol": cards[0]["symbol"], "reason": "先查核營收變化的來源。",
+            "main_unresolved_risk": "缺少長期資料供交叉確認。",
+        }]
+        return answer
+
+    run = partial(
+        analyze_research_shortlist, grounded_generator=generate,
+        synthesis_generator=synthesize, generated_at=NOW,
+    )
+    radar = {row["股票代號"]: row["_analyst_evidence"] for row in rows}
+    with patch("app.analyze_research_shortlist", side_effect=run), patch(
+        "app.load_cached_stock_for_ai_analyst", side_effect=acceptance_stock,
+    ), patch("app.resolve_current_opportunity_radar_evidence", side_effect=radar.get):
+        app_module.render_ai_analyst_shortlist_control(rows)
+
+
+def ai_analyst_acceptance_pipeline_fixture_app():
+    from tests.test_daily_research_dashboard import _render_acceptance_pipeline
+
+    _render_acceptance_pipeline()
+
+
 class DailyResearchDashboardTestCase(unittest.TestCase):
+    def test_ai_analyst_radar_resolver_uses_local_snapshot_and_local_relative_context(self):
+        import app as app_module
+        from opportunity_radar_service import MonthlyRevenueRecord
+
+        record = MonthlyRevenueRecord("2027.TW", "大成鋼", "N/A", 120, 100, 80, 0.4612, 0.0597)
+        with patch("app.find_latest_monthly_revenue_record", return_value=({"retrieved_at": "2026-08-30T00:00:00+08:00"}, record)), patch(
+            "app.load_live_historical_price_series", side_effect=lambda symbol: symbol
+        ), patch(
+            "app.build_local_observation_context",
+            return_value=SimpleNamespace(rel_return_20d=0.1260, rel_return_60d=0.2047),
+        ):
+            evidence = app_module.resolve_current_opportunity_radar_evidence("2027.TW")
+
+        self.assertEqual(evidence["revenue_period"], "N/A")
+        self.assertEqual(evidence["revenue_yoy"], 0.4612)
+        self.assertEqual(evidence["revenue_mom"], 0.0597)
+        self.assertEqual(evidence["relative_return_20d"], 0.1260)
+        self.assertEqual(evidence["relative_return_60d"], 0.2047)
+
 
     def test_status_rows_preserve_existing_module_boundaries(self):
         rows = build_rows(
@@ -243,6 +567,183 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
         self.assertFalse(app_test.exception)
         self.assertTrue(any(button.label == "加入本次研究清單" for button in app_test.button))
         self.assertTrue(any("本次研究清單" in element.value for element in app_test.markdown))
+
+    def test_opportunity_radar_fixture_renders_filters_shortlist_and_pending_handoff(self):
+        app_test = AppTest.from_function(opportunity_radar_fixture_app)
+        app_test.run()
+        self.assertFalse(app_test.exception)
+        text = "\n".join(item.value for item in app_test.markdown) + "\n" + "\n".join(item.value for item in app_test.caption)
+        self.assertIn("研究機會雷達", text)
+        self.assertTrue(any(button.label == "加入本次研究清單" for button in app_test.button))
+        app_test.button(key="opportunity_radar_add_shortlist").click().run()
+        self.assertFalse(app_test.exception)
+
+    def test_opportunity_radar_handoff_explains_manual_tab_switch(self):
+        app_test = AppTest.from_function(opportunity_radar_fixture_app)
+        app_test.run()
+        app_test.button(key="opportunity_radar_go_research").click().run()
+
+        self.assertFalse(app_test.exception)
+        self.assertTrue(any("請點上方 Research 分頁繼續" in item.value for item in app_test.success))
+
+    def test_ai_analyst_explicit_click_renders_cards_and_deep_dive(self):
+        app_test = AppTest.from_function(ai_analyst_shortlist_fixture_app)
+        app_test.run()
+        self.assertTrue(any(button.label == "AI 分析本次研究清單" for button in app_test.button))
+
+        app_test.button(key="ai_analyst_shortlist_run").click().run()
+
+        self.assertFalse(app_test.exception)
+        markdown = "\n".join(item.value for item in app_test.markdown)
+        captions = "\n".join(item.value for item in app_test.caption)
+        self.assertIn("AI 分析師初步審查", markdown)
+        self.assertIn("已驗證研究證據", markdown)
+        self.assertIn("AI 分析", markdown)
+        self.assertIn("Revenue YoY：50.00%", markdown)
+        self.assertIn("20D 相對 0050：資料不足", markdown)
+        self.assertIn("本次優先深入研究", markdown)
+        self.assertIn("研究注意力", captions)
+        for label in (
+            "Net Margin", "EPS", "Total Cash", "Total Debt", "Debt to Equity",
+            "Operating Cash Flow", "Free Cash Flow", "Trailing P/E", "Forward P/E",
+            "P/B", "Current Price", "52-week High", "52-week Low", "50-day Average", "200-day Average",
+        ):
+            self.assertEqual(markdown.count(f"{label}："), 1)
+        rendered_text = markdown + "\n" + captions
+        self.assertIn("市值資料", rendered_text)
+        self.assertIn("相關研究資料", rendered_text)
+        self.assertNotRegex(rendered_text, r"(?:missing|context|global):")
+        expander_labels = "\n".join(item.label for item in app_test.expander)
+        self.assertIn("優先深入研究", expander_labels)
+        self.assertIn("值得觀察", expander_labels)
+        self.assertIn("證據不足", expander_labels)
+        self.assertNotIn("上漲機率", markdown)
+        self.assertNotIn("目標價", markdown)
+
+    def test_ai_analyst_malformed_synthesis_keeps_card_and_friendly_failure(self):
+        app_test = AppTest.from_function(ai_analyst_malformed_synthesis_fixture_app)
+        app_test.run()
+        app_test.button(key="ai_analyst_shortlist_run").click().run()
+
+        self.assertFalse(app_test.exception)
+        self.assertTrue(any("清單比較暫時無法完成" in item.value for item in app_test.warning))
+        self.assertTrue(any("AI 分析師初步審查" in item.value for item in app_test.markdown))
+        diagnostic = next(item for item in app_test.expander if item.label == "技術診斷")
+        self.assertIn("STRUCTURED_OUTPUT_SCHEMA_ERROR", "\n".join(item.value for item in diagnostic.caption))
+
+    def _assert_single_card_renderer_is_canonical(self, fixture_app):
+        from ai_analyst_shortlist import VERIFIED_EVIDENCE_FIELDS
+
+        app_test = AppTest.from_function(fixture_app)
+        app_test.run()
+
+        self.assertFalse(app_test.exception)
+        markdown_values = [item.value for item in app_test.markdown]
+        markdown = "\n".join(markdown_values)
+        evidence_start = markdown_values.index("##### 已驗證研究證據")
+        analysis_start = markdown_values.index("##### AI 分析")
+        evidence_markdown = "\n".join(markdown_values[evidence_start:analysis_start])
+        for section in ("Opportunity Radar", "基本面", "估值", "市場"):
+            self.assertEqual(evidence_markdown.count(f"**{section}**"), 1)
+            self.assertEqual(markdown_values.count(f"**{section}**"), 1)
+        self.assertEqual(markdown_values.count("**估值解讀**"), 1)
+        for _section, _metric, label in VERIFIED_EVIDENCE_FIELDS:
+            self.assertEqual(markdown.count(f"{label}："), 1)
+        self.assertNotIn("STALE DUPLICATE", markdown)
+        self.assertNotRegex(markdown, r"(?:missing|context|global):")
+
+    def test_ai_analyst_sparse_1216_renderer_uses_one_canonical_metric_map(self):
+        self._assert_single_card_renderer_is_canonical(ai_analyst_sparse_renderer_fixture_app)
+
+    def test_ai_analyst_rich_2027_renderer_uses_one_canonical_metric_map(self):
+        self._assert_single_card_renderer_is_canonical(ai_analyst_rich_renderer_fixture_app)
+
+    def _assert_acceptance_card_ownership(self, expander):
+        values = [item.value for item in expander.markdown]
+        text = "\n".join(values)
+        self.assertEqual(values.count("##### 已驗證研究證據"), 1)
+        self.assertEqual(values.count("##### AI 分析"), 1)
+        expected = {
+            "Opportunity Radar": ["營收月份", "Revenue YoY", "Revenue MoM", "20D 相對 0050", "60D 相對 0050"],
+            "基本面": ["Revenue Growth", "Earnings Growth", "ROE", "Gross Margin", "Operating Margin", "Net Margin",
+                    "EPS", "Total Cash", "Total Debt", "Debt to Equity", "Operating Cash Flow", "Free Cash Flow"],
+            "估值": ["Trailing P/E", "Forward P/E", "P/B"],
+            "市場": ["Current Price", "52-week High", "52-week Low", "50-day Average", "200-day Average"],
+        }
+        self.assertEqual([len(labels) for labels in expected.values()], [5, 12, 3, 5])
+        sections = list(expected)
+        for index, (section, labels) in enumerate(expected.items()):
+            heading = f"**{section}**"
+            self.assertEqual(values.count(heading), 1)
+            end = values.index(f"**{sections[index + 1]}**") if index < 3 else values.index("##### AI 分析")
+            rows = values[values.index(heading) + 1:end]
+            self.assertEqual(len(rows), len(labels))
+            for row, label in zip(rows, labels):
+                self.assertTrue(row.startswith(f"- {label}："), row)
+                self.assertEqual(text.count(f"- {label}："), 1)
+        for heading in ("機會判讀", "基本面品質", "估值解讀", "市場確認", "主要風險", "矛盾", "缺少證據", "下一步確認"):
+            self.assertEqual(values.count(f"**{heading}**"), 1)
+        self.assertNotRegex(text, r"(?:missing|context|global):")
+        return text
+
+    def _run_acceptance_pipeline(self, valid_count):
+        app_test = AppTest.from_function(ai_analyst_acceptance_pipeline_fixture_app)
+        app_test.session_state["fixture_valid_count"] = valid_count
+        app_test.run()
+        self.assertFalse(app_test.exception)
+        self.assertEqual(app_test.session_state["fixture_stage1_calls"], [])
+        app_test.button(key="ai_analyst_shortlist_run").click().run()
+        self.assertFalse(app_test.exception)
+        return app_test
+
+    def test_three_company_button_session_renderer_preserves_all_metrics_once(self):
+        app_test = self._run_acceptance_pipeline(3)
+        symbols = ["1216.TW", "1608.TW", "2027.TW"]
+        self.assertEqual(app_test.session_state["fixture_stage1_calls"], symbols)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [symbols])
+        self.assertEqual(len(app_test.expander), 3)
+        for symbol, expander in zip(symbols, app_test.expander):
+            with self.subTest(symbol=symbol):
+                self.assertTrue(expander.label.startswith(symbol))
+                text = self._assert_acceptance_card_ownership(expander)
+                if symbol != "2027.TW":
+                    self.assertIn("- ROE：資料不足", text)
+                    self.assertIn("- Current Price：資料不足", text)
+                else:
+                    for expected in ("Current Price：TWD 48.40", "50-day Average：TWD 44.08",
+                                     "200-day Average：TWD 39.55", "Earnings Growth：362.20%"):
+                        self.assertIn(expected, text)
+        self.assertTrue(any(item.value == "#### 本次優先深入研究" for item in app_test.markdown))
+        app_test.run()
+        self.assertFalse(app_test.exception)
+        self.assertEqual(app_test.session_state["fixture_stage1_calls"], symbols)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [symbols])
+
+    def test_partial_comparison_renders_validated_pair_and_excluded_company_notice(self):
+        app_test = self._run_acceptance_pipeline(2)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [["1216.TW", "1608.TW"]])
+        self.assertTrue(any(item.value == "#### 本次優先深入研究" for item in app_test.markdown))
+        info = "\n".join(item.value for item in app_test.info)
+        self.assertIn("本次比較僅涵蓋已通過初步審查的標的", info)
+        self.assertIn("2027.TW 未通過 Stage 1", info)
+        text = "\n".join(item.value for item in app_test.markdown)
+        self.assertIn("**1216.TW**：先查核營收變化的來源。", text)
+        self.assertNotIn("**2027.TW**：", text)
+        for expander in app_test.expander[:2]:
+            self._assert_acceptance_card_ownership(expander)
+
+    def test_single_validated_card_skips_comparison_with_clear_reason(self):
+        app_test = self._run_acceptance_pipeline(1)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [])
+        self.assertTrue(any("至少需要兩檔" in item.value for item in app_test.info))
+        self.assertFalse(any(item.value == "#### 本次優先深入研究" for item in app_test.markdown))
+        self.assertFalse(any("清單比較暫時無法完成" in item.value for item in app_test.warning))
+
+    def test_zero_validated_cards_skips_comparison_with_clear_reason(self):
+        app_test = self._run_acceptance_pipeline(0)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [])
+        self.assertTrue(any("尚無標的通過初步審查" in item.value for item in app_test.info))
+        self.assertFalse(any(item.value == "#### 本次優先深入研究" for item in app_test.markdown))
 
     def test_candidate_rows_use_selected_source_and_neutral_symbol_order(self):
         import app as app_module

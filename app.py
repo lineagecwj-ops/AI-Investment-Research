@@ -100,6 +100,12 @@ from ai_followup import build_followup_suggestions
 from ai_followup import create_research_turn
 from ai_followup import infer_followup_question_type
 from ai_research_service import generate_grounded_research_answer
+from ai_analyst_shortlist import AI_ANALYST_SHORTLIST_MAX_SIZE
+from ai_analyst_shortlist import AIAnalystShortlistError
+from ai_analyst_shortlist import VERIFIED_EVIDENCE_FIELDS
+from ai_analyst_shortlist import analyze_research_shortlist
+from ai_analyst_shortlist import format_stage_two_failure_diagnostic
+from ai_analyst_shortlist import humanize_analyst_display_text
 from company_summary_service import build_company_summary_display
 from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
@@ -115,6 +121,12 @@ from forward_research_observation_service import capture_local_forward_observati
 from forward_research_observation_service import deterministic_observation_id
 from forward_research_observation_service import live_market_data_status
 from forward_research_observation_service import load_live_historical_price_series
+from opportunity_radar_service import OpportunityRadarRevenueError
+from opportunity_radar_service import find_latest_monthly_revenue_record
+from opportunity_radar_service import load_latest_monthly_revenue_snapshot
+from opportunity_radar_service import normalize_monthly_revenue_records
+from opportunity_radar_service import persist_monthly_revenue_snapshot
+from opportunity_radar_service import request_official_monthly_revenue
 from historical_condition_outcome_service import DEFAULT_DIAGNOSTIC_WARMUP_TRADING_BARS
 from historical_condition_outcome_service import HistoricalConditionOutcomeComparisonConfig
 from historical_condition_outcome_service import build_diagnostic_technical_series
@@ -263,6 +275,7 @@ RESEARCH_CANDIDATE_AVAILABILITY_COLUMNS = (
 RESEARCH_CANDIDATE_SORT_OPTIONS = ("股票代號", "公司名稱", "產業")
 RESEARCH_SHORTLIST_SESSION_KEY = "research_shortlist_v0"
 RESEARCH_SHORTLIST_MAX_SIZE = 20
+AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY = "ai_analyst_shortlist_result_v0"
 
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
@@ -351,6 +364,7 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("v1_1_shadow_dashboard_view", None)
     st.session_state.setdefault("v1_1_shadow_dashboard_last_error", None)
     st.session_state.setdefault(RESEARCH_SHORTLIST_SESSION_KEY, [])
+    st.session_state.setdefault(AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY, None)
 
 
 def render_query_failures(failures) -> None:
@@ -689,19 +703,34 @@ def build_research_candidate_reason(
 
 
 def research_candidate_action_buttons(selected_symbol: str, *, key_prefix: str) -> None:
+    notice_key = f"{key_prefix}_handoff_notice"
+    notice = st.session_state.get(notice_key)
+    if isinstance(notice, dict) and notice.get("symbol") == selected_symbol:
+        destination = notice.get("destination")
+        st.success(f"已將 {selected_symbol} 帶入 {destination}，請點上方 {destination} 分頁繼續。")
     action_cols = st.columns(6)
+    destination = None
     if action_cols[0].button("帶入每日研究首頁", key=f"{key_prefix}_daily"):
-        queue_research_symbol_handoff("daily", selected_symbol)
+        queue_research_symbol_handoff("daily", selected_symbol, rerun=False)
+        destination = "每日研究首頁"
     if action_cols[1].button("Research", key=f"{key_prefix}_research"):
-        queue_research_symbol_handoff("research", selected_symbol)
+        queue_research_symbol_handoff("research", selected_symbol, rerun=False)
+        destination = "Research"
     if action_cols[2].button("Historical Trends", key=f"{key_prefix}_historical"):
-        queue_research_symbol_handoff("historical", selected_symbol)
+        queue_research_symbol_handoff("historical", selected_symbol, rerun=False)
+        destination = "Historical Trends"
     if action_cols[3].button("AI Research", key=f"{key_prefix}_ai"):
-        queue_research_symbol_handoff("ai", selected_symbol)
+        queue_research_symbol_handoff("ai", selected_symbol, rerun=False)
+        destination = "AI Research"
     if action_cols[4].button("Swing Research", key=f"{key_prefix}_swing"):
-        queue_research_symbol_handoff("swing", selected_symbol)
+        queue_research_symbol_handoff("swing", selected_symbol, rerun=False)
+        destination = "Swing Research"
     if action_cols[5].button("Comparison", key=f"{key_prefix}_comparison"):
-        queue_research_symbol_handoff("comparison", selected_symbol)
+        queue_research_symbol_handoff("comparison", selected_symbol, rerun=False)
+        destination = "Comparison"
+    if destination:
+        st.session_state[notice_key] = {"symbol": selected_symbol, "destination": destination}
+        st.rerun()
 
 
 def add_research_shortlist_rows(
@@ -844,6 +873,196 @@ def build_research_shortlist_status_rows(
     return status_rows
 
 
+def load_cached_stock_for_ai_analyst(symbol: str):
+    """Read current local stock evidence without falling back to a network provider."""
+    try:
+        return LiveDataStore().get_cached_stock(symbol)
+    except Exception:
+        return None
+
+
+def resolve_current_opportunity_radar_evidence(symbol: str) -> dict | None:
+    """Resolve canonical local Radar evidence by symbol without refreshing data."""
+    resolved = find_latest_monthly_revenue_record(symbol)
+    if resolved is None:
+        return None
+    payload, record = resolved
+    try:
+        price_context = build_local_observation_context(
+            stock_series=load_live_historical_price_series(symbol),
+            benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL),
+            company_name=None,
+            industry=None,
+            in_watchlist=False,
+            long_term_research_available=False,
+            historical_trends_available=False,
+            ai_research_available=False,
+            swing_research_available=False,
+        )
+    except ForwardResearchObservationError:
+        rel20 = rel60 = None
+    else:
+        rel20 = price_context.rel_return_20d
+        rel60 = price_context.rel_return_60d
+
+    flags = []
+    if record.revenue_yoy is not None and record.revenue_yoy > 0:
+        flags.append("營收年增為正")
+    if record.revenue_mom is not None and record.revenue_mom > 0:
+        flags.append("營收月增為正")
+    if rel20 is not None and rel20 > 0:
+        flags.append("20D 強於 0050")
+    if rel60 is not None and rel60 > 0:
+        flags.append("60D 強於 0050")
+    return {
+        "revenue_period": record.reported_year_month,
+        "revenue_yoy": record.revenue_yoy,
+        "revenue_mom": record.revenue_mom,
+        "relative_return_20d": rel20,
+        "relative_return_60d": rel60,
+        "condition_flags": flags,
+        "retrieved_at": payload.get("retrieved_at"),
+    }
+
+
+def render_ai_analyst_shortlist_result(result: dict) -> None:
+    cards = result.get("cards") or []
+    if not cards:
+        return
+    if result.get("stage1_success_count") == 0:
+        st.warning("AI 分析暫時無法完成，原始研究資料仍可正常使用。")
+    st.markdown("#### AI 分析師初步審查")
+    st.caption("研究優先度只代表研究注意力，不是買賣建議、分數、機率或目標價。")
+    for card in cards:
+        with st.expander(f"{card['symbol']} · {card['company_name']} · {card['research_priority']}"):
+            st.markdown(f"**研究優先度：** {card['research_priority']}")
+            st.markdown("##### 已驗證研究證據")
+            evidence_by_metric = build_canonical_analyst_evidence_map(
+                card.get("verified_evidence", [])
+            )
+            rendered_evidence_count = 0
+            for section in ("Opportunity Radar", "基本面", "估值", "市場"):
+                section_fields = [
+                    (metric, label)
+                    for owner, metric, label in VERIFIED_EVIDENCE_FIELDS
+                    if owner == section and metric in evidence_by_metric
+                ]
+                if not section_fields:
+                    continue
+                st.markdown(f"**{section}**")
+                for metric, label in section_fields:
+                    item = evidence_by_metric[metric]
+                    st.write(f"- {label}：{item['display_value']}")
+                    rendered_evidence_count += 1
+            if rendered_evidence_count == 0:
+                st.write("- 資料不足")
+
+            st.markdown("##### AI 分析")
+            sections = (
+                (
+                    "機會判讀",
+                    card.get("opportunity_interpretation", card.get("opportunity_evidence", [])),
+                ),
+                ("基本面品質", [card["fundamental_quality"]]),
+                ("估值解讀", [card["valuation_context"]]),
+                ("市場確認", [card["market_confirmation"]]),
+                ("主要風險", card["risks"]),
+                ("矛盾", card["contradictions"]),
+                ("缺少證據", card["missing_evidence"]),
+                ("下一步確認", card["next_checks"]),
+            )
+            for label, values in sections:
+                st.markdown(f"**{label}**")
+                if values:
+                    for value in values:
+                        st.write(f"- {humanize_analyst_display_text(value)}")
+                else:
+                    st.write("- 目前沒有可驗證內容。")
+
+    excluded_symbols = result.get("stage2_excluded_symbols") or []
+    if excluded_symbols:
+        st.info(
+            "本次比較僅涵蓋已通過初步審查的標的；"
+            + "、".join(excluded_symbols)
+            + " 未通過 Stage 1，因此未納入本次比較。"
+        )
+    skip_reason = result.get("synthesis_skip_reason")
+    if skip_reason:
+        st.info(skip_reason)
+        return
+    synthesis = result.get("synthesis")
+    if synthesis is None:
+        st.warning("AI 清單比較暫時無法完成；個別公司初步審查與原始研究資料仍可正常使用。")
+        diagnostic = result.get("stage2_diagnostic")
+        if isinstance(diagnostic, dict):
+            with st.expander("技術診斷", expanded=False):
+                st.caption(format_stage_two_failure_diagnostic(diagnostic))
+        return
+    st.markdown("#### 本次優先深入研究")
+    st.caption("此區是在本批 validated cards 中的相對研究注意力排序，不改變個別卡片的研究優先度。")
+    if synthesis["priority_deep_dive"]:
+        for item in synthesis["priority_deep_dive"]:
+            st.write(f"**{item['symbol']}**：{humanize_analyst_display_text(item['reason'])}")
+            st.caption(
+                f"主要待確認風險：{humanize_analyst_display_text(item['main_unresolved_risk'])}"
+            )
+    else:
+        st.info("目前沒有需要強制列入優先深入研究的標的。")
+    for observation in synthesis["cross_company_observations"]:
+        st.write(f"- {humanize_analyst_display_text(observation)}")
+    st.caption(humanize_analyst_display_text(synthesis["overall_note"]))
+
+
+def build_canonical_analyst_evidence_map(verified_evidence: list[dict]) -> dict[str, dict]:
+    expected_owner = {
+        metric: owner
+        for owner, metric, _label in VERIFIED_EVIDENCE_FIELDS
+    }
+    evidence_by_metric = {}
+    for item in verified_evidence:
+        metric = item.get("metric")
+        if metric not in expected_owner:
+            continue
+        current = evidence_by_metric.get(metric)
+        item_has_canonical_owner = item.get("section") == expected_owner[metric]
+        current_has_canonical_owner = (
+            current is not None
+            and current.get("section") == expected_owner[metric]
+        )
+        if current is None or (item_has_canonical_owner and not current_has_canonical_owner):
+            evidence_by_metric[metric] = item
+    return evidence_by_metric
+
+
+def render_ai_analyst_shortlist_control(shortlist: list[dict[str, str]]) -> None:
+    if not shortlist:
+        st.info("本次研究清單尚無標的，請先加入股票後再使用 AI 分析。")
+        return
+    if st.button("AI 分析本次研究清單", key="ai_analyst_shortlist_run"):
+        if len(shortlist) > AI_ANALYST_SHORTLIST_MAX_SIZE:
+            st.warning("AI 分析 V0 一次最多分析 5 檔，請先縮小本次研究清單。")
+        else:
+            try:
+                with st.spinner("正在進行逐檔 grounded review 與跨公司整理…"):
+                    result = analyze_research_shortlist(
+                        shortlist,
+                        stock_loader=load_cached_stock_for_ai_analyst,
+                        radar_evidence_resolver=resolve_current_opportunity_radar_evidence,
+                    )
+            except AIAnalystShortlistError as error:
+                st.warning(str(error))
+            except Exception:
+                st.warning("AI 分析暫時無法完成，原始研究資料仍可正常使用。")
+            else:
+                result["shortlist_symbols"] = [row["股票代號"] for row in shortlist]
+                st.session_state[AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY] = result
+
+    result = st.session_state.get(AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY)
+    current_symbols = [row["股票代號"] for row in shortlist]
+    if result and result.get("shortlist_symbols") == current_symbols:
+        render_ai_analyst_shortlist_result(result)
+
+
 def render_research_shortlist_controls(
     filtered_rows: list[dict[str, str]],
     *,
@@ -867,11 +1086,13 @@ def render_research_shortlist_controls(
             except ValueError as error:
                 st.warning(str(error))
             else:
+                st.session_state[AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY] = None
                 st.rerun()
 
     shortlist = st.session_state[RESEARCH_SHORTLIST_SESSION_KEY]
     if not shortlist:
         st.caption("目前尚未加入研究標的。清單只保留於本次 session。")
+        render_ai_analyst_shortlist_control(shortlist)
         return
 
     status_rows = build_research_shortlist_status_rows(shortlist)
@@ -886,10 +1107,14 @@ def render_research_shortlist_controls(
     if management_cols[0].button("移除選取標的", key="research_shortlist_remove"):
         remove_symbols = [shortlist[shortlist_labels.index(label)]["股票代號"] for label in remove_labels]
         st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = remove_research_shortlist_symbols(shortlist, remove_symbols)
+        st.session_state[AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY] = None
         st.rerun()
     if management_cols[1].button("清空本次研究清單", key="research_shortlist_clear"):
         st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = []
+        st.session_state[AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY] = None
         st.rerun()
+
+    render_ai_analyst_shortlist_control(shortlist)
 
     action_cols = st.columns(2)
     if action_cols[0].button("更新研究清單市場資料", key="research_shortlist_refresh"):
@@ -911,6 +1136,95 @@ def render_research_shortlist_controls(
         st.info(f"本次研究快照\n\n新建立：{created_count}\n\n已存在：{existing_count}\n\n未儲存：{len(unsaved)}")
         if unsaved:
             st.dataframe(unsaved, width="stretch", hide_index=True)
+
+
+def render_opportunity_radar(frozen_universe, company_context, watchlist_symbols):
+    st.markdown("#### 研究機會雷達")
+    st.caption("以目前官方月營收與本機相對 0050 強弱整理研究條件，不是分數、排名或投資建議。")
+    daily_notice = st.session_state.get("opportunity_radar_daily_handoff_notice")
+    if isinstance(daily_notice, str):
+        st.success(daily_notice)
+    if st.button("更新官方月營收資料", key="opportunity_radar_refresh_revenue"):
+        try:
+            raw = request_official_monthly_revenue()
+            records = normalize_monthly_revenue_records(raw, set(frozen_universe.symbols))
+            path = persist_monthly_revenue_snapshot(records, raw)
+        except OpportunityRadarRevenueError as error:
+            st.warning(f"官方月營收更新失敗：{error}")
+        else:
+            st.success(f"已保存官方月營收研究快照：{path.name}。")
+    loaded = load_latest_monthly_revenue_snapshot()
+    if loaded is None:
+        st.info("尚無官方月營收研究快照；可手動更新後再檢視。")
+        return
+    payload, records = loaded
+    st.caption(f"月營收資料擷取時間：{payload['retrieved_at']}。")
+    filters = st.columns(5)
+    yoy_positive = filters[0].checkbox("Revenue YoY > 0", key="radar_yoy_positive")
+    mom_positive = filters[1].checkbox("Revenue MoM > 0", key="radar_mom_positive")
+    rel20_positive = filters[2].checkbox("REL_RETURN_20D > 0", key="radar_rel20_positive")
+    rel60_positive = filters[3].checkbox("REL_RETURN_60D > 0", key="radar_rel60_positive")
+    industry = filters[4].selectbox("雷達產業", ["全部", *sorted({context.get('broad_industry', 'N/A') for context in company_context.values()})], key="radar_industry")
+    rows = []
+    shortlist_rows = []
+    for record in records:
+        context = company_context.get(record.symbol, {})
+        if industry != "全部" and context.get("broad_industry", "N/A") != industry: continue
+        if yoy_positive and not (record.revenue_yoy is not None and record.revenue_yoy > 0): continue
+        if mom_positive and not (record.revenue_mom is not None and record.revenue_mom > 0): continue
+        try:
+            price_context = build_local_observation_context(stock_series=load_live_historical_price_series(record.symbol), benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL), company_name=None, industry=None, in_watchlist=False, long_term_research_available=False, historical_trends_available=False, ai_research_available=False, swing_research_available=False)
+            rel20, rel60 = price_context.rel_return_20d, price_context.rel_return_60d
+        except ForwardResearchObservationError:
+            rel20 = rel60 = None
+        if rel20_positive and not (rel20 is not None and rel20 > 0): continue
+        if rel60_positive and not (rel60 is not None and rel60 > 0): continue
+        flags = []
+        if record.revenue_yoy is not None and record.revenue_yoy > 0: flags.append("營收年增為正")
+        if record.revenue_mom is not None and record.revenue_mom > 0: flags.append("營收月增為正")
+        if rel20 is not None and rel20 > 0: flags.append("20D 強於 0050")
+        if rel60 is not None and rel60 > 0: flags.append("60D 強於 0050")
+        row = {"股票代號": record.symbol, "公司名稱": context.get("company_name") or record.company_name or "N/A", "產業": context.get("broad_industry") or "N/A", "營收月份": record.reported_year_month, "Revenue YoY": format_percentage(record.revenue_yoy) if record.revenue_yoy is not None else "unavailable", "Revenue MoM": format_percentage(record.revenue_mom) if record.revenue_mom is not None else "unavailable", "REL_RETURN_20D": format_percentage(rel20) if rel20 is not None else "unavailable", "REL_RETURN_60D": format_percentage(rel60) if rel60 is not None else "unavailable", "研究條件": "、".join(flags) or "月營收條件未成立"}
+        rows.append(row)
+        shortlist_rows.append({
+            **row,
+            "長期研究": DAILY_RESEARCH_STATUS_EMPTY,
+            "歷史趨勢": DAILY_RESEARCH_STATUS_EMPTY,
+            "AI 研究": DAILY_RESEARCH_STATUS_EMPTY,
+            "波段研究": DAILY_RESEARCH_STATUS_EMPTY,
+            "_analyst_evidence": {
+                "revenue_period": record.reported_year_month,
+                "revenue_yoy": record.revenue_yoy,
+                "revenue_mom": record.revenue_mom,
+                "relative_return_20d": rel20,
+                "relative_return_60d": rel60,
+                "condition_flags": flags,
+                "retrieved_at": payload.get("retrieved_at"),
+            },
+        })
+    st.dataframe(rows, width="stretch", hide_index=True)
+    if not shortlist_rows:
+        return
+    labels = [daily_research_stock_label(row["股票代號"], company_context) for row in shortlist_rows]
+    selected_label = st.selectbox("檢視雷達標的", labels, key="opportunity_radar_selected_symbol")
+    selected = shortlist_rows[labels.index(selected_label)]
+    st.info(f"目前符合的研究條件：{selected['研究條件']}。\n\n尚缺的研究證據：月營收或相對資料顯示 unavailable 時，請先手動更新相關本機資料。")
+    action_cols = st.columns(2)
+    if action_cols[0].button("加入本次研究清單", key="opportunity_radar_add_shortlist"):
+        try:
+            st.session_state[RESEARCH_SHORTLIST_SESSION_KEY] = add_research_shortlist_rows(st.session_state[RESEARCH_SHORTLIST_SESSION_KEY], [selected])
+        except ValueError as error:
+            st.warning(str(error))
+        else:
+            st.session_state[AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY] = None
+            st.rerun()
+    if action_cols[1].button("帶入每日研究首頁", key="opportunity_radar_daily"):
+        queue_research_symbol_handoff("daily", selected["股票代號"], rerun=False)
+        st.session_state["opportunity_radar_daily_handoff_notice"] = (
+            f"已將 {selected['股票代號']} 帶入每日研究首頁，請點上方每日研究首頁分頁繼續。"
+        )
+        st.rerun()
+    research_candidate_action_buttons(selected["股票代號"], key_prefix="opportunity_radar_go")
 
 
 def render_research_candidate_explorer(
@@ -976,6 +1290,8 @@ def render_research_candidate_explorer(
         company_context=company_context,
         watchlist_symbols=watchlist_symbols,
     )
+    if frozen_universe is not None:
+        render_opportunity_radar(frozen_universe, company_context, watchlist_symbols)
 
     if not filtered_rows:
         st.info("目前沒有符合條件的研究標的。")
