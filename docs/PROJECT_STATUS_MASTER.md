@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-31, after Research Evidence Expansion V1A release.
+Last updated: 2026-08-31, after Research Deep Dive / Catalyst V1F foundation release.
 
 ## Project Purpose
 
@@ -42,16 +42,17 @@ This status document is based on:
 - Productionization P1B Read-Only Health Check + Operator Verify Command source and test inspection
 - Opportunity Radar V0 + AI Analyst V0 release validation and final manual acceptance evidence
 - Research Evidence Expansion V1A release validation and crash-safe real-AI acceptance evidence
+- Research Deep Dive / Catalyst V1F external-source retrieval foundation release validation evidence
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `b96e160 feat: add shortlist research evidence refresh v1a`
-- Current full HEAD: `b96e1603768e371d96a02a06cb475e1202a0531d`
-- Remote baseline at synchronization time: `origin/main` points to `b96e1603768e371d96a02a06cb475e1202a0531d`
-- Documentation status: this file is being synchronized after the Research Evidence Expansion V1A release.
+- Implementation baseline: `68c33e0 feat: add catalyst external source retrieval foundation`
+- Current full HEAD: `68c33e04e14913ec4f10714b2fe6e27657eb27bb`
+- Remote baseline at synchronization time: `origin/main` points to `68c33e04e14913ec4f10714b2fe6e27657eb27bb`
+- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1F foundation release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -2129,6 +2130,56 @@ This section supersedes earlier V1 planning statements where they differ; earlie
 - Non-blocking limitations remain: provider-returned current fields may be missing; exact 0050 alignment can make relative returns unavailable; current Yahoo evidence is not historical PIT evidence; upstream source metadata can be incomplete; and individual AI slots may be rejected while a company Card remains usable by design.
 - `RESEARCH_EVIDENCE_EXPANSION_V1B = NOT YET APPROVED`. Possible later review priorities are 0050 freshness / alignment observability, provenance display, provider-missing-field impact, and richer cross-company Analyst usefulness. No V1B implementation is approved by this release.
 
+## Research Deep Dive / Catalyst V1F Release (2026-08-31)
+
+This section records a research-only, deterministic external-source evidence foundation. It does not create a Catalyst interpretation, Deep Dive UI, real product transport, persistence, or production capability.
+
+### Released Baseline And Scope
+
+- `RESEARCH_DEEP_DIVE_CATALYST_V1F = RELEASED`
+- Release commit: `68c33e04e14913ec4f10714b2fe6e27657eb27bb` (`feat: add catalyst external source retrieval foundation`).
+- Released scope: `src/external_source.py`, `src/web_search_retrieval.py`, `tests/fixtures/catalyst_v1f_web_search_results.json`, `tests/test_external_source.py`, and `tests/test_web_search_retrieval.py`.
+- Final validation: focused tests `17 OK`; relevant AI Research / Research Context / AI Follow-up / AI Analyst / Dashboard regression `300 OK`; `compileall`: PASS; `git diff --check`: PASS; final pre-commit verdict: `V1F_FINAL_PRECOMMIT_PASS`.
+
+### Deterministic Evidence Foundation
+
+V1F introduces immutable `ExternalSourceRef`, `SourceTemporalEvidence`, and `WebSearchRetrievalArtifact` concepts. The foundation provides explicit research-window validation, fail-closed company association, related-entity isolation, program-owned source-tier classification, URL canonicalization, deterministic source deduplication, content hashes, deterministic artifact checksums, and actual observed web-search-call accounting.
+
+`source_published_at` is distinct from `EVENT_ANNOUNCED_AT`, `EVENT_OCCURRED_AT`, and `retrieved_at`. A source page can contain multiple future events; therefore `ONE SEARCH RESULT != ONE CATALYST EVENT`. No timestamp is fabricated: date-only `2026-08-10` remains `DATE`, genuine datetime remains `DATETIME`, and relative dates such as `3 weeks ago` plus ambiguous numeric forms such as `08/06/2026` fail closed. The pre-release P1 issue that promoted date-only metadata to midnight `DATETIME` was corrected and covered by regression tests before release.
+
+Company identity is evaluated from canonical identity evidence rather than a URL suffix alone. Related entities are retained but isolated: `Uni-President China Holdings Ltd.` / stock `220` cannot automatically satisfy direct evidence for `1216.TW` / Uni-President Enterprises Corp. Tier 4 social/community sources may remain in a raw retrieval artifact but cannot satisfy primary factual-evidence acceptance.
+
+Known tracking parameters are removed deterministically while meaningful URL components are preserved; URLs are never semantically rewritten. Primary deduplication uses canonical URL, with `domain + normalized title` only as a fallback when URL is unavailable. Artifact checksums intentionally exclude `retrieved_at` where deterministic equivalent-evidence replay requires it.
+
+### Retrieval And Model Boundary
+
+V1F contains no real network transport. `WebSearchRetrievalService` requires an injected client and `explicit_refresh=True`; it has no automatic network access, startup refresh, fallback refresh, DB persistence, or Production write path. The retrieval model is explicit and configurable. Existing AI Research synthesis remains on `gpt-5-mini`; V1F does not change the global synthesis model.
+
+Real V1E3 / V1E4 feasibility trials manually confirmed that OpenAI Responses Web Search could retrieve Taiwan company research for `1216.TW` / Uni-President Enterprises Corp. with HTTP `200` / completed results. Observed source categories included Yahoo Taiwan stock announcements, MarketScreener, TWSE company information, and other attributable financial sources. Observed factual examples included a 2026-08-06 Q2 / H1 financial-report approval and 2026-08-10 July revenue plus investor-conference announcements. These findings are summarized only; no long real provider snippet or provider payload is committed here.
+
+The observed `web_search_call.results` could provide title, URL, snippet, and richer search text, but did not guarantee normalized structured `published_at` for every result. Temporal evidence may instead appear inside snippets and must be normalized conservatively. A request configured with `max_tool_calls=1` also produced more than one observed `web_search_call` output item; V1F therefore records actual observed count rather than treating configured limit as the sole audit or cost truth. This records observed behavior only and does not infer provider internals.
+
+### Closed Provider Research And Remaining Gaps
+
+- `MARKETAUX_ENTITY_ONLY_PARTIAL`: Taiwan entity mapping `3/3`; 30-day relevant event coverage `0/3`.
+- `ALPHA_VANTAGE_TAIWAN_COVERAGE_FAIL`: deterministic Taiwan mapping `0/3`.
+- `TRADITIONAL_FINANCIAL_NEWS_API_PATH = PAUSE`; do not resume provider hopping for Catalyst V1 at this point.
+
+Remaining gaps are real Web Search transport integration, real retrieval acceptance for `1608.TW` and `2027.TW`, normalized provider `published_at` availability, multi-event decomposition from one search result, related-company isolation in real input, local JSON retrieval-artifact persistence, a Catalyst event model / synthesis, Deep Dive UI, and Production approval.
+
+### Product State And Next Approval Gate
+
+- `OPPORTUNITY_RADAR_V0 = RELEASED`
+- `AI_ANALYST_V0 = RELEASED`
+- `RESEARCH_EVIDENCE_EXPANSION_V1A = RELEASED`
+- `RESEARCH_DEEP_DIVE_CATALYST_V1F = RELEASED`
+- Catalyst AI synthesis: `NOT IMPLEMENTED`.
+- Deep Dive UI: `NOT IMPLEMENTED`.
+- Real retrieval transport integrated into product: `NO`.
+- `RESEARCH_DEEP_DIVE_CATALYST_V1G = NOT YET APPROVED`.
+
+The candidate V1G objective is real bounded Web Search responses for `1216.TW`, `1608.TW`, and `2027.TW` flowing through V1F normalization and ExternalSourceRef temporal / company / tier / dedup acceptance. It must add no UI, Catalyst synthesis, DB, or Production behavior unless separately approved.
+
 ## Current Working State
 
 Current state:
@@ -2142,7 +2193,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap decision point: Research Evidence Expansion V1B is not yet approved. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Research Deep Dive / Catalyst V1G is also not yet approved. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2210,6 +2261,7 @@ Completed:
 
 Next planning candidate:
 
+- Research Deep Dive / Catalyst V1G approval review: bounded real Web Search retrieval acceptance for 1216 / 1608 / 2027 using the released V1F normalization foundation only
 - Research Evidence Expansion V1B approval review
 
 Future:
@@ -2482,11 +2534,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `b96e1603768e371d96a02a06cb475e1202a0531d` or inspect any newer commits.
+2. Confirm HEAD is still `68c33e04e14913ec4f10714b2fe6e27657eb27bb` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Treat Research Evidence Expansion V1B as not yet approved; complete a separate approval review before implementation.
+8. Treat Research Evidence Expansion V1B and Research Deep Dive / Catalyst V1G as not yet approved; complete separate approval reviews before implementation.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
