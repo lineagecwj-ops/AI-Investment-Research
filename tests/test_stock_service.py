@@ -168,6 +168,17 @@ class StockServiceCacheTestCase(unittest.TestCase):
         self.assertEqual(stock.symbol, "NVDA")
         self.assertEqual(stock.current_price, 200.75)
 
+    def test_explicit_refresh_bypasses_a_valid_cache(self):
+        save_stock(self.sample_stock(price=200.75), self.db_path, fetched_at=self.now)
+        yahoo_stock = self.sample_stock(price=210.5)
+
+        with patch("database.utc_now", return_value=self.now + timedelta(hours=1)):
+            with patch("stock_service.fetch_stock_from_yahoo", return_value=yahoo_stock) as mock_fetch:
+                stock = get_stock("NVDA", db_path=self.db_path, force_refresh=True)
+
+        mock_fetch.assert_called_once_with("NVDA")
+        self.assertEqual(stock.current_price, 210.5)
+
     def test_cache_miss_queries_yahoo_and_writes_cache(self):
         yahoo_stock = self.sample_stock(price=210.5)
 

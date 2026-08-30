@@ -561,6 +561,7 @@ def stock_from_row(row: sqlite3.Row) -> Stock:
         two_hundred_day_average=row["two_hundred_day_average"],
         sector=row["sector"],
         industry=row["industry"],
+        fetched_at=parse_cache_datetime(row["fetched_at"]),
     )
 
 

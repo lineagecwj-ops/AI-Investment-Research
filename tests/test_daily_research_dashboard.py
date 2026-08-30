@@ -1,10 +1,12 @@
 import sys
 import inspect
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pyarrow as pa
 from streamlit.testing.v1 import AppTest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +75,30 @@ def candidate_explorer_app():
                 }
             },
         )
+
+
+def evidence_refresh_fixture_app():
+    import app as app_module
+    from unittest.mock import patch
+
+    def refresh(rows):
+        app_module.st.session_state["fixture_refresh_calls"] = app_module.st.session_state.get("fixture_refresh_calls", 0) + 1
+        return ({
+            "股票代號": "1216.TW", "目前快照": "已更新", "基本面": "可用", "估值": "可用",
+            "市場": "可用", "歷史市場": "已更新", "月營收": "本地資料可用", "相對 0050": "可用",
+        },)
+
+    with patch("app.build_research_shortlist_status_rows", return_value=[]), patch(
+        "app.refresh_research_shortlist_evidence", side_effect=refresh
+    ), patch("app.analyze_research_shortlist") as analyze:
+        app_module.initialize_session_state()
+        app_module.st.session_state[app_module.RESEARCH_SHORTLIST_SESSION_KEY] = [{
+            "股票代號": "1216.TW", "公司名稱": "統一", "產業": "食品業",
+        }]
+        app_module.render_research_shortlist_controls(
+            [], company_context={"1216.TW": {"company_name": "統一", "broad_industry": "食品業"}}, watchlist_symbols=[]
+        )
+        app_module.st.session_state["fixture_ai_calls"] = analyze.call_count
 
 
 def opportunity_radar_fixture_app():
@@ -335,7 +361,7 @@ def _render_acceptance_pipeline():
     from functools import partial
     from ai_analyst_shortlist import analyze_research_shortlist
     from tests.test_ai_analyst_shortlist import (
-        NOW, acceptance_answer, acceptance_stock, shortlist_row, valid_synthesis,
+        NOW, section_answer, acceptance_stock, shortlist_row, valid_synthesis,
     )
     import app as app_module
 
@@ -345,6 +371,7 @@ def _render_acceptance_pipeline():
     valid_count = state.get("fixture_valid_count", 3)
     state.setdefault("fixture_stage1_calls", [])
     state.setdefault("fixture_stage2_calls", [])
+    state.setdefault("fixture_stage2_payloads", [])
     rows = [shortlist_row(symbol) for symbol in symbols]
     for row in rows:
         row["公司名稱"] = acceptance_stock(row["股票代號"]).company_name
@@ -353,10 +380,18 @@ def _render_acceptance_pipeline():
         state["fixture_stage1_calls"].append(selected_context.symbol)
         if selected_context.symbol not in symbols[:valid_count]:
             raise RuntimeError("fixture Stage-1 failure")
-        return acceptance_answer(selected_context)
+        output = section_answer(selected_context)
+        if state.get("fixture_reject_valuation") and "valuation_text" in output:
+            output["valuation_text"] = "估值18.33倍，便宜可持有。"
+        if state.get("fixture_all_slots_invalid"):
+            for key in output:
+                if key.endswith("_text"):
+                    output[key] = "ROE 12%"
+        return output
 
     def synthesize(*, cards):
         state["fixture_stage2_calls"].append([card["symbol"] for card in cards])
+        state["fixture_stage2_payloads"].append(cards)
         answer = valid_synthesis(cards)
         answer["priority_deep_dive"] = [{
             "symbol": cards[0]["symbol"], "reason": "先查核營收變化的來源。",
@@ -365,7 +400,7 @@ def _render_acceptance_pipeline():
         return answer
 
     run = partial(
-        analyze_research_shortlist, grounded_generator=generate,
+        analyze_research_shortlist, section_generator=generate,
         synthesis_generator=synthesize, generated_at=NOW,
     )
     radar = {row["股票代號"]: row["_analyst_evidence"] for row in rows}
@@ -400,6 +435,51 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
         self.assertEqual(evidence["revenue_mom"], 0.0597)
         self.assertEqual(evidence["relative_return_20d"], 0.1260)
         self.assertEqual(evidence["relative_return_60d"], 0.2047)
+
+    def test_portfolio_display_inputs_are_arrow_safe_without_mutating_projection(self):
+        import app as app_module
+        from portfolio_dashboard.streamlit_view import build_overview_metric_rows
+        from portfolio_dashboard.view_model import PortfolioOverviewProjection
+        from portfolio_dashboard.view_model import PortfolioRiskDashboardProjection
+
+        created_at = datetime(2026, 8, 30, 13, 0, tzinfo=UTC)
+        projection = PortfolioRiskDashboardProjection(
+            overview=PortfolioOverviewProjection(
+                portfolio_ids=("portfolio-a",),
+                symbol_count=2,
+                artifact_count=1,
+                event_count=3,
+                alert_candidate_count=0,
+                risk_level_counts=(),
+                monitoring_state_counts=(),
+                policy_version_counts=(),
+                latest_created_at=created_at,
+            ),
+            positions=(),
+            risk_event_rows=(),
+            alert_candidate_rows=(),
+            artifact_lineage_rows=(),
+        )
+        warning_metadata = {"artifact_count": 1, "reference_time": created_at, "missing": None}
+
+        display_projection, display_metadata = app_module.build_portfolio_risk_display_inputs(
+            projection, warning_metadata,
+        )
+
+        self.assertEqual(projection.overview.symbol_count, 2)
+        self.assertIs(projection.overview.latest_created_at, created_at)
+        self.assertEqual(display_projection.overview.symbol_count, "2")
+        self.assertEqual(display_projection.overview.latest_created_at, created_at.isoformat())
+        self.assertEqual(display_metadata, {
+            "artifact_count": "1", "reference_time": created_at.isoformat(), "missing": "資料不足",
+        })
+        overview_rows = build_overview_metric_rows(display_projection)
+        overview_table = pa.Table.from_pylist(overview_rows)
+        self.assertEqual(str(overview_table.schema.field("Value").type), "string")
+        warning_table = pa.Table.from_pylist([
+            {"Name": key, "Value": value} for key, value in display_metadata.items()
+        ])
+        self.assertEqual(str(warning_table.schema.field("Value").type), "string")
 
 
     def test_status_rows_preserve_existing_module_boundaries(self):
@@ -533,6 +613,60 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
             [("2330.TW", "UPDATED"), ("2454.TW", "FAILED"), ("0050.TW", "UPDATED")],
         )
 
+    def test_explicit_evidence_refresh_updates_current_and_prices_with_isolated_failures(self):
+        import app as app_module
+
+        stock_calls = []
+        price_calls = []
+        radar_calls = []
+
+        def stock_loader(symbol, *, force_refresh):
+            stock_calls.append((symbol, force_refresh))
+            if symbol == "1608.TW":
+                raise app_module.StockServiceError("offline")
+            return SimpleNamespace(
+                revenue_growth=0.1, earnings_growth=0.2, return_on_equity=0.1,
+                gross_margin=0.2, operating_margin=0.1, net_margin=0.1,
+                trailing_eps=1.0, total_cash=1, total_debt=2, debt_to_equity=3,
+                operating_cash_flow=None, free_cash_flow=None, trailing_pe=10.0,
+                forward_pe=9.0, price_to_book=1.2, current_price=100.0,
+                fifty_two_week_high=110.0, fifty_two_week_low=70.0,
+                fifty_day_average=95.0, two_hundred_day_average=90.0,
+            )
+
+        def price_loader(symbol, *, force_refresh):
+            price_calls.append((symbol, force_refresh))
+            if symbol == "1608.TW":
+                raise HistoricalPriceError("offline")
+            return SimpleNamespace(is_stale=False)
+
+        def radar(symbol):
+            radar_calls.append((symbol, list(price_calls)))
+            return {
+                "revenue_yoy": 0.1,
+                "revenue_mom": 0.2,
+                "relative_return_20d": 0.01 if symbol == "1216.TW" else None,
+                "relative_return_60d": 0.02 if symbol == "1216.TW" else None,
+            }
+        results = app_module.refresh_research_shortlist_evidence(
+            [candidate_row("1608.TW"), candidate_row("1216.TW"), candidate_row("1216.TW")],
+            stock_loader=stock_loader,
+            price_loader=price_loader,
+            radar_evidence_resolver=radar,
+        )
+
+        self.assertEqual(stock_calls, [("1216.TW", True), ("1608.TW", True)])
+        self.assertEqual(price_calls, [("1216.TW", True), ("1608.TW", True), ("0050.TW", True)])
+        self.assertTrue(all(calls[-1] == ("0050.TW", True) for _symbol, calls in radar_calls))
+        by_symbol = {row["股票代號"]: row for row in results}
+        self.assertEqual(by_symbol["1216.TW"]["目前快照"], "已更新")
+        self.assertEqual(by_symbol["1216.TW"]["基本面"], "部分可用")
+        self.assertEqual(by_symbol["1216.TW"]["相對 0050"], "可用")
+        self.assertEqual(by_symbol["1608.TW"]["目前快照"], "更新失敗")
+        self.assertEqual(by_symbol["1608.TW"]["歷史市場"], "更新失敗")
+        self.assertEqual(by_symbol["1608.TW"]["相對 0050"], "日期未對齊或資料不足")
+        self.assertEqual(by_symbol["0050.TW"]["歷史市場"], "已更新")
+
     def test_batch_save_is_local_only_and_reports_created_existing_and_stale(self):
         import app as app_module
 
@@ -567,6 +701,20 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
         self.assertFalse(app_test.exception)
         self.assertTrue(any(button.label == "加入本次研究清單" for button in app_test.button))
         self.assertTrue(any("本次研究清單" in element.value for element in app_test.markdown))
+
+    def test_explicit_evidence_refresh_button_does_not_run_ai_analysis(self):
+        app_test = AppTest.from_function(evidence_refresh_fixture_app)
+        app_test.run()
+
+        self.assertFalse(app_test.exception)
+        self.assertTrue(any(button.label == "更新研究證據" for button in app_test.button))
+        self.assertEqual(app_test.session_state["fixture_refresh_calls"] if "fixture_refresh_calls" in app_test.session_state else 0, 0)
+        app_test.button(key="research_shortlist_refresh").click().run()
+
+        self.assertFalse(app_test.exception)
+        self.assertEqual(app_test.session_state["fixture_refresh_calls"], 1)
+        self.assertEqual(app_test.session_state["fixture_ai_calls"], 0)
+        self.assertTrue(app_test.dataframe)
 
     def test_opportunity_radar_fixture_renders_filters_shortlist_and_pending_handoff(self):
         app_test = AppTest.from_function(opportunity_radar_fixture_app)
@@ -718,6 +866,33 @@ class DailyResearchDashboardTestCase(unittest.TestCase):
         self.assertFalse(app_test.exception)
         self.assertEqual(app_test.session_state["fixture_stage1_calls"], symbols)
         self.assertEqual(app_test.session_state["fixture_stage2_calls"], [symbols])
+
+    def test_section_failure_keeps_verified_numbers_and_other_sections_visible(self):
+        app_test = AppTest.from_function(ai_analyst_acceptance_pipeline_fixture_app)
+        app_test.session_state["fixture_reject_valuation"] = True
+        app_test.run().button(key="ai_analyst_shortlist_run").click().run()
+        self.assertFalse(app_test.exception)
+        text = "\n".join(item.value for item in app_test.markdown)
+        self.assertIn("AI 解讀未通過驗證；已驗證數據仍可使用。", text)
+        self.assertIn("Current Price：TWD 48.40", text)
+        self.assertIn("目前財務證據可供初步研究", text)
+        self.assertNotIn("估值18.33倍，便宜可持有。", text)
+        payload = app_test.session_state["fixture_stage2_payloads"][0]
+        rich = next(card for card in payload if card["symbol"] == "2027.TW")
+        self.assertNotIn("valuation_context", rich)
+        self.assertNotIn("verified_evidence", rich)
+        self.assertEqual(app_test.session_state["fixture_stage1_calls"], ["1216.TW", "1608.TW", "2027.TW"])
+
+    def test_all_invalid_sections_render_evidence_only_and_skip_comparison(self):
+        app_test = AppTest.from_function(ai_analyst_acceptance_pipeline_fixture_app)
+        app_test.session_state["fixture_all_slots_invalid"] = True
+        app_test.run().button(key="ai_analyst_shortlist_run").click().run()
+        self.assertFalse(app_test.exception)
+        text = "\n".join(item.value for item in app_test.markdown)
+        self.assertIn("Current Price：TWD 48.40", text)
+        self.assertNotIn("ROE 12%", text)
+        self.assertEqual(app_test.session_state["fixture_stage2_calls"], [])
+        self.assertTrue(all("證據不足" in expander.label for expander in app_test.expander))
 
     def test_partial_comparison_renders_validated_pair_and_excluded_company_notice(self):
         app_test = self._run_acceptance_pipeline(2)

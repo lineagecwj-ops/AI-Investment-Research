@@ -94,15 +94,18 @@ def get_stock(
     symbol: str,
     db_path: Path | str | None = None,
     live_store: LiveDataStore | None = None,
+    *,
+    force_refresh: bool = False,
 ) -> Stock:
     store = live_store or LiveDataStore(db_path=db_path)
-    try:
-        cached_stock = store.get_cached_stock(symbol)
-    except Exception as exc:
-        log_cache_warning("SQLite cache read failed", exc)
-    else:
-        if cached_stock is not None:
-            return cached_stock
+    if not force_refresh:
+        try:
+            cached_stock = store.get_cached_stock(symbol)
+        except Exception as exc:
+            log_cache_warning("SQLite cache read failed", exc)
+        else:
+            if cached_stock is not None:
+                return cached_stock
 
     stock = fetch_stock_from_yahoo(symbol)
 

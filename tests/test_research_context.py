@@ -455,6 +455,17 @@ class ResearchContextTestCase(unittest.TestCase):
             ("current:current_price", "current:two_hundred_day_average"),
         )
 
+    def test_current_evidence_preserves_live_cache_timestamp_when_available(self):
+        stock = self.sample_stock()
+        stock.fetched_at = datetime(2026, 8, 1, 9, 0, tzinfo=UTC)
+
+        context = self.build_context(stock=stock)
+
+        self.assertEqual(
+            self.evidence_by_id(context)["current:current_price"].note,
+            "Live cache fetched at 2026-08-01T09:00:00+00:00.",
+        )
+
     def test_historical_revenue_recovery_traceability(self):
         series = self.recovery_series()
         context = self.build_context(series=series)

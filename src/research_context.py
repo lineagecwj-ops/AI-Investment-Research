@@ -702,6 +702,11 @@ def build_current_evidence(stock: Stock) -> list[EvidenceItem]:
                 period_year=None,
                 source="Yahoo Finance current snapshot",
                 source_type="source",
+                note=(
+                    f"Live cache fetched at {stock.fetched_at.isoformat()}."
+                    if stock.fetched_at is not None
+                    else None
+                ),
             )
         )
     return evidence

@@ -6,7 +6,7 @@ from decimal import ROUND_HALF_UP
 import json
 import os
 import re
-from typing import Any
+from typing import Any, Callable
 
 from ai_config import AIResearchConfig
 from ai_config import MAX_RESEARCH_QUESTION_LENGTH
@@ -369,7 +369,11 @@ NUMERIC_SCALE_FACTORS = {
 NUMERIC_CLAIM_PATTERN = re.compile(
     r"(?<![\w.])(?:(?P<currency>[A-Z]{3})\s+)?"
     r"(?P<value>[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
-    r"(?P<scale>[KMBT])?(?P<multiple>\s*(?:x|倍))?(?![\w.])",
+    r"(?P<scale>[KMBT])?(?P<multiple>\s*(?:x|倍))?(?!(?:[\w]|\.\d))",
+    flags=re.IGNORECASE,
+)
+METRIC_SPAN_BOUNDARY_PATTERN = re.compile(
+    r"[,，;；。！？!?\n•]|\b(?:and|but|while)\b|(?:以及|和|及)",
     flags=re.IGNORECASE,
 )
 NON_FINANCIAL_NUMERIC_PATTERNS = (
@@ -489,6 +493,9 @@ def generate_grounded_research_answer(
     client: Any | None = None,
     config: AIResearchConfig | None = None,
     generated_at: datetime | None = None,
+    response_format: dict[str, Any] | None = None,
+    answer_builder: Callable | None = None,
+    answer_validator: Callable | None = None,
 ) -> GroundedResearchAnswer:
     resolved_config = config or get_ai_research_config()
     validate_ai_request(question, selected_context)
@@ -505,7 +512,7 @@ def generate_grounded_research_answer(
         max_output_tokens=resolved_config.max_output_tokens,
         reasoning_effort=resolved_config.reasoning_effort,
         text_verbosity=resolved_config.text_verbosity,
-        response_format=STRUCTURED_OUTPUT_FORMAT,
+        response_format=response_format if response_format is not None else STRUCTURED_OUTPUT_FORMAT,
     )
 
     answer_data = parse_structured_response(response)
@@ -519,8 +526,8 @@ def generate_grounded_research_answer(
         cached_input_tokens=usage.get("cached_input_tokens"),
         usage=json_safe_value(getattr(response, "usage", None)) if getattr(response, "usage", None) is not None else None,
     )
-    answer = build_grounded_answer(answer_data, metadata)
-    validate_grounded_ai_answer(answer, selected_context)
+    answer = (answer_builder or build_grounded_answer)(answer_data, metadata)
+    (answer_validator or validate_grounded_ai_answer)(answer, selected_context)
     return answer
 
 
@@ -832,6 +839,8 @@ def string_list(value: Any, field_name: str) -> list[str]:
 def validate_grounded_ai_answer(
     answer: GroundedResearchAnswer,
     selected_context: SelectedResearchContext,
+    *,
+    numeric_validator: Callable | None = None,
 ) -> None:
     if answer.symbol != selected_context.symbol:
         raise AIGroundingError("AI answer symbol does not match selected context.")
@@ -840,12 +849,14 @@ def validate_grounded_ai_answer(
 
     validate_forbidden_output_policy(answer)
 
-    validate_grounded_ai_evidence(answer, selected_context)
+    validate_grounded_ai_evidence(answer, selected_context, numeric_validator=numeric_validator)
 
 
 def validate_grounded_ai_evidence(
     answer: GroundedResearchAnswer,
     selected_context: SelectedResearchContext,
+    *,
+    numeric_validator: Callable | None = None,
 ) -> None:
     """Validate evidence independently; this does not authorize an answer for display."""
     if answer.symbol != selected_context.symbol:
@@ -871,8 +882,11 @@ def validate_grounded_ai_evidence(
                 normalized_ids.append(evidence_id)
         finding.evidence_ids[:] = normalized_ids
         factual_evidence_ids = [item for item in normalized_ids if item in evidence_by_id]
-        validate_numeric_percentage_claims(finding.statement, factual_evidence_ids, evidence_by_id)
-        validate_non_percentage_numeric_claims(finding.statement, factual_evidence_ids, evidence_by_id)
+        if numeric_validator is None:
+            validate_numeric_percentage_claims(finding.statement, factual_evidence_ids, evidence_by_id)
+            validate_non_percentage_numeric_claims(finding.statement, factual_evidence_ids, evidence_by_id)
+        else:
+            numeric_validator(finding, factual_evidence_ids, evidence_by_id)
 
     validate_missing_context_references(answer, missing_context_ids)
 
@@ -1067,16 +1081,19 @@ def validate_non_percentage_numeric_claims(
             )
 
 
-def extract_non_percentage_numeric_claims(statement: str) -> list[NumericClaim]:
+def extract_non_percentage_numeric_claims(
+    statement: str, *, infer_metric: bool = True, exclude_structural: bool = True,
+) -> list[NumericClaim]:
     ignored_spans = [match.span() for match in PERCENTAGE_CLAIM_PATTERN.finditer(statement)]
-    for pattern in NON_FINANCIAL_NUMERIC_PATTERNS:
-        ignored_spans.extend(match.span() for match in pattern.finditer(statement))
+    if exclude_structural:
+        for pattern in NON_FINANCIAL_NUMERIC_PATTERNS:
+            ignored_spans.extend(match.span() for match in pattern.finditer(statement))
 
     claims = []
     for match in NUMERIC_CLAIM_PATTERN.finditer(statement):
         if any(_spans_overlap(match.span(), ignored) for ignored in ignored_spans):
             continue
-        metric = numeric_claim_metric(statement, match.start())
+        metric = numeric_claim_metric(statement, match.start()) if infer_metric else None
         kind = NUMERIC_METRIC_KINDS.get(metric) if metric else None
         if match.group("multiple"):
             kind = NUMERIC_KIND_MULTIPLE
@@ -1105,7 +1122,9 @@ def extract_non_percentage_numeric_claims(statement: str) -> list[NumericClaim]:
 
 
 def numeric_claim_metric(statement: str, claim_start: int) -> str | None:
-    prefix = statement[max(0, claim_start - 72):claim_start].lower()
+    boundary_matches = list(METRIC_SPAN_BOUNDARY_PATTERN.finditer(statement, 0, claim_start))
+    span_start = boundary_matches[-1].end() if boundary_matches else max(0, claim_start - 72)
+    prefix = statement[span_start:claim_start].lower()
     matches = []
     for metric, aliases in NUMERIC_METRIC_ALIASES.items():
         for alias in aliases:

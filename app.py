@@ -3,6 +3,7 @@ import importlib
 import html
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -111,6 +112,8 @@ from historical_financial_service import get_historical_financials
 from historical_financial_service import HistoricalFinancialServiceError
 from historical_price_service import get_historical_prices
 from historical_price_service import HistoricalPriceError
+from stock_service import get_stock
+from stock_service import StockServiceError
 from frozen_twse_research_universe_service import FrozenTWSEResearchUniverseError
 from live_data_store import LiveDataStore
 from forward_research_observation_service import ForwardResearchObservationError
@@ -781,6 +784,80 @@ def refresh_research_shortlist_market_data(
     return tuple(results)
 
 
+CURRENT_EVIDENCE_GROUPS = {
+    "基本面": (
+        "revenue_growth", "earnings_growth", "return_on_equity", "gross_margin",
+        "operating_margin", "net_margin", "trailing_eps", "total_cash", "total_debt",
+        "debt_to_equity", "operating_cash_flow", "free_cash_flow",
+    ),
+    "估值": ("trailing_pe", "forward_pe", "price_to_book"),
+    "市場": (
+        "current_price", "fifty_two_week_high", "fifty_two_week_low",
+        "fifty_day_average", "two_hundred_day_average",
+    ),
+}
+
+
+def _evidence_group_status(stock, metrics: tuple[str, ...]) -> str:
+    available = sum(getattr(stock, metric, None) is not None for metric in metrics)
+    if available == len(metrics):
+        return "可用"
+    if available:
+        return "部分可用"
+    return "資料不足"
+
+
+def refresh_research_shortlist_evidence(
+    rows: list[dict[str, str]],
+    *,
+    stock_loader=get_stock,
+    price_loader=get_historical_prices,
+    radar_evidence_resolver=None,
+) -> tuple[dict[str, str], ...]:
+    """Explicitly refresh local current and price evidence for a shortlist only."""
+    symbols = sorted({
+        normalize_stock_symbol(row["股票代號"])
+        for row in rows
+        if normalize_stock_symbol(row["股票代號"]) != BENCHMARK_SYMBOL
+    })
+    resolve_radar = radar_evidence_resolver or resolve_current_opportunity_radar_evidence
+    results_by_symbol = {}
+    for symbol in symbols:
+        result = {"股票代號": symbol}
+        try:
+            stock = stock_loader(symbol, force_refresh=True)
+        except StockServiceError:
+            result.update({
+                "目前快照": "更新失敗", "基本面": "資料不足", "估值": "資料不足", "市場": "資料不足",
+            })
+        else:
+            result["目前快照"] = "已更新"
+            result.update({group: _evidence_group_status(stock, metrics) for group, metrics in CURRENT_EVIDENCE_GROUPS.items()})
+        try:
+            series = price_loader(symbol, force_refresh=True)
+        except HistoricalPriceError:
+            result["歷史市場"] = "更新失敗"
+        else:
+            result["歷史市場"] = "已更新" if not series.is_stale else "更新失敗"
+        results_by_symbol[symbol] = result
+
+    try:
+        benchmark = price_loader(BENCHMARK_SYMBOL, force_refresh=True)
+    except HistoricalPriceError:
+        benchmark_status = "更新失敗"
+    else:
+        benchmark_status = "已更新" if not benchmark.is_stale else "更新失敗"
+
+    for symbol in symbols:
+        result = results_by_symbol[symbol]
+        radar = resolve_radar(symbol)
+        result["月營收"] = "本地資料可用" if radar and (radar.get("revenue_yoy") is not None or radar.get("revenue_mom") is not None) else "本地資料不足"
+        result["相對 0050"] = "可用" if radar and radar.get("relative_return_20d") is not None and radar.get("relative_return_60d") is not None else "日期未對齊或資料不足"
+
+    benchmark_result = {"股票代號": BENCHMARK_SYMBOL, "目前快照": "不適用", "基本面": "不適用", "估值": "不適用", "市場": "不適用", "歷史市場": benchmark_status, "月營收": "不適用", "相對 0050": "基準資料"}
+    return tuple([*(results_by_symbol[symbol] for symbol in symbols), benchmark_result])
+
+
 def save_research_shortlist_observations(
     rows: list[dict[str, str]],
     *,
@@ -888,9 +965,11 @@ def resolve_current_opportunity_radar_evidence(symbol: str) -> dict | None:
         return None
     payload, record = resolved
     try:
+        stock_series = load_live_historical_price_series(symbol)
+        benchmark_series = load_live_historical_price_series(BENCHMARK_SYMBOL)
         price_context = build_local_observation_context(
-            stock_series=load_live_historical_price_series(symbol),
-            benchmark_series=load_live_historical_price_series(BENCHMARK_SYMBOL),
+            stock_series=stock_series,
+            benchmark_series=benchmark_series,
             company_name=None,
             industry=None,
             in_watchlist=False,
@@ -901,9 +980,24 @@ def resolve_current_opportunity_radar_evidence(symbol: str) -> dict | None:
         )
     except ForwardResearchObservationError:
         rel20 = rel60 = None
+        relative_provenance = None
     else:
         rel20 = price_context.rel_return_20d
         rel60 = price_context.rel_return_60d
+        as_of_date = getattr(price_context, "as_of_date", None)
+        stock_fetched_at = getattr(stock_series, "fetched_at", None)
+        benchmark_fetched_at = getattr(benchmark_series, "fetched_at", None)
+        source = getattr(stock_series, "source", None)
+        relative_provenance = (
+            {
+                "as_of_date": as_of_date.isoformat(),
+                "stock_fetched_at": stock_fetched_at.isoformat(),
+                "benchmark_fetched_at": benchmark_fetched_at.isoformat(),
+                "source": source,
+            }
+            if all((as_of_date, stock_fetched_at, benchmark_fetched_at, source))
+            else None
+        )
 
     flags = []
     if record.revenue_yoy is not None and record.revenue_yoy > 0:
@@ -922,6 +1016,7 @@ def resolve_current_opportunity_radar_evidence(symbol: str) -> dict | None:
         "relative_return_60d": rel60,
         "condition_flags": flags,
         "retrieved_at": payload.get("retrieved_at"),
+        "relative_provenance": relative_provenance,
     }
 
 
@@ -936,6 +1031,8 @@ def render_ai_analyst_shortlist_result(result: dict) -> None:
     for card in cards:
         with st.expander(f"{card['symbol']} · {card['company_name']} · {card['research_priority']}"):
             st.markdown(f"**研究優先度：** {card['research_priority']}")
+            if card.get("priority_reason"):
+                st.write(card["priority_reason"])
             st.markdown("##### 已驗證研究證據")
             evidence_by_metric = build_canonical_analyst_evidence_map(
                 card.get("verified_evidence", [])
@@ -1117,15 +1214,8 @@ def render_research_shortlist_controls(
     render_ai_analyst_shortlist_control(shortlist)
 
     action_cols = st.columns(2)
-    if action_cols[0].button("更新研究清單市場資料", key="research_shortlist_refresh"):
-        refresh_results = refresh_research_shortlist_market_data(shortlist)
-        success_count = sum(result["更新狀態"] != "FAILED" for result in refresh_results if result["股票代號"] != BENCHMARK_SYMBOL)
-        failed_count = sum(result["更新狀態"] == "FAILED" for result in refresh_results if result["股票代號"] != BENCHMARK_SYMBOL)
-        benchmark_result = next(result for result in refresh_results if result["股票代號"] == BENCHMARK_SYMBOL)
-        if failed_count:
-            st.warning(f"更新成功：{success_count}；更新失敗：{failed_count}；0050：{benchmark_result['更新狀態']}。")
-        else:
-            st.success(f"更新成功：{success_count}；更新失敗：0；0050：{benchmark_result['更新狀態']}。")
+    if action_cols[0].button("更新研究證據", key="research_shortlist_refresh"):
+        refresh_results = refresh_research_shortlist_evidence(shortlist)
         st.dataframe(list(refresh_results), width="stretch", hide_index=True)
 
     if action_cols[1].button("儲存本日研究快照", key="research_shortlist_save"):
@@ -5010,6 +5100,38 @@ def render_comparison() -> None:
         st.dataframe(comparison_rows, width="stretch", hide_index=True)
 
 
+def _arrow_safe_display_value(value: object) -> str:
+    """Render heterogeneous metadata as text without changing its canonical source value."""
+    if value is None:
+        return "資料不足"
+    if isinstance(value, tuple):
+        return "、".join(_arrow_safe_display_value(item) for item in value) or "資料不足"
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def build_portfolio_risk_display_inputs(projection, warning_metadata):
+    """Create Arrow-safe display copies for the Portfolio Risk renderer only."""
+    display_metadata = (
+        {key: _arrow_safe_display_value(value) for key, value in warning_metadata.items()}
+        if warning_metadata is not None
+        else None
+    )
+    if projection is None:
+        return None, display_metadata
+    overview = projection.overview
+    display_overview = replace(
+        overview,
+        symbol_count=_arrow_safe_display_value(overview.symbol_count),
+        artifact_count=_arrow_safe_display_value(overview.artifact_count),
+        event_count=_arrow_safe_display_value(overview.event_count),
+        alert_candidate_count=_arrow_safe_display_value(overview.alert_candidate_count),
+        latest_created_at=_arrow_safe_display_value(overview.latest_created_at),
+    )
+    return replace(projection, overview=display_overview), display_metadata
+
+
 def main() -> None:
     initialize_session_state()
 
@@ -5050,10 +5172,14 @@ def main() -> None:
 
     with portfolio_risk_tab:
         portfolio_risk_result = load_portfolio_risk_dashboard()
+        portfolio_projection, portfolio_warning_metadata = build_portfolio_risk_display_inputs(
+            portfolio_risk_result.projection,
+            portfolio_risk_result.warning_metadata,
+        )
         render_portfolio_risk_dashboard(
-            projection=portfolio_risk_result.projection,
+            projection=portfolio_projection,
             validation_error=portfolio_risk_result.error,
-            warning_metadata=portfolio_risk_result.warning_metadata,
+            warning_metadata=portfolio_warning_metadata,
         )
 
     with universe_tab:

@@ -61,6 +61,9 @@ class Stock:
 
     industry: str | None = None
 
+    # Present only when this current snapshot was loaded from the live cache.
+    fetched_at: datetime | None = None
+
 
 @dataclass
 class HistoricalFinancialPeriod:
