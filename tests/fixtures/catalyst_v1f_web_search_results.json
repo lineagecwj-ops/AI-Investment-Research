@@ -1,0 +1,60 @@
+{
+  "sources": [
+    {
+      "name": "direct_1216_official",
+      "url": "HTTPS://www.uni-president.com.tw/news/revenue?utm_source=search&utm_campaign=aug",
+      "title": "統一(1216) 2026年08月營收公告",
+      "snippet": "日 期：2026年08月10日，公司名稱：統一(1216)，公告 7 月營收。",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "related_220_media",
+      "url": "https://www.marketscreener.com/quote/stock/UNI-PRESIDENT-CHINA-HOLDI-6171016/news/",
+      "title": "Uni-President China Holdings Ltd. (220) update",
+      "snippet": "10 Aug 2026: Uni-President China Holdings Ltd. reported an update.",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "tier_2_media",
+      "url": "https://money.udn.com/money/story/5612/8000012?utm_medium=search",
+      "title": "統一(1216) 法說會公告",
+      "snippet": "2026-08-10 統一(1216) 召開投資人說明會。",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "tier_4_social",
+      "url": "https://www.reddit.com/r/stocks/comments/example/",
+      "title": "Uni-President discussion",
+      "snippet": "3 weeks ago: discussion only.",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "no_date",
+      "url": "https://example.test/company/1216",
+      "title": "統一(1216) company profile",
+      "snippet": "Company profile without a deterministic date.",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "multiple_events",
+      "url": "https://tw.stock.yahoo.com/quote/1216.TWO/news",
+      "title": "統一(1216) 重大訊息",
+      "snippet": "日 期：2026年08月06日，董事會通過第二季財報。日 期：2026年08月10日，召開法說會。",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "malformed_missing_title",
+      "url": "https://twse.com.tw/company/1216",
+      "title": null,
+      "snippet": "2026/08/10 company disclosure.",
+      "source_type": "web_search_result"
+    },
+    {
+      "name": "ambiguous_numeric_date",
+      "url": "https://example.test/ambiguous",
+      "title": "統一(1216) note",
+      "snippet": "08/06/2026 is intentionally ambiguous.",
+      "source_type": "web_search_result"
+    }
+  ]
+}
