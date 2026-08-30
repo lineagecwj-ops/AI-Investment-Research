@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-30, after Opportunity Radar V0 + AI Analyst V0 release.
+Last updated: 2026-08-31, after Research Evidence Expansion V1A release.
 
 ## Project Purpose
 
@@ -41,16 +41,17 @@ This status document is based on:
 - Productionization P1A Production Persistence Config + Bootstrap / Backup source and test inspection
 - Productionization P1B Read-Only Health Check + Operator Verify Command source and test inspection
 - Opportunity Radar V0 + AI Analyst V0 release validation and final manual acceptance evidence
+- Research Evidence Expansion V1A release validation and crash-safe real-AI acceptance evidence
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `788bb6c feat: add opportunity radar and ai analyst review`
-- Current full HEAD: `788bb6ccafde47a90c00d31caad87478ea06e764`
-- Remote baseline at synchronization time: `origin/main` points to `788bb6ccafde47a90c00d31caad87478ea06e764`
-- Documentation status: this file is being synchronized after the Opportunity Radar V0 + AI Analyst V0 release.
+- Implementation baseline: `b96e160 feat: add shortlist research evidence refresh v1a`
+- Current full HEAD: `b96e1603768e371d96a02a06cb475e1202a0531d`
+- Remote baseline at synchronization time: `origin/main` points to `b96e1603768e371d96a02a06cb475e1202a0531d`
+- Documentation status: this file is being synchronized after the Research Evidence Expansion V1A release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -2091,7 +2092,42 @@ Initial target evidence categories only, not an implementation decision:
 
 V1 design principles: reuse existing trusted project services first; explicit user-triggered refresh; no hidden network fetch or silent fallback; no nearest-date benchmark substitution; fail closed for missing evidence; canonical symbol identity and deterministic evidence provenance; preserve the research / production boundary; no historical PIT backfill unless separately approved; no new external provider unless a later audit proves necessary; no new ML; and no production investment recommendation.
 
-Immediate next task: `RESEARCH EVIDENCE EXPANSION V1 FOUNDATION AUDIT`. It must determine which target metrics already exist in current services, which can refresh through existing authorized data paths, why 1216.TW / 1608.TW lacked them in final acceptance, the exact gap category, and whether expansion is possible without a new data pipeline. No implementation has been approved.
+Historical V0 planning note: `RESEARCH EVIDENCE EXPANSION V1 FOUNDATION AUDIT` was the then-proposed next task. It is superseded by the V1A release decision below.
+
+## Research Evidence Expansion V1A Release (2026-08-31)
+
+This section supersedes earlier V1 planning statements where they differ; earlier Opportunity Radar V0 and AI Analyst V0 sections remain historical records.
+
+### Released Capability
+
+- `RESEARCH_EVIDENCE_EXPANSION_V1A = RELEASED`
+- Release commit: `b96e1603768e371d96a02a06cb475e1202a0531d`.
+- Research Shortlist now provides explicit `更新研究證據`: current stock snapshot refresh through `stock_service.get_stock()`, historical-price refresh, one 0050 refresh per batch, local monthly-revenue snapshot reuse, and local-evidence AI Analyst consumption.
+- Manual Research-page priming is no longer required after explicit shortlist evidence refresh.
+- Existing services are reused: `stock_service.get_stock()`, the historical-price service, the existing live SQLite cache, Opportunity Radar monthly-revenue snapshots, and the existing AI Analyst local-evidence resolver. No new provider, DB, or external data pipeline was introduced.
+
+### Provenance And Section-Bounded Analyst
+
+- Current `Stock.fetched_at`, current evidence capture metadata, monthly-revenue `retrieved_at`, and historical / benchmark capture metadata where available are retained. Provenance is `PARTIAL` where upstream metadata is unavailable; V1A does not claim full historical PIT lineage.
+- Program owns symbol, Card structure, section identity, canonical evidence IDs, numeric evidence display, missing evidence, next checks, and deterministic risk / contradiction state. AI generates only small qualitative section text, research priority, and priority reason.
+- Stage 1 makes at most one AI call per company and repair calls are zero. AI does not author evidence refs, `numeric_mentions`, or a full findings structure.
+- Opportunity, Fundamental, Valuation, and Market slots validate independently. An invalid slot is rejected locally, is not displayed, and is not passed to Stage 2; deterministic evidence remains available. A rejected slot does not automatically invalidate the company Card.
+- Stage 2 receives validated Cards only and retains safeguards against Buy / Sell / Hold, scores, probabilities, target prices, and expected returns.
+
+### Final Crash-Safe Real-AI Acceptance
+
+- `1216.TW`, `1608.TW`, and `2027.TW`: USABLE.
+- Stage 2: PASS.
+- Real AI calls: four total: one Stage 1 call per company plus one Stage 2 call. Repair calls: zero. Unknown reserved calls: zero.
+- Rejected slots remained locally isolated and did not reach Stage 2.
+
+### Validation, Boundaries, And Next Decision
+
+- V1A focused regression: `309 OK`; `compileall`: PASS; `git diff --check`: PASS.
+- Runtime data was not committed. Production was not touched and `data/production/` remains absent.
+- V1A does not include historical PIT fundamental backfill, historical monthly-revenue PIT, T86 restart, new ML, probability, investment score, Buy / Sell / Hold, price target, expected return, Production policy, or Production DB.
+- Non-blocking limitations remain: provider-returned current fields may be missing; exact 0050 alignment can make relative returns unavailable; current Yahoo evidence is not historical PIT evidence; upstream source metadata can be incomplete; and individual AI slots may be rejected while a company Card remains usable by design.
+- `RESEARCH_EVIDENCE_EXPANSION_V1B = NOT YET APPROVED`. Possible later review priorities are 0050 freshness / alignment observability, provenance display, provider-missing-field impact, and richer cross-company Analyst usefulness. No V1B implementation is approved by this release.
 
 ## Current Working State
 
@@ -2106,7 +2142,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap priority: Research Evidence Expansion V1 Foundation Audit. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B is not yet approved. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2174,7 +2210,7 @@ Completed:
 
 Next planning candidate:
 
-- Research Evidence Expansion V1 Foundation Audit
+- Research Evidence Expansion V1B approval review
 
 Future:
 
@@ -2446,11 +2482,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `788bb6ccafde47a90c00d31caad87478ea06e764` or inspect any newer commits.
+2. Confirm HEAD is still `b96e1603768e371d96a02a06cb475e1202a0531d` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Complete PROJECT_STATUS_MASTER review / commit / release validation / push before starting the Research Evidence Expansion V1 Foundation Audit.
+8. Treat Research Evidence Expansion V1B as not yet approved; complete a separate approval review before implementation.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
