@@ -1,0 +1,52 @@
+{
+  "status": "completed",
+  "usage": {"input_tokens": 101, "output_tokens": 202, "total_tokens": 303},
+  "output": [
+    {
+      "type": "web_search_call",
+      "id": "ws_1",
+      "status": "completed",
+      "action": {
+        "query": "synthetic query",
+        "sources": [
+          {"url": "https://www.twse.com.tw/company/1216?utm_source=inventory", "title": ""},
+          {"url": "https://tw.stock.yahoo.com/quote/1216.TW/news", "title": "Yahoo inventory"},
+          {"url": "https://www.goodinfo.tw/tw/StockDetail.asp?STOCK_ID=1216"}
+        ]
+      },
+      "results": [
+        {"type": "text_result", "url": "https://www.twse.com.tw/company/1216?utm_source=result", "title": "統一(1216) 重大訊息", "snippet": "2026年08月10日 統一(1216) 公告。"},
+        {"type": "text_result", "url": "https://tw.stock.yahoo.com/quote/1216.TW/news", "title": "統一(1216) 營收新聞", "snippet": "2026-08-08 統一(1216) 公布營收。"},
+        {"type": "text_result", "url": "https://www.goodinfo.tw/tw/StockDetail.asp?STOCK_ID=1216", "title": "統一(1216) 資訊", "snippet": "2026-08-07 source detail."},
+        {"type": "text_result", "url": "https://www.reddit.com/r/stocks/comments/1216", "title": "Uni-President discussion", "snippet": "3 weeks ago."},
+        {"type": "text_result", "url": "https://unknown.example/1216", "title": "統一(1216) note", "snippet": "08/06/2026 ambiguous."},
+        {"type": "text_result", "url": "https://marketscreener.com/quote/220", "title": "Uni-President China Holdings Ltd. (220)", "snippet": "2026-08-09 related entity."}
+      ]
+    },
+    {
+      "type": "message",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Generated prose must never become source evidence.",
+          "annotations": [
+            {"type": "url_citation", "url": "https://tw.stock.yahoo.com/quote/1216.TW/news", "title": "Yahoo citation title"},
+            {"type": "url_citation", "url": "https://moneydj.com/KMDJ/News/NewsViewer.aspx?a=123", "title": "統一(1216) citation-only source"}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "web_search_call",
+      "id": "ws_2",
+      "status": "completed",
+      "action": {
+        "query": "synthetic second query",
+        "sources": [
+          {"url": "https://moneydj.com/KMDJ/News/NewsViewer.aspx?a=123", "title": ""}
+        ]
+      },
+      "results": []
+    }
+  ]
+}
