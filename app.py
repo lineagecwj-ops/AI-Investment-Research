@@ -101,6 +101,10 @@ from ai_followup import build_followup_suggestions
 from ai_followup import create_research_turn
 from ai_followup import infer_followup_question_type
 from ai_research_service import generate_grounded_research_answer
+from catalyst_deep_dive import build_selected_catalyst_context
+from catalyst_deep_dive import catalyst_card_display
+from catalyst_deep_dive import catalyst_result_for_symbol
+from catalyst_deep_dive import run_catalyst_deep_dive_refresh
 from ai_analyst_shortlist import AI_ANALYST_SHORTLIST_MAX_SIZE
 from ai_analyst_shortlist import AIAnalystShortlistError
 from ai_analyst_shortlist import VERIFIED_EVIDENCE_FIELDS
@@ -279,6 +283,7 @@ RESEARCH_CANDIDATE_SORT_OPTIONS = ("股票代號", "公司名稱", "產業")
 RESEARCH_SHORTLIST_SESSION_KEY = "research_shortlist_v0"
 RESEARCH_SHORTLIST_MAX_SIZE = 20
 AI_ANALYST_SHORTLIST_RESULT_SESSION_KEY = "ai_analyst_shortlist_result_v0"
+CATALYST_DEEP_DIVE_RESULTS_SESSION_KEY = "catalyst_deep_dive_results_v0"
 
 SWING_TECHNICAL_DETAIL_REQUIRED_ATTRIBUTES = (
     "TECHNICAL_DETAIL_CAPTION",
@@ -347,6 +352,7 @@ def initialize_session_state() -> None:
     st.session_state.setdefault("ai_research_last_error_details", None)
     st.session_state.setdefault("ai_followup_question_draft", "")
     st.session_state.setdefault("ai_followup_question_type", None)
+    st.session_state.setdefault(CATALYST_DEEP_DIVE_RESULTS_SESSION_KEY, {})
     st.session_state.setdefault("historical_case_result", None)
     st.session_state.setdefault("historical_case_last_error", None)
     st.session_state.setdefault("swing_research_result", None)
@@ -1809,6 +1815,95 @@ def render_research_glossary() -> None:
             st.write(entry["description"])
 
 
+def render_catalyst_deep_dive(stock, report, display_data: dict[str, str]) -> None:
+    """Render only the current company's session-scoped, explicitly refreshed Catalyst result."""
+    symbol = stock.symbol or ""
+    company_name = display_data["Company Name"]
+    st.markdown("### Catalyst 深度分析")
+    st.caption("僅在按下更新後擷取近期來源並分析已驗證事件；內容是研究輔助，不是投資建議。")
+
+    if st.button("更新 Catalyst 深度分析", key=f"catalyst_deep_dive_refresh_{symbol}"):
+        try:
+            selected_context = build_selected_catalyst_context(
+                stock=stock,
+                research_report=report,
+                display_name=company_name,
+            )
+            result = run_catalyst_deep_dive_refresh(
+                selected_context=selected_context,
+                explicit_refresh=True,
+            )
+        except ValueError as error:
+            st.warning(str(error))
+        else:
+            results = dict(st.session_state[CATALYST_DEEP_DIVE_RESULTS_SESSION_KEY])
+            results[symbol] = result
+            st.session_state[CATALYST_DEEP_DIVE_RESULTS_SESSION_KEY] = results
+
+    result = catalyst_result_for_symbol(
+        st.session_state[CATALYST_DEEP_DIVE_RESULTS_SESSION_KEY],
+        symbol,
+    )
+    if result is None:
+        st.info("按下「更新 Catalyst 深度分析」後，系統才會分析目前這一家公司。")
+        return
+    if result.state != "COMPLETED":
+        st.info(result.message)
+        return
+
+    st.success(result.message)
+    if result.omitted_validated_event_count:
+        st.caption(f"另有 {result.omitted_validated_event_count} 個已驗證事件未納入本次分析，以維持單次更新的固定呼叫上限。")
+    for card in result.cards:
+        values = catalyst_card_display(card)
+        with st.container(border=True):
+            st.caption(f"{values['事件日期']} · {catalyst_event_type_label(values['事件類型'])}")
+            st.markdown("**發生了什麼**")
+            st.write(values["發生了什麼"])
+            st.caption(f"事件來源數量：{values['事件來源數量']}")
+            if card.impact_hypothesis is None:
+                st.warning(values["分析狀態"])
+            else:
+                st.markdown("**可能的影響路徑**")
+                st.write(values["可能的影響路徑"])
+                st.markdown("**為什麼可能重要**")
+                st.write(values["為什麼可能重要"])
+                st.markdown("**支持證據**")
+                st.write(f"支持證據數：{values['支持證據數']}；反證數：{values['反證數']}。")
+                st.markdown("**限制 / 反證**")
+                st.write(values["限制 / 反證"])
+                st.markdown("**不確定性**")
+                st.write(values["不確定性"])
+                st.markdown("**下一步要查什麼**")
+                st.write(values["下一步要查什麼"][0])
+                st.markdown("**證據狀態**")
+                st.write(catalyst_hypothesis_status_label(values["證據狀態"]))
+            if values["仍缺少的證據"]:
+                st.markdown("**仍缺少的證據**")
+                for reason in values["仍缺少的證據"]:
+                    st.write(f"- {reason}")
+
+
+def catalyst_event_type_label(value: str) -> str:
+    return {
+        "EARNINGS_RESULT": "財務結果",
+        "REVENUE_UPDATE": "營收更新",
+        "MANAGEMENT_GOVERNANCE": "經營 / 治理",
+        "CAPEX_CAPACITY": "資本支出 / 產能",
+        "DIVIDEND_CAPITAL_RETURN": "股利 / 資本回饋",
+        "OTHER": "其他",
+    }.get(value, value)
+
+
+def catalyst_hypothesis_status_label(value: str) -> str:
+    return {
+        "PLAUSIBLE": "合理假說",
+        "SUPPORTED": "有獨立證據支持",
+        "CONTRADICTED": "存在明確反證",
+        "INSUFFICIENT_EVIDENCE": "證據不足",
+    }.get(value, value)
+
+
 def render_company_summary(stock) -> None:
     summary = build_company_summary_display(stock)
 
@@ -1950,6 +2045,7 @@ def render_research() -> None:
 
     st.markdown("### Research Next Steps（下一步研究）")
     render_next_steps(report.next_steps)
+    render_catalyst_deep_dive(stock, report, display_data)
 
 
 def render_historical_trends() -> None:
