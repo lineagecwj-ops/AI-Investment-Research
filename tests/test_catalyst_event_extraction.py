@@ -59,7 +59,7 @@ def candidates(*sources):
 
 class CatalystEventExtractionTestCase(unittest.TestCase):
     def test_single_structured_earnings_event_is_validated(self):
-        item = source("https://official.test/earnings", "統一(1216) 重大訊息", "日 期：2026年08月06日，董事會通過第二季財務報告。")
+        item = source("https://official.test/earnings", "統一(1216) 重大訊息", "日 期：2026年08月06日，統一(1216)董事會通過第二季財務報告。")
         extracted = candidates(item)
         self.assertEqual(len(extracted), 1)
         self.assertEqual(extracted[0].candidate_type, CatalystEventType.EARNINGS_RESULT)
@@ -95,7 +95,7 @@ class CatalystEventExtractionTestCase(unittest.TestCase):
 
     def test_official_and_yahoo_same_event_cluster_with_tier_one_primary(self):
         official = source("https://official.test/july", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月合併營收。")
-        yahoo = source("https://media.test/july", "統一(1216) monthly revenue", "2026-08-10 Uni-President announced July revenue.")
+        yahoo = source("https://media.test/july", "統一(1216) monthly revenue", "2026-08-10 統一(1216) announced July revenue.")
         extracted = candidates(official, yahoo)
         events = cluster_validated_events(extracted, sources=(official, yahoo), research_window=WINDOW)
         self.assertEqual(len(events), 1)
@@ -178,6 +178,114 @@ class CatalystEventExtractionTestCase(unittest.TestCase):
         second = cluster_validated_events(candidates(duplicate_b, duplicate_a), sources=(duplicate_b, duplicate_a), research_window=WINDOW)
         self.assertEqual(first, second)
         self.assertEqual(first[0].support_count, 1)
+
+    def test_candidate_local_identity_blocks_other_company_on_target_calendar_page(self):
+        item = source(
+            "https://media.test/calendar",
+            "Uni-President Enterprises Corp. financial calendar | 1216",
+            "2026-08-31 | PRESIDENT BAKERY | Ex-dividend date - 0.25 THB | 12:00 am",
+        )
+        extracted = candidates(item)
+        self.assertEqual(extracted[0].company_association_status, CompanyAssociationStatus.AMBIGUOUS)
+        event = cluster_validated_events(extracted, sources=(item,), research_window=WINDOW)[0]
+        self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+
+    def test_page_chrome_timestamp_is_background_and_event_local_date_validates(self):
+        item = source(
+            "https://media.test/page-header",
+            "統一(1216) 個股公告",
+            "2026/08/21 14:30 更新 成交量 2,044 本益比 15.07。"
+            "日期：2026年08月10日 統一(1216)公告 7 月合併營收。",
+        )
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        validated = [event for event in events if event.validation_status is EventValidationStatus.VALIDATED]
+        self.assertEqual(len(validated), 1)
+        self.assertEqual(validated[0].event_type, CatalystEventType.REVENUE_UPDATE)
+        self.assertEqual(validated[0].event_temporal_value, date(2026, 8, 10))
+        self.assertTrue(all("更新" not in event.event_fact for event in validated))
+
+    def test_investor_conference_precedes_neighboring_revenue_text(self):
+        item = source(
+            "https://official.test/conference-mixed",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 統一(1216)受邀參加投資人說明會；頁面另列 7 月合併營收新聞。",
+        )
+        self.assertEqual(candidates(item)[0].candidate_type, CatalystEventType.MANAGEMENT_GOVERNANCE)
+
+    def test_page_header_acquisition_does_not_duplicate_event_local_disclosure(self):
+        item = source(
+            "https://media.test/acquisition-page",
+            "統一(1216) 個股公告",
+            "2026/08/28 14:30 更新 成交量 10,296 本益比 9.55。"
+            "日期：2026年08月12日 統一(1216)取得統一子公司股權。",
+        )
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        validated = [event for event in events if event.validation_status is EventValidationStatus.VALIDATED]
+        self.assertEqual(len(validated), 1)
+        self.assertEqual(validated[0].event_type, CatalystEventType.OTHER)
+        self.assertEqual(validated[0].event_temporal_value, date(2026, 8, 12))
+
+    def test_same_source_duplicate_q2_income_statement_collapses_to_one_earnings_event(self):
+        item = source(
+            "https://media.test/q2",
+            "統一(1216) 第二季財報",
+            "2026/08/13 統一(1216)第2季綜合損益表，每股盈餘 1.93 元。"
+            "2026/08/13 統一(1216)第2季綜合損益表，營業收入 100 元。",
+        )
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].event_type, CatalystEventType.EARNINGS_RESULT)
+        self.assertEqual(events[0].validation_status, EventValidationStatus.VALIDATED)
+        self.assertEqual(events[0].support_count, 1)
+
+    def test_structured_earnings_subject_precedes_incidental_acquisition(self):
+        item = source(
+            "https://official.test/earnings-acquisition",
+            "統一(1216) 公告",
+            "日期：2026年08月13日 主旨：公告本公司115年第2季合併財務報告。說明：本期另取得子公司股權。",
+        )
+        self.assertEqual(candidates(item)[0].candidate_type, CatalystEventType.EARNINGS_RESULT)
+
+    def test_structured_conference_subject_precedes_incidental_order_acquisition(self):
+        item = source(
+            "https://official.test/conference-acquisition",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 主旨：本公司受邀參加法人說明會。說明：將討論取得訂單、營收與投資計畫。",
+        )
+        self.assertEqual(candidates(item)[0].candidate_type, CatalystEventType.MANAGEMENT_GOVERNANCE)
+
+    def test_acquisition_subject_remains_other_with_board_date(self):
+        item = source(
+            "https://official.test/acquisition-core",
+            "統一(1216) 公告",
+            "日期：2026年08月12日 主旨：本公司取得○○公司股權。董事會通過日期：2026年08月11日。",
+        )
+        extracted = candidates(item)
+        self.assertEqual(extracted[0].candidate_type, CatalystEventType.OTHER)
+        self.assertEqual(extracted[1].candidate_type, CatalystEventType.OTHER)
+
+    def test_revenue_and_capex_subjects_precede_incidental_acquisition(self):
+        revenue = source(
+            "https://official.test/revenue-acquisition",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 主旨：公告7月合併營收。說明：另取得子公司股權。",
+        )
+        capex = source(
+            "https://official.test/capex-acquisition",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 主旨：擴建新廠增加產能。說明：另取得設備使用權。",
+        )
+        self.assertEqual(candidates(revenue)[0].candidate_type, CatalystEventType.REVENUE_UPDATE)
+        self.assertEqual(candidates(capex)[0].candidate_type, CatalystEventType.CAPEX_CAPACITY)
+
+    def test_price_table_row_never_becomes_validated_event(self):
+        item = source(
+            "https://media.test/quote",
+            "統一(1216) 個股資訊",
+            "2026/08/21 14:30 更新 成交量 2,044 本益比 15.07 收盤 35.85。",
+        )
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        self.assertEqual(events[0].validation_status, EventValidationStatus.BACKGROUND_ONLY)
 
     def test_extraction_is_offline_and_does_not_import_ai_or_transport(self):
         implementation = (SRC_PATH / "catalyst_event_extraction.py").read_text(encoding="utf-8")

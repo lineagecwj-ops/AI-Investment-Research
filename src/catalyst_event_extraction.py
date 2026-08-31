@@ -32,8 +32,12 @@ _DATE_BLOCK = re.compile(
 )
 _EVENT_MARKERS = re.compile(
     r"財務報告|財報|季報|半年報|合併營收|月營收|法說會|投資人說明會|董事會|"
-    r"增資|投資|擴建|新廠|股利|配息|庫藏股|重大訊息",
+    r"綜合損益表|增資|投資|取得|股權|擴建|新廠|股利|配息|庫藏股|重大訊息",
     re.IGNORECASE,
+)
+_PAGE_CHROME_MARKERS = (
+    "更新", "成交量", "本益比", "同業平均", "走勢圖", "技術分析", "成交彙整",
+    "籌碼", "法人買賣", "主力進出", "資券變化", "股價", "開盤", "最高", "最低", "收盤",
 )
 _WHITESPACE = re.compile(r"\s+")
 _NON_SUBJECT = re.compile(r"[^\w\u4e00-\u9fff]+", re.UNICODE)
@@ -43,6 +47,10 @@ _MONTH_IN_TEXT = re.compile(
 )
 _REPORTING_PERIOD = re.compile(
     r"\b(?P<quarter>q[1-4])\b|\b(?P<half>h[12])\b|(?P<chinese_quarter>第[一二三四1234]季)|(?P<chinese_half>上半年|下半年)",
+    re.IGNORECASE,
+)
+_STRUCTURED_SUBJECT = re.compile(
+    r"(?:(?:公告\s*)?主\s*旨|標題)\s*[：:]\s*(?P<subject>[^\n。；;]{1,240})",
     re.IGNORECASE,
 )
 _ENGLISH_MONTH_NUMBERS = {
@@ -130,19 +138,37 @@ def _extract_source_candidates(source: ExternalSourceRef, validated_aliases: tup
     matches = list(_DATE_BLOCK.finditer(text))
     if matches:
         return [
-            _candidate_from_span(
+            _candidate_from_date_span(
                 source,
                 text,
                 match.start(),
                 matches[index + 1].start() if index + 1 < len(matches) else len(text),
                 ExtractionBasis.STRUCTURED_DATE_BLOCK,
                 _matching_temporal_evidence(source, match.group(0)),
+                validated_aliases,
             )
             for index, match in enumerate(matches)
         ]
     if _EVENT_MARKERS.search(text):
-        return [_candidate_from_span(source, text, 0, len(text), ExtractionBasis.TITLE_OR_EXCERPT_FALLBACK, ())]
+        return [_candidate_from_span(
+            source, text, 0, len(text), ExtractionBasis.TITLE_OR_EXCERPT_FALLBACK, (), validated_aliases,
+        )]
     return [_background_candidate(source, text)]
+
+
+def _candidate_from_date_span(
+    source: ExternalSourceRef,
+    text: str,
+    start: int,
+    end: int,
+    basis: ExtractionBasis,
+    temporal_evidence: tuple[SourceTemporalEvidence, ...],
+    validated_aliases: tuple[str, ...],
+) -> EventCandidate:
+    """Reject page chrome as a date source before it reaches event validation."""
+    if _is_page_chrome_span(text, start, end):
+        return _background_candidate(source, text, start=start, end=end, validated_aliases=validated_aliases)
+    return _candidate_from_span(source, text, start, end, basis, temporal_evidence, validated_aliases)
 
 
 def _candidate_from_span(
@@ -152,8 +178,10 @@ def _candidate_from_span(
     end: int,
     basis: ExtractionBasis,
     temporal_evidence: tuple[SourceTemporalEvidence, ...],
+    validated_aliases: tuple[str, ...],
 ) -> EventCandidate:
     anchor, local_start, local_end = _bounded_anchor(text, start, end)
+    association = _candidate_association(source, anchor, validated_aliases)
     event_type = _classify_event_type(anchor)
     candidate_key = _candidate_key(source.source_id, local_start, local_end, event_type, anchor)
     return EventCandidate(
@@ -166,7 +194,7 @@ def _candidate_from_span(
         candidate_end=local_end,
         candidate_type=event_type,
         temporal_evidence=temporal_evidence,
-        company_association_status=source.company_association_status,
+        company_association_status=association,
         source_tier=source.source_tier,
         candidate_status=CandidateStatus.EVENT_LIKE,
         extraction_basis=basis,
@@ -174,8 +202,16 @@ def _candidate_from_span(
     )
 
 
-def _background_candidate(source: ExternalSourceRef, text: str) -> EventCandidate:
-    anchor, start, end = _bounded_anchor(text, 0, len(text))
+def _background_candidate(
+    source: ExternalSourceRef,
+    text: str,
+    *,
+    start: int = 0,
+    end: int | None = None,
+    validated_aliases: tuple[str, ...] = (),
+) -> EventCandidate:
+    anchor, start, end = _bounded_anchor(text, start, len(text) if end is None else end)
+    association = _candidate_association(source, anchor, validated_aliases)
     candidate_key = _candidate_key(source.source_id, start, end, CatalystEventType.OTHER, anchor)
     return EventCandidate(
         candidate_id="catalyst_candidate_" + _digest(candidate_key),
@@ -187,7 +223,7 @@ def _background_candidate(source: ExternalSourceRef, text: str) -> EventCandidat
         candidate_end=end,
         candidate_type=CatalystEventType.OTHER,
         temporal_evidence=(),
-        company_association_status=source.company_association_status,
+        company_association_status=association,
         source_tier=source.source_tier,
         candidate_status=CandidateStatus.BACKGROUND_ONLY,
         extraction_basis=ExtractionBasis.TITLE_OR_EXCERPT_FALLBACK,
@@ -336,20 +372,72 @@ def _subject_key(anchor: str, event_type: CatalystEventType) -> str:
 
 
 def _classify_event_type(anchor: str) -> CatalystEventType:
-    normalized = _normalized(anchor)
-    if any(token in normalized for token in ("財務報告", "財報", "季報", "半年報", "earnings")):
+    core_subject = _core_event_subject(anchor)
+    classified = _specific_event_type(core_subject)
+    if classified is not None:
+        return classified
+    if _is_acquisition_core(core_subject):
+        return CatalystEventType.OTHER
+    classified = _specific_event_type(anchor)
+    if classified is not None:
+        return classified
+    return CatalystEventType.OTHER
+
+
+def _core_event_subject(anchor: str) -> str:
+    """Prefer a structured subject, then the first factual sentence."""
+    structured = _STRUCTURED_SUBJECT.search(anchor)
+    if structured:
+        return structured.group("subject")
+    return re.split(r"[\n。；;]", anchor, maxsplit=1)[0] or anchor
+
+
+def _specific_event_type(text: str) -> CatalystEventType | None:
+    normalized = _normalized(text)
+    if any(token in normalized for token in ("投資人說明會", "投資者說明會", "法人說明會", "法說會")):
+        return CatalystEventType.MANAGEMENT_GOVERNANCE
+    if any(token in normalized for token in ("財務報告", "財報", "季報", "半年報", "綜合損益表", "earnings", "eps")):
         return CatalystEventType.EARNINGS_RESULT
     if any(token in normalized for token in ("合併營收", "月營收", "revenue")):
         return CatalystEventType.REVENUE_UPDATE
-    if any(token in normalized for token in ("投資人說明會", "投資者說明會", "法人說明會", "法說會")):
-        return CatalystEventType.MANAGEMENT_GOVERNANCE
-    if any(token in normalized for token in ("擴建", "新廠", "產能", "設備投資", "資本支出", "廠房", "生產線", "capex", "capacityexpansion", "plantexpansion")):
-        return CatalystEventType.CAPEX_CAPACITY
     if any(token in normalized for token in ("股利", "配息", "庫藏股")):
         return CatalystEventType.DIVIDEND_CAPITAL_RETURN
-    if any(token in normalized for token in ("法說會", "投資人說明會", "董事會")):
-        return CatalystEventType.MANAGEMENT_GOVERNANCE
-    return CatalystEventType.OTHER
+    if any(token in normalized for token in ("擴建", "新廠", "產能", "設備投資", "資本支出", "廠房", "生產線", "capex", "capacityexpansion", "plantexpansion")):
+        return CatalystEventType.CAPEX_CAPACITY
+    return None
+
+
+def _is_acquisition_core(text: str) -> bool:
+    normalized = _normalized(text)
+    return bool(re.search(
+        r"(?:取得|購入).{0,80}(?:股權|有價證券)|投資取得子公司|"
+        r"acquisition|equitypurchase|shareacquisition",
+        normalized,
+    ))
+
+
+def _candidate_association(
+    source: ExternalSourceRef,
+    anchor: str,
+    validated_aliases: tuple[str, ...],
+) -> CompanyAssociationStatus:
+    """A page-level direct match never substitutes for candidate-local identity."""
+    if source.company_association_status not in {
+        CompanyAssociationStatus.DIRECT_EXACT,
+        CompanyAssociationStatus.DIRECT_SUPPORTED,
+    }:
+        return source.company_association_status
+    target_code = source.target_symbol.split(".", maxsplit=1)[0]
+    exact_names = (source.target_company_name, *validated_aliases)
+    has_code = bool(re.search(rf"(?<!\d){re.escape(target_code)}(?!\d)", anchor))
+    has_name = any(name and name in anchor for name in exact_names)
+    return source.company_association_status if has_code or has_name else CompanyAssociationStatus.AMBIGUOUS
+
+
+def _is_page_chrome_span(text: str, start: int, end: int) -> bool:
+    """Conservatively identify quote/page framing that cannot supply event time."""
+    prefix = text[start:min(end, start + 240)]
+    return "更新" in prefix and any(marker in prefix for marker in _PAGE_CHROME_MARKERS if marker != "更新")
 
 
 def _reporting_period(anchor: str) -> str | None:
