@@ -1,0 +1,190 @@
+import sys
+import unittest
+from datetime import UTC, date, datetime
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = PROJECT_ROOT / "src"
+
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+from catalyst_event import CandidateStatus
+from catalyst_event import CatalystEventType
+from catalyst_event import EventConflictStatus
+from catalyst_event import EventValidationStatus
+from catalyst_event_extraction import cluster_validated_events
+from catalyst_event_extraction import extract_event_candidates
+from catalyst_event_extraction import validate_event_candidate
+from external_source import CompanyAssociationStatus
+from external_source import RawWebSearchSource
+from external_source import RelatedCompanyIdentity
+from external_source import SourceTier
+from external_source import TargetCompanyIdentity
+from external_source import normalize_external_source
+
+
+NOW = datetime(2026, 8, 31, 8, 0, tzinfo=UTC)
+WINDOW = (date(2026, 8, 1), date(2026, 8, 31))
+TARGET = TargetCompanyIdentity("1216.TW", "統一", "Uni-President Enterprises Corp.", ("統一(1216)",))
+RELATED = (RelatedCompanyIdentity("Uni-President China Holdings Ltd.", ("220",), ("統一中國",)),)
+DOMAIN_MAP = {
+    "official.test": SourceTier.TIER_1_OFFICIAL,
+    "media.test": SourceTier.TIER_2_ESTABLISHED_MEDIA,
+    "other.test": SourceTier.TIER_3_OTHER_ATTRIBUTABLE,
+    "social.test": SourceTier.TIER_4_SOCIAL_COMMUNITY,
+}
+
+
+def source(url, title, snippet):
+    return normalize_external_source(
+        RawWebSearchSource(url=url, title=title, snippet=snippet),
+        target=TARGET,
+        retrieved_at=NOW,
+        domain_map=DOMAIN_MAP,
+        related_entities=RELATED,
+    )
+
+
+def candidates(*sources):
+    return extract_event_candidates(
+        sources,
+        target_symbol=TARGET.symbol,
+        target_company_name=TARGET.canonical_name,
+        validated_aliases=TARGET.supported_aliases,
+        research_window=WINDOW,
+    )
+
+
+class CatalystEventExtractionTestCase(unittest.TestCase):
+    def test_single_structured_earnings_event_is_validated(self):
+        item = source("https://official.test/earnings", "統一(1216) 重大訊息", "日 期：2026年08月06日，董事會通過第二季財務報告。")
+        extracted = candidates(item)
+        self.assertEqual(len(extracted), 1)
+        self.assertEqual(extracted[0].candidate_type, CatalystEventType.EARNINGS_RESULT)
+        events = cluster_validated_events(extracted, sources=(item,), research_window=WINDOW)
+        self.assertEqual(events[0].validation_status, EventValidationStatus.VALIDATED)
+
+    def test_monthly_revenue_is_deterministically_classified(self):
+        item = source("https://official.test/revenue", "統一(1216) 營收公告", "日期：2026-08-10，統一(1216) 公告 7 月合併營收。")
+        extracted = candidates(item)
+        self.assertEqual(extracted[0].candidate_type, CatalystEventType.REVENUE_UPDATE)
+        self.assertEqual(validate_event_candidate(extracted[0], source=item, research_window=WINDOW), EventValidationStatus.VALIDATED)
+
+    def test_investor_conference_precedes_generic_investment_and_true_capex_remains_capex(self):
+        conference = source("https://official.test/conference", "統一(1216) 公告", "2026-08-10 統一(1216) 召開投資人說明會。")
+        capex = source("https://official.test/capex", "統一(1216) 公告", "2026-08-10 統一(1216) 公告擴建新廠並增加產能。")
+        generic_investment = source("https://official.test/generic-investment", "統一(1216) 公告", "2026-08-10 統一(1216) 投資人關注公司發展。")
+        self.assertEqual(candidates(conference)[0].candidate_type, CatalystEventType.MANAGEMENT_GOVERNANCE)
+        self.assertEqual(candidates(capex)[0].candidate_type, CatalystEventType.CAPEX_CAPACITY)
+        self.assertEqual(candidates(generic_investment)[0].candidate_type, CatalystEventType.OTHER)
+
+    def test_one_source_produces_three_distinct_candidates(self):
+        item = source(
+            "https://official.test/multi",
+            "統一(1216) 重大訊息",
+            "日期：2026-08-06，董事會通過第二季財報。日期：2026-08-10，公告 7 月合併營收。日期：2026-08-10，召開法說會。",
+        )
+        extracted = candidates(item)
+        self.assertEqual(len(extracted), 3)
+        self.assertEqual({item.candidate_type for item in extracted}, {
+            CatalystEventType.EARNINGS_RESULT, CatalystEventType.REVENUE_UPDATE, CatalystEventType.MANAGEMENT_GOVERNANCE,
+        })
+        self.assertTrue(all(item.candidate_anchor and len(item.candidate_anchor) <= 360 for item in extracted))
+
+    def test_official_and_yahoo_same_event_cluster_with_tier_one_primary(self):
+        official = source("https://official.test/july", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月合併營收。")
+        yahoo = source("https://media.test/july", "統一(1216) monthly revenue", "2026-08-10 Uni-President announced July revenue.")
+        extracted = candidates(official, yahoo)
+        events = cluster_validated_events(extracted, sources=(official, yahoo), research_window=WINDOW)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].support_count, 2)
+        self.assertEqual(events[0].primary_source_id, official.source_id)
+        self.assertEqual(events[0].validation_status, EventValidationStatus.VALIDATED)
+
+    def test_tier_two_is_an_acceptable_primary_without_tier_one(self):
+        media = source("https://media.test/july", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月合併營收。")
+        event = cluster_validated_events(candidates(media), sources=(media,), research_window=WINDOW)[0]
+        self.assertEqual(event.primary_source_id, media.source_id)
+        self.assertEqual(event.validation_status, EventValidationStatus.VALIDATED)
+
+    def test_same_day_different_events_remain_separate(self):
+        item = source("https://official.test/same-day", "統一(1216) 公告", "2026-08-10 公告 7 月合併營收。2026-08-10 召開法說會。")
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        self.assertEqual(len(events), 2)
+        self.assertEqual({event.event_type for event in events}, {CatalystEventType.REVENUE_UPDATE, CatalystEventType.MANAGEMENT_GOVERNANCE})
+
+    def test_same_day_same_type_different_reporting_subjects_remain_separate(self):
+        item = source(
+            "https://official.test/report-subjects",
+            "統一(1216) 公告",
+            "2026-08-10 董事會通過第二季財務報告。2026-08-10 董事會通過上半年財務報告。",
+        )
+        events = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)
+        self.assertEqual(len(events), 2)
+        self.assertEqual({event.event_type for event in events}, {CatalystEventType.EARNINGS_RESULT})
+        self.assertEqual(len({event.event_key for event in events}), 2)
+        self.assertEqual(len({event.event_id for event in events}), 2)
+
+    def test_related_entity_remains_partial_and_separate(self):
+        related = source("https://media.test/220", "Uni-President China Holdings Ltd. (220)", "2026-08-10 Uni-President China announced July revenue.")
+        extracted = candidates(related)
+        events = cluster_validated_events(extracted, sources=(related,), research_window=WINDOW)
+        self.assertEqual(extracted[0].company_association_status, CompanyAssociationStatus.RELATED_ENTITY)
+        self.assertEqual(events[0].validation_status, EventValidationStatus.PARTIALLY_VALIDATED)
+
+    def test_ambiguous_company_and_missing_title_fail_closed(self):
+        ambiguous = source("https://media.test/ambiguous", "Uni-President update", "2026-08-10 announced monthly revenue.")
+        missing_title = source("https://official.test/missing-title", None, "2026-08-10 統一(1216) 公告月營收。")
+        for item in (ambiguous, missing_title):
+            event = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)[0]
+            self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+
+    def test_relative_and_ambiguous_dates_never_validate(self):
+        for url, snippet in (
+            ("https://official.test/relative", "統一(1216) 3 weeks ago 公告月營收。"),
+            ("https://official.test/ambiguous-date", "統一(1216) 08/06/2026 公告月營收。"),
+        ):
+            item = source(url, "統一(1216) 營收", snippet)
+            event = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)[0]
+            self.assertEqual(event.validation_status, EventValidationStatus.PARTIALLY_VALIDATED)
+
+    def test_tier_three_alone_does_not_validate_and_tier_four_cannot_be_primary(self):
+        tier_three = source("https://other.test/revenue", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月營收。")
+        tier_four = source("https://social.test/revenue", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月營收。")
+        tier_three_event = cluster_validated_events(candidates(tier_three), sources=(tier_three,), research_window=WINDOW)[0]
+        self.assertEqual(tier_three_event.validation_status, EventValidationStatus.PARTIALLY_VALIDATED)
+        self.assertEqual(tier_three_event.primary_source_id, tier_three.source_id)
+        tier_four_event = cluster_validated_events(candidates(tier_four), sources=(tier_four,), research_window=WINDOW)[0]
+        self.assertEqual(tier_four_event.validation_status, EventValidationStatus.PARTIALLY_VALIDATED)
+        self.assertIsNone(tier_four_event.primary_source_id)
+
+    def test_conflicting_dates_do_not_silently_merge(self):
+        first = source("https://official.test/july-one", "統一(1216) 營收", "2026-08-09 統一(1216) 公告 7 月營收。")
+        second = source("https://media.test/july-two", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 July revenue.")
+        event = cluster_validated_events(candidates(first, second), sources=(first, second), research_window=WINDOW)[0]
+        self.assertEqual(event.conflict_status, EventConflictStatus.SOURCE_DATE)
+        self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+
+    def test_background_only_and_duplicate_url_are_explicit_and_deterministic(self):
+        profile = source("https://official.test/profile", "統一(1216) 公司介紹", "Company profile without an event.")
+        duplicate_a = source("https://official.test/revenue?utm_source=x", "統一(1216) 營收", "2026-08-10 統一(1216) 公告 7 月營收。")
+        duplicate_b = source("https://official.test/revenue?utm_source=y", "統一(1216) 不同標題", "2026-08-10 統一(1216) 公告 7 月營收。")
+        background = candidates(profile)[0]
+        self.assertEqual(background.candidate_status, CandidateStatus.BACKGROUND_ONLY)
+        self.assertEqual(cluster_validated_events((background,), sources=(profile,), research_window=WINDOW)[0].validation_status, EventValidationStatus.BACKGROUND_ONLY)
+        first = cluster_validated_events(candidates(duplicate_a, duplicate_b), sources=(duplicate_a, duplicate_b), research_window=WINDOW)
+        second = cluster_validated_events(candidates(duplicate_b, duplicate_a), sources=(duplicate_b, duplicate_a), research_window=WINDOW)
+        self.assertEqual(first, second)
+        self.assertEqual(first[0].support_count, 1)
+
+    def test_extraction_is_offline_and_does_not_import_ai_or_transport(self):
+        implementation = (SRC_PATH / "catalyst_event_extraction.py").read_text(encoding="utf-8")
+        self.assertNotIn("openai", implementation.casefold())
+        self.assertNotIn("requests", implementation.casefold())
+        self.assertNotIn("sqlite", implementation.casefold())
+
+
+if __name__ == "__main__":
+    unittest.main()
