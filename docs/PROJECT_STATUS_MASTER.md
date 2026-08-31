@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-09-01, after Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release.
+Last updated: 2026-09-01, after Research Deep Dive / Catalyst V1J-B Deep Dive UI release.
 
 ## Project Purpose
 
@@ -48,16 +48,17 @@ This status document is based on:
 - Research Deep Dive / Catalyst V1I-A deterministic event extraction foundation release validation
 - Research Deep Dive / Catalyst V1I-B durable real-event acceptance release validation
 - Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release validation
+- Research Deep Dive / Catalyst V1J-B Deep Dive UI integration release validation
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- V1J-A implementation release baseline: `d38ce1f feat: add catalyst impact hypothesis prototype`
-- V1J-A source release SHA: `d38ce1f0656684131bf88c41921cfcc17312648c`
-- Remote source baseline at documentation-update start: `origin/main` pointed to `d38ce1f0656684131bf88c41921cfcc17312648c`
-- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release.
+- V1J-B implementation release baseline: `3d4a501 feat: add catalyst deep dive research ui`
+- V1J-B source release SHA: `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3`
+- Remote source baseline at documentation-update start: `origin/main` pointed to `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3`
+- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1J-B Deep Dive UI release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -97,6 +98,7 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `3d4a501 feat: add catalyst deep dive research ui`
 - `d38ce1f feat: add catalyst impact hypothesis prototype`
 - `5cba8f3 fix: harden catalyst real-event validation`
 - `e6ef1b0 feat: add production risk persistence health check`
@@ -2421,7 +2423,71 @@ The accepted `1216.TW` offline prototype is `PLAUSIBLE` and provides an impact h
 - `git diff --check`: PASS.
 - Final release closure: `V1J_A_FINAL_RELEASE_READY`.
 
-V1J-A does not release a Deep Dive UI, company-level multi-event Catalyst synthesis, Research Priority integration, DB persistence, probability, price target, recommendation, or Production approval. `CATALYST_DEEP_DIVE_UI_INTEGRATION = NOT YET APPROVED` and `CATALYST_COMPANY_LEVEL_SYNTHESIS = NOT YET APPROVED`.
+V1J-A does not itself release a Deep Dive UI, company-level multi-event Catalyst synthesis, Research Priority integration, DB persistence, probability, price target, recommendation, or Production approval. V1J-B subsequently releases the bounded selected-company Deep Dive UI described below; `CATALYST_COMPANY_LEVEL_SYNTHESIS = NOT YET APPROVED`.
+
+## Research Deep Dive / Catalyst V1J-B Deep Dive UI Release (2026-09-01)
+
+### Release Status And Scope
+
+- `RESEARCH_DEEP_DIVE_CATALYST_V1J_B = RELEASED`.
+- Release commit: `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3` (`feat: add catalyst deep dive research ui`).
+- Released files: `app.py`, `src/catalyst_deep_dive.py`, and `tests/test_catalyst_deep_dive.py`.
+- V1J-B integrates released Catalyst analysis into the existing selected-company Research Deep Dive flow. No standalone Catalyst dashboard was added.
+
+The visible flow is:
+
+`selected company -> explicit "更新 Catalyst 深度分析" -> released Web Search retrieval -> released Catalyst event validation -> released ImpactHypothesis -> Catalyst Deep Dive cards`.
+
+### Explicit Trigger, Budget, And Session Boundaries
+
+- Catalyst analysis runs only after an explicit user click. Page load, normal Streamlit rerun, symbol switch, and filter change do not trigger a provider request.
+- A second real refresh requires a second explicit click.
+- Per explicit refresh: `MAX_RETRIEVAL_RESPONSES_REQUESTS = 1` and `MAX_IMPACT_AI_CALLS = 2`.
+- There is no automatic retrieval retry, Impact repair call, or hidden company-level synthesis call. A third eligible validated event is not sent to the Impact provider.
+- Runtime Catalyst state is scoped by symbol. Results for `1216.TW` must not display as `2027.TW`; switching symbols alone does not trigger a paid refresh.
+- A failed same-symbol refresh does not silently present stale cards as newly refreshed data.
+
+### Factual And Event Governance
+
+Only `validation_status == VALIDATED` events may enter primary `ImpactHypothesis` generation. `PARTIALLY_VALIDATED`, `BACKGROUND_ONLY`, and `REJECTED` events do not receive a primary hypothesis. This preserves the V1I-B fail-closed factual boundary.
+
+The UI renders event date, event type, event fact, and source count from deterministic `ValidatedCatalystEvent` fields. AI cannot rewrite the event fact, date, type, target identity, or source provenance. `ImpactHypothesis` owns only bounded interpretation: impact channel, hypothesis status, why it may matter, limitation / contradiction, uncertainty, and next check.
+
+The visible card structure is `事件日期`, `事件類型`, `發生了什麼`, `為什麼可能重要`, `支持證據`, `限制 / 反證`, `不確定性`, `下一步要查什麼`, and `證據狀態`. Supporting evidence, contradiction / limitation, and program-owned missing evidence remain separate. Raw provider JSON is not rendered, and AI-created URLs, source IDs, or citations are not accepted.
+
+### Product And Failure Boundaries
+
+V1J-B does not create Buy, Sell, Hold, target price, expected return, probability, bullish / bearish score, explicit stock-price direction, Research Priority mutation, or a company-level investment conclusion.
+
+- Missing `OPENAI_API_KEY` makes zero provider calls.
+- Retrieval failure makes zero Impact calls.
+- Zero `VALIDATED` events produces a clear no-event state and zero Impact calls.
+- A single event Impact failure does not remove other successful event cards.
+- There is no retry or repair behavior.
+
+### Mocked Acceptance And Validation
+
+- `1216.TW` mocked Catalyst card flow: PASS.
+- `1608`-style zero-validated path: PASS.
+- `2027.TW` two-event path: PASS.
+- With three validated events, only the first two are analyzed and the third Impact provider call is zero.
+- The mocked UI and orchestration route was exercised without real provider calls.
+- Focused V1J-B tests: `11 OK`.
+- Relevant regression: `428 OK`.
+- `compileall`: PASS.
+- `git diff --check`: PASS.
+
+The full suite ran `2953` tests with `3` failures. They are recorded transparently as Portfolio dashboard static-contract failure = `BASELINE_PREEXISTING`, Research-service snapshot wording/static-scan failure = `BASELINE_PREEXISTING`, and Portfolio-generation Python cache sentinel = `TEST_ENVIRONMENT_SIDE_EFFECT`. `V1J_B_REGRESSION = 0`; this does not claim the full suite was fully green.
+
+### Runtime Acceptance And Next Approval Gate
+
+- `REAL_CATALYST_UI_SMOKE_1216 = NOT YET APPROVED`.
+- No real end-to-end provider and UI smoke has occurred after V1J-B release.
+- `CATALYST_COMPANY_LEVEL_SYNTHESIS = NOT YET APPROVED`.
+- `CATALYST_RESEARCH_PRIORITY_INTEGRATION = NOT YET APPROVED`; the existing Stage 2 priority remains unchanged.
+- Recommended next step, subject to separate approval: `BOUNDED REAL 1216 CATALYST UI SMOKE`, with at most one Responses retrieval request and up to two Impact AI calls, no retry, and no repair.
+
+V1J-B leaves V1J-A domain/service, V1I factual layer, V1F / V1H retrieval foundations, AI Research transport, AI Analyst, Research Priority, Portfolio, Technical Risk, DB, and Production unchanged. New DB: `NO`; DB writes: `NO`; Production: `UNTOUCHED`; `data/production/ = NOT_FOUND`.
 
 ## Current Working State
 
@@ -2436,7 +2502,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1J-A event-level impact hypothesis is released, while Deep Dive UI integration and company-level Catalyst synthesis remain not yet approved. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1J-A event-level impact hypothesis and V1J-B selected-company Deep Dive UI are released, while real V1J-B UI smoke, company-level Catalyst synthesis, and Research Priority integration remain not yet approved. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2504,7 +2570,7 @@ Completed:
 
 Next planning candidates:
 
-- Catalyst Deep Dive UI integration approval review
+- Bounded real `1216.TW` Catalyst UI smoke approval review
 - Catalyst company-level synthesis approval review
 - Research Evidence Expansion V1B approval review
 
@@ -2778,11 +2844,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `d38ce1f0656684131bf88c41921cfcc17312648c` or inspect any newer commits.
+2. Confirm HEAD is still `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Treat Research Evidence Expansion V1B, Catalyst Deep Dive UI integration, and Catalyst company-level synthesis as not yet approved. V1J-A is released bounded event-level impact-hypothesis capability; V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
+8. Treat Research Evidence Expansion V1B, the real V1J-B Catalyst UI smoke, Catalyst company-level synthesis, and Research Priority integration as not yet approved. V1J-B is released bounded selected-company Deep Dive UI capability; V1J-A is released event-level impact-hypothesis capability; V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
