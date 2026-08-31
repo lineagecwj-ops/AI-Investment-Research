@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-31, after Research Deep Dive / Catalyst V1I-B real-event acceptance release.
+Last updated: 2026-09-01, after Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release.
 
 ## Project Purpose
 
@@ -47,16 +47,17 @@ This status document is based on:
 - Research Deep Dive / Catalyst V1H real Web Search retrieval transport release validation and `1216.TW` smoke evidence
 - Research Deep Dive / Catalyst V1I-A deterministic event extraction foundation release validation
 - Research Deep Dive / Catalyst V1I-B durable real-event acceptance release validation
+- Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release validation
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `5cba8f3 fix: harden catalyst real-event validation`
-- Current full HEAD: `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc`
-- Remote baseline at synchronization time: `origin/main` points to `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc`
-- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1I-B real-event acceptance release.
+- V1J-A implementation release baseline: `d38ce1f feat: add catalyst impact hypothesis prototype`
+- V1J-A source release SHA: `d38ce1f0656684131bf88c41921cfcc17312648c`
+- Remote source baseline at documentation-update start: `origin/main` pointed to `d38ce1f0656684131bf88c41921cfcc17312648c`
+- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -96,6 +97,7 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `d38ce1f feat: add catalyst impact hypothesis prototype`
 - `5cba8f3 fix: harden catalyst real-event validation`
 - `e6ef1b0 feat: add production risk persistence health check`
 - `3e1e903 feat: add production risk persistence bootstrap`
@@ -2367,11 +2369,59 @@ Representative accepted outcomes are: `1216.TW` monthly revenue on `2026-08-11` 
 - Final validation: focused extraction `25 OK`; model plus extraction `28 OK`; relevant V1F / V1H / AI Research / Research Context / AI Follow-up / AI Analyst / Dashboard regression `338 OK`; `compileall`: PASS; `git diff --check`: PASS; offline replay deterministic: PASS.
 - Final pre-commit verdict: `V1I_B_FINAL_PRECOMMIT_PASS`. Final release verdict: `V1I_B_RELEASED`.
 - Final patch, review, and release made no OpenAI call, real retrieval, DB write, DB schema change, Production change, UI change, or new API request. Network use was Git push only. `data/production/ = NOT_FOUND`.
-- `CATALYST_IMPACT_HYPOTHESIS = NOT YET APPROVED` and `CATALYST_DEEP_DIVE_ANALYST = NOT YET APPROVED`.
+- `RESEARCH_DEEP_DIVE_CATALYST_V1J_A = RELEASED`. V1J-A now supplies the bounded event-level impact-hypothesis capability recorded below. Deep Dive UI and company-level Catalyst synthesis remain not yet approved.
 
 The next proposed product stage is Impact Hypothesis / Deep Dive Analyst Foundation: `ValidatedCatalystEvent -> factual event summary -> impact hypothesis -> affected business or financial channel -> supporting and contradictory evidence -> uncertainty / missing evidence -> next checks`. It must not create Buy / Sell / Hold, score, probability, target price, expected return, or automatic recommendation.
 
 Remaining gaps: bounded Web Search snippets can omit event-local detail; full-page deterministic event segmentation is not implemented; in-product event-artifact persistence remains deferred; impact hypothesis, contradiction synthesis, Deep Dive Analyst UI, Catalyst ranking / probability / target price, and Production approval remain unimplemented.
+
+## Research Deep Dive / Catalyst V1J-A Impact Hypothesis Prototype Release (2026-09-01)
+
+### Technical Release Status
+
+- `RESEARCH_DEEP_DIVE_CATALYST_V1J_A = RELEASED`.
+- Source release commit: `d38ce1f0656684131bf88c41921cfcc17312648c` (`feat: add catalyst impact hypothesis prototype`).
+- `V1J_A_TECHNICAL_RELEASE = PASS`.
+- `V1J_A_PROCEDURAL_COMPLIANCE = PASS_WITH_NON_BLOCKING_EXCEPTION`.
+- `V1J_A_OVERALL_STATUS = RELEASED_WITH_NON_BLOCKING_PROCEDURAL_EXCEPTION`.
+
+The source release succeeded. After the successful push, a read-only `git fetch origin` was used to verify remote state. That exceeded the narrow release-task allowance of Git push only, but did not alter the source commit, working tree, `HEAD`, `origin/main`, or create another commit. No force push, provider retrieval, OpenAI call, DB access, or Production change occurred. This is classified as `NON_BLOCKING_PROCEDURAL_EXCEPTION`, not as release corruption, source release failure, Catalyst failure, or AI-safety failure.
+
+### Released Capability And Boundaries
+
+V1J-A implements the bounded domain/service prototype:
+
+`ValidatedCatalystEvent -> ImpactHypothesis`.
+
+It provides qualitative, event-linked, immutable, deterministically identified interpretation fields: impact hypothesis, why it matters, contradiction / limitation, uncertainty, and next check. The allowed channels are `REVENUE`, `MARGIN_COST`, `CAPACITY`, `CAPITAL_ALLOCATION`, `GOVERNANCE`, and `OTHER`. Statuses are `PLAUSIBLE`, `INSUFFICIENT_EVIDENCE`, `CONTRADICTED`, and `SUPPORTED`.
+
+The boundary remains strict: `EVENT FACT != IMPACT HYPOTHESIS != INVESTMENT CONCLUSION`. AI cannot modify or create event identity, factual event content, event date, company identity, event type, source IDs, evidence refs, URLs, citations, validation status, or conflict status. Evidence refs, contradictory refs, and missing evidence remain program-owned. General company background never becomes supporting evidence automatically.
+
+`SUPPORTED` requires genuinely independent approved evidence. Event source, primary source, same event provenance, a repackaged event fact, a renamed same-event alias, or unprovable provenance cannot self-support; unprovable independence fails closed. `CONTRADICTED` requires approved contradictory evidence. `PLAUSIBLE` and `INSUFFICIENT_EVIDENCE` remain conservative, non-confidence states.
+
+V1J-A blocks Buy / Sell / Hold, Strong Buy / Strong Sell, target price, expected return, and explicit stock-price direction, including `股價將上漲`, `股價可能下跌`, `看多`, `看空`, `stock price will rise`, and `share price may fall`. Business and financial channel analysis remains allowed without becoming an investment conclusion.
+
+### P1 Closure And Determinism
+
+- `INDEPENDENT_SUPPORT_SELF_REFERENCE_FIXED = YES`.
+- `STOCK_PRICE_DIRECTION_LEAKAGE_FIXED = YES`.
+- `DUPLICATE_EVENT_CONTEXT_ORDER_DEPENDENCE_FIXED = YES`.
+
+Order-independent event context collections are canonically normalized for duplicate detection: company background, supporting evidence and provenance, contradictory evidence, missing evidence, provider-bound evidence, provider missing-data context, and event source IDs where applicable. Equivalent context collapses to one logical event and at most one provider call. Materially different same-event context fails closed as `DUPLICATE_EVENT_CONTEXT_CONFLICT` with zero provider calls. There is no first-write-wins or last-write-wins behavior.
+
+The call budget is fixed at `MAX_AI_CALLS_PER_EVENT = 1`, `MAX_AI_CALLS_PER_COMPANY_RUN = 2`, `AUTO_RETRY = 0`, and `REPAIR_CALLS = 0`. A failed provider request still consumes its slot. A `PARTIALLY_VALIDATED` event cannot produce a primary hypothesis and makes zero AI calls.
+
+### Offline Prototype And Validation
+
+The accepted `1216.TW` offline prototype is `PLAUSIBLE` and provides an impact hypothesis, why it matters, meaningful limitation, uncertainty, and an actionable next check. Supporting evidence provenance is independent of the event source. The accepted output contains no recommendation, stock-price direction, unsupported financial number, or AI-created provenance.
+
+- Focused V1J-A validation: `25 OK`.
+- Relevant Catalyst V1I-A / V1I-B, V1F, V1H, AI Research, Research Context, AI Follow-up, AI Analyst, and Dashboard regression: `408 OK`.
+- `compileall`: PASS.
+- `git diff --check`: PASS.
+- Final release closure: `V1J_A_FINAL_RELEASE_READY`.
+
+V1J-A does not release a Deep Dive UI, company-level multi-event Catalyst synthesis, Research Priority integration, DB persistence, probability, price target, recommendation, or Production approval. `CATALYST_DEEP_DIVE_UI_INTEGRATION = NOT YET APPROVED` and `CATALYST_COMPANY_LEVEL_SYNTHESIS = NOT YET APPROVED`.
 
 ## Current Working State
 
@@ -2386,7 +2436,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1I-B real event acceptance is released, while Impact Hypothesis / Deep Dive Analyst Foundation remains not yet approved. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1J-A event-level impact hypothesis is released, while Deep Dive UI integration and company-level Catalyst synthesis remain not yet approved. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2454,7 +2504,8 @@ Completed:
 
 Next planning candidates:
 
-- Research Deep Dive / Catalyst Impact Hypothesis / Deep Dive Analyst Foundation approval review
+- Catalyst Deep Dive UI integration approval review
+- Catalyst company-level synthesis approval review
 - Research Evidence Expansion V1B approval review
 
 Future:
@@ -2727,11 +2778,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc` or inspect any newer commits.
+2. Confirm HEAD is still `d38ce1f0656684131bf88c41921cfcc17312648c` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Treat Research Evidence Expansion V1B, Catalyst Impact Hypothesis, and Catalyst Deep Dive Analyst as not yet approved. V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
+8. Treat Research Evidence Expansion V1B, Catalyst Deep Dive UI integration, and Catalyst company-level synthesis as not yet approved. V1J-A is released bounded event-level impact-hypothesis capability; V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
