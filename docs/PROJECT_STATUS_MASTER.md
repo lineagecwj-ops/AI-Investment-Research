@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-08-31, after Research Deep Dive / Catalyst V1I-A deterministic event extraction foundation release.
+Last updated: 2026-08-31, after Research Deep Dive / Catalyst V1I-B real-event acceptance release.
 
 ## Project Purpose
 
@@ -46,16 +46,17 @@ This status document is based on:
 - Research Deep Dive / Catalyst V1G temporary real Web Search retrieval acceptance evidence
 - Research Deep Dive / Catalyst V1H real Web Search retrieval transport release validation and `1216.TW` smoke evidence
 - Research Deep Dive / Catalyst V1I-A deterministic event extraction foundation release validation
+- Research Deep Dive / Catalyst V1I-B durable real-event acceptance release validation
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
 ## Current Git Status
 
 - Branch: `main`
-- Implementation baseline: `0a2496e feat: add catalyst event extraction foundation`
-- Current full HEAD: `0a2496e6aeaf245796d9b90fdde609ecc3107af8`
-- Remote baseline at synchronization time: `origin/main` points to `0a2496e6aeaf245796d9b90fdde609ecc3107af8`
-- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1I-A deterministic event extraction foundation release.
+- Implementation baseline: `5cba8f3 fix: harden catalyst real-event validation`
+- Current full HEAD: `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc`
+- Remote baseline at synchronization time: `origin/main` points to `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc`
+- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1I-B real-event acceptance release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -95,6 +96,7 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `5cba8f3 fix: harden catalyst real-event validation`
 - `e6ef1b0 feat: add production risk persistence health check`
 - `3e1e903 feat: add production risk persistence bootstrap`
 - `c6b2921 docs: sync project master status through sprint 6c`
@@ -2283,7 +2285,7 @@ The smoke records `OBSERVED_WEB_SEARCH_CALL_COUNT_EXCEEDS_EXPECTED_POLICY`: two 
 - Local JSON retrieval persistence is deferred; V1H creates no committed provider payload, no new DB, and no Production artifact.
 - V1G remains `3 / 3 PASS` for `1216.TW`, `1608.TW`, and `2027.TW`; V1H is its released repository transport successor, not a change to V1G acceptance evidence.
 - Marketaux, Alpha Vantage, and traditional-news provider hopping remain `PAUSED / NOT SELECTED`. OpenAI Web Search is the validated and released retrieval path.
-- V1I-A now provides deterministic candidate segmentation, event-level temporal validation, source linkage, and clustering / deduplication. Still not implemented: validation against frozen real Taiwan source evidence, impact hypothesis, Catalyst synthesis, Deep Dive UI, ranking, Buy / Sell / Hold, probability, policy, or Production approval.
+- V1I-A provides deterministic candidate segmentation, event-level temporal validation, source linkage, and clustering / deduplication. V1I-B now validates those contracts against durable frozen real Taiwan source evidence. Still not implemented: impact hypothesis, Catalyst synthesis, Deep Dive UI, ranking, Buy / Sell / Hold, probability, policy, or Production approval.
 
 ### Next Approval Gate
 
@@ -2336,13 +2338,40 @@ V1I-A replays offline from `ExternalSourceRef`, `SourceTemporalEvidence`, and an
 
 Existing AI Research / `gpt-5-mini` synthesis, V1H OpenAI Web Search transport, `app.py`, AI Analyst, and Opportunity Radar remain unchanged.
 
-### Next Approval Gate And Remaining Gaps
+## Research Deep Dive / Catalyst V1I-B Real Event Acceptance Release (2026-08-31)
 
-`RESEARCH_DEEP_DIVE_CATALYST_V1I_B = NOT YET APPROVED`.
+`RESEARCH_DEEP_DIVE_CATALYST_V1I_B = REAL_EVENT_ACCEPTANCE_PASS`.
 
-The candidate V1I-B scope is Real Frozen-Source Event Extraction Acceptance: use already captured bounded real Taiwan source evidence with released V1I-A extraction, validation, clustering, and `ValidatedCatalystEvent` output. It must not make a new Web Search request, call AI, create a DB, add UI, add impact synthesis, or alter Production.
+- Release commit: `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc` (`fix: harden catalyst real-event validation`).
+- Final real acceptance: `1216.TW = COMPANY_EVENT_ACCEPTANCE_PASS`; `1608.TW = COMPANY_EVENT_ACCEPTANCE_PARTIAL`; `2027.TW = COMPANY_EVENT_ACCEPTANCE_PASS`.
+- Overall gate: PASS. At least two of three companies must PASS, the remainder must be at least PARTIAL, and there must be zero validated false positives, identity contamination, invalid temporal promotions, and duplicate validated factual events.
 
-Remaining gaps: V1I-A has not yet been accepted against frozen real Taiwan source evidence; bounded snippets can omit events on a multi-event page; event artifact persistence is deferred; ambiguous categories remain `OTHER`; AI-assisted ambiguous-event proposal, impact hypothesis, Catalyst synthesis, Deep Dive UI, and Production approval remain unimplemented.
+### Durable Evidence And Fail-Closed Result
+
+The frozen acceptance evidence for `1216.TW`, `1608.TW`, and `2027.TW` is held outside the repository and outside `/private/tmp` at `/Users/hankmacmini/Documents/AI-Investment-Research-Acceptance/catalyst-v1i-b/`. It is not committed to Git or stored in a DB, is replayable offline, and has deterministic candidate ordering, event ordering, IDs, keys, validation statuses, conflicts, and replay checksums.
+
+V1I-B resolves `EPHEMERAL_ACCEPTANCE_EVIDENCE_LOSS`: earlier `/private/tmp` V1G / V1H acceptance evidence disappeared, so V1I-B established a durable research-only acceptance harness without adding Production persistence.
+
+Representative accepted outcomes are: `1216.TW` monthly revenue on `2026-08-11` and investor conference on `2026-08-10`; `2027.TW` Q2 financial statement on `2026-08-13` and acquisition event on `2026-08-12`. `1608.TW` retains no VALIDATED event because the bounded evidence cannot safely establish event-local time after the false `2026-08-21` page-update timestamp is rejected. This PARTIAL result is acceptable: `QUALITY > EVENT COUNT`; prefer a missed event over wrong-company, wrong-date, or wrong-fact validation.
+
+### Real-Event Hardening And Taxonomy Closure
+
+- Candidate-local target identity is required; source-level `DIRECT_EXACT` alone is insufficient. Related or non-target evidence, including `PRESIDENT BAKERY`, cannot validate as `1216.TW`.
+- Event-local temporal binding excludes page chrome and quote / market timestamps such as `更新`, `成交量`, `本益比`, `股價`, `走勢圖`, `技術分析`, and `籌碼` from defining Catalyst event time.
+- Deterministic identity prevents page-header/body and same-source Q2 financial-statement duplicates where factual equivalence is proven, while same-date / same-type / different-subject events remain separate and `SOURCE_DATE` conflicts fail closed.
+- The taxonomy remains `EARNINGS_RESULT`, `REVENUE_UPDATE`, `MANAGEMENT_GOVERNANCE`, `CAPEX_CAPACITY`, `DIVIDEND_CAPITAL_RETURN`, and `OTHER`.
+- `CORE EVENT SUBJECT > INCIDENTAL KEYWORDS`: structured `主旨` / headline takes precedence where available, then the first factual event block. Generic `取得`, `股權`, and `有價證券` no longer globally override stronger core classifications. Q2 financial statements remain `EARNINGS_RESULT`; investor conferences remain `MANAGEMENT_GOVERNANCE`; true acquisition / equity-purchase cores remain `OTHER`; monthly revenue remains `REVENUE_UPDATE`; capacity expansion remains `CAPEX_CAPACITY`.
+
+### Validation, Boundaries, And Next Approval Gate
+
+- Final validation: focused extraction `25 OK`; model plus extraction `28 OK`; relevant V1F / V1H / AI Research / Research Context / AI Follow-up / AI Analyst / Dashboard regression `338 OK`; `compileall`: PASS; `git diff --check`: PASS; offline replay deterministic: PASS.
+- Final pre-commit verdict: `V1I_B_FINAL_PRECOMMIT_PASS`. Final release verdict: `V1I_B_RELEASED`.
+- Final patch, review, and release made no OpenAI call, real retrieval, DB write, DB schema change, Production change, UI change, or new API request. Network use was Git push only. `data/production/ = NOT_FOUND`.
+- `CATALYST_IMPACT_HYPOTHESIS = NOT YET APPROVED` and `CATALYST_DEEP_DIVE_ANALYST = NOT YET APPROVED`.
+
+The next proposed product stage is Impact Hypothesis / Deep Dive Analyst Foundation: `ValidatedCatalystEvent -> factual event summary -> impact hypothesis -> affected business or financial channel -> supporting and contradictory evidence -> uncertainty / missing evidence -> next checks`. It must not create Buy / Sell / Hold, score, probability, target price, expected return, or automatic recommendation.
+
+Remaining gaps: bounded Web Search snippets can omit event-local detail; full-page deterministic event segmentation is not implemented; in-product event-artifact persistence remains deferred; impact hypothesis, contradiction synthesis, Deep Dive Analyst UI, Catalyst ranking / probability / target price, and Production approval remain unimplemented.
 
 ## Current Working State
 
@@ -2357,7 +2386,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1I-A deterministic event extraction is released, while V1I-B frozen-source acceptance remains not yet approved. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1I-B real event acceptance is released, while Impact Hypothesis / Deep Dive Analyst Foundation remains not yet approved. Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2425,7 +2454,7 @@ Completed:
 
 Next planning candidates:
 
-- Research Deep Dive / Catalyst V1I-B approval review: Real Frozen-Source Event Extraction Acceptance using released V1I-A deterministic extraction only
+- Research Deep Dive / Catalyst Impact Hypothesis / Deep Dive Analyst Foundation approval review
 - Research Evidence Expansion V1B approval review
 
 Future:
@@ -2698,11 +2727,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `0a2496e6aeaf245796d9b90fdde609ecc3107af8` or inspect any newer commits.
+2. Confirm HEAD is still `5cba8f3f6657bdf5170dcd090a9a61ac00e6dffc` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Treat Research Evidence Expansion V1B and Research Deep Dive / Catalyst V1I-B as not yet approved. V1I-A is released deterministic event extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
+8. Treat Research Evidence Expansion V1B, Catalyst Impact Hypothesis, and Catalyst Deep Dive Analyst as not yet approved. V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
