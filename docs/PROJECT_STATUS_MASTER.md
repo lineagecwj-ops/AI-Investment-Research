@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-09-01, after Research Deep Dive / Catalyst V1J-B Deep Dive UI release.
+Last updated: 2026-09-01, after the Real 1216 Catalyst UI Smoke mixed-identity P1 safety patch release.
 
 ## Project Purpose
 
@@ -55,10 +55,10 @@ No network fetch, DB migration, live DB schema inspection, or production data qu
 ## Current Git Status
 
 - Branch: `main`
-- V1J-B implementation release baseline: `3d4a501 feat: add catalyst deep dive research ui`
-- V1J-B source release SHA: `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3`
-- Remote source baseline at documentation-update start: `origin/main` pointed to `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3`
-- Documentation status: this file is being synchronized after the Research Deep Dive / Catalyst V1J-B Deep Dive UI release.
+- Mixed-identity P1 patch release baseline: `03a8369 fix: block mixed-company catalyst candidates`
+- Mixed-identity P1 patch source release SHA: `03a83690d219138d606a5c8bbbdf0ab1cfe4344b`
+- Remote source baseline at documentation-update start: `origin/main` pointed to `03a83690d219138d606a5c8bbbdf0ab1cfe4344b`
+- Documentation status: this file is being synchronized after the Real 1216 Catalyst UI Smoke mixed-identity P1 safety patch release.
 - Documentation update status: currently local until committed and pushed.
 - Current Phase 7A-7L Long-Term Growth files are committed and pushed.
 - Phase 8A Portfolio Risk Dashboard Foundation implementation is committed and pushed at `0d71d85`.
@@ -98,6 +98,7 @@ Technical Risk v1 production policy promotion is part of Git history at `3fa2682
 
 Latest pushed milestones visible in `git log --oneline --decorate`:
 
+- `03a8369 fix: block mixed-company catalyst candidates`
 - `3d4a501 feat: add catalyst deep dive research ui`
 - `d38ce1f feat: add catalyst impact hypothesis prototype`
 - `5cba8f3 fix: harden catalyst real-event validation`
@@ -2488,6 +2489,56 @@ The full suite ran `2953` tests with `3` failures. They are recorded transparent
 - Recommended next step, subject to separate approval: `BOUNDED REAL 1216 CATALYST UI SMOKE`, with at most one Responses retrieval request and up to two Impact AI calls, no retry, and no repair.
 
 V1J-B leaves V1J-A domain/service, V1I factual layer, V1F / V1H retrieval foundations, AI Research transport, AI Analyst, Research Priority, Portfolio, Technical Risk, DB, and Production unchanged. New DB: `NO`; DB writes: `NO`; Production: `UNTOUCHED`; `data/production/ = NOT_FOUND`.
+
+## Real 1216 Catalyst UI Smoke Mixed-Identity P1 Safety Patch Release (2026-09-01)
+
+### Real Smoke Status And Forensic Root Cause
+
+- `REAL_CATALYST_UI_SMOKE_1216 = BLOCKED_PENDING_RETEST`.
+- The first real UI smoke exercised real retrieval, event extraction, the `ImpactHypothesis` path, and UI rendering. It exposed one P1 factual-correctness issue: a `VALIDATED` 1216 governance event contained mixed factual content from `1216` / Uni-President Enterprises and `5866` / 統一期.
+- Root cause: `CANDIDATE_MIXED_IDENTITY_GAP`. Candidate-local identity previously accepted target identity without rejecting a conflicting explicit non-target listed-company identity in the same unsplit candidate span.
+- This was not a V1H normalization issue, V1J context-isolation issue, UI-rendering issue, clustering implementation issue, or taxonomy issue.
+
+### Patch Release And Safety Rule
+
+- `REAL_1216_MIXED_IDENTITY_P1_PATCH = RELEASED`.
+- Release commit: `03a83690d219138d606a5c8bbbdf0ab1cfe4344b` (`fix: block mixed-company catalyst candidates`).
+- `CANDIDATE_MIXED_IDENTITY_GAP_FIXED = YES`.
+
+The released rule is candidate-local and fail-closed:
+
+`explicit target listed-company identity + conflicting explicit non-target listed-company identity in the same candidate span -> AMBIGUOUS / non-direct -> cannot independently become a VALIDATED target event`.
+
+Strong conflicting identity requires explicit listed-company structure, including `公司名稱：統一期(5866)`, `統一期（5866）`, `股票代號：5866`, or `股票代碼：5866`. Ordinary financial values and standalone numbers such as `2026`, `621.69`, `6.63`, `8.85`, `4121.47`, or a standalone `5866` are not listed-company identities by themselves. Source-level `DIRECT_EXACT` cannot override a candidate-local conflict.
+
+### Cluster Isolation And Factual Provenance
+
+Direct regression covers clean and mixed candidates in the same actual clustering / validation path:
+
+- Clean event: `VALIDATED`.
+- Mixed event: `REJECTED` / non-validated.
+- The mixed candidate does not join the clean cluster or increase its `support_count`.
+- The clean `primary_source_id` comes from the clean source.
+- The clean `event_fact` comes from the clean candidate anchor and contains neither `5866` nor `統一期`.
+- A mixed candidate cannot become the primary factual candidate, displayed event-fact source, or validation-quality booster for a clean event.
+
+Clean `1216` investor-conference and revenue candidates remain direct and eligible. Existing protections remain covered: PRESIDENT BAKERY contamination blocking, candidate-local identity requirements, page-update timestamp protection, event-local temporal binding, duplicate-event protections, `SOURCE_DATE` fail-closed semantics, acquisition precedence, earnings taxonomy, and investor-conference taxonomy.
+
+### Validation, Boundaries, And Retest Gate
+
+- Focused V1I: `33 OK`.
+- Relevant regression: `462 OK`.
+- `compileall`: PASS.
+- `git diff --check`: PASS.
+- V1H, V1J-A, V1J-B UI, segmentation implementation, clustering implementation, DB, and Production are unchanged.
+- `REAL_SMOKE_RUNTIME_PROVENANCE_PERSISTENCE = DEFERRED`.
+- DB writes: `NO`; DB schema: `NO`; Production: `UNTOUCHED`; `data/production/ = NOT_FOUND`.
+
+A new separately authorized real 1216 UI smoke is required before `REAL_CATALYST_UI_SMOKE_1216` can be marked `PASS`. Its acceptance condition is that every rendered `VALIDATED` 1216 event contains only clean target-company factual content; explicit non-target listed-company content such as `5866`, `2912`, or other listed-company factual events must not contaminate the displayed `event_fact`.
+
+- `NEXT_STEP = BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST`.
+- Retest status: `NOT YET EXECUTED`.
+- No new development sprint is approved before that retest result.
 
 ## Current Working State
 
