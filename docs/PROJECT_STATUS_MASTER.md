@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-09-01, after the Real 1216 Catalyst UI Smoke mixed-identity P1 safety patch release.
+Last updated: 2026-09-01, after the Catalyst V1I versioned Taiwan listed-company identity catalog and alias-only mixed-identity guard release.
 
 ## Project Purpose
 
@@ -2539,6 +2539,57 @@ A new separately authorized real 1216 UI smoke is required before `REAL_CATALYST
 - `NEXT_STEP = BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST`.
 - Retest status: `NOT YET EXECUTED`.
 - No new development sprint is approved before that retest result.
+
+## Catalyst V1I Versioned Taiwan Listed-Company Identity Catalog And Alias-Only Guard Release (2026-09-01)
+
+- `CATALYST_V1I_TAIWAN_IDENTITY_CATALOG = RELEASED`.
+- `CATALYST_V1I_ALIAS_ONLY_MIXED_IDENTITY_GUARD = RELEASED`.
+- Release commit: `a9cb78cf0856c7c5770c0c7a54b13c76ded7e8a6` (`feat: add catalyst listed-company identity catalog`).
+
+### Frozen Catalog And Input Lineage
+
+The Git-tracked, read-only catalog is `data/research/catalyst_identity/taiwan_listed_company_identity_catalog_v1.json`, version `CATALYST_V1I_TAIWAN_LISTED_COMPANY_IDENTITY_CATALOG_V1`. Its pinned catalog checksum is `63a923dece67cdc6bc5e86faaa635883141dc1c9b31a545d5db83649c43c7057`.
+
+- Total records: `1,979`; TWSE: `1,089`; TPEx: `890`.
+- Resolvable aliases: `1,520`; ambiguous aliases: `0`.
+- The frozen TPEx official common-stock build input contains `890` records. Raw SHA-256: `a2a39e8380d6fb0769355135bac384a13297d3b9cbec41cbaaf10df273486509`; normalized file SHA-256: `664efd38fe734c163f869316c8f789e372ea9798f31407af7dc300e0f285c1a7`; normalized content checksum: `473bfdddf552647c13b41f0c3c73ad0a1e1f76290c8e4a4a3c0e591b3b4a4837`.
+- The local `.TW` company-name input had `1,095` records. The catalog contains `1,089` TWSE common stocks after six deterministic non-common-stock DR exclusions: `910322 康師傅-DR`, `910861 神州-DR`, `911608 明輝-DR`, `911622 泰聚亨-DR`, `911868 同方友友-DR`, and `912000 晨訊科-DR`. There is no silent record loss.
+
+Runtime loads only this explicit version- and checksum-pinned artifact. It is offline and read-only: no `latest.json`, newest-file search, mutable company-name-cache fallback, TWSE / TPEx refresh, Yahoo fallback, or OpenAI fallback. Missing or invalid catalog input fails closed.
+
+### Alias Governance And Candidate Safety
+
+Reverse lookup permits exact unique aliases only. It does not use fuzzy matching, semantic matching, arbitrary prose substring matching, or first-record guessing; ambiguous aliases fail closed.
+
+- `統一超` resolves through the frozen catalog to `2912.TW`; this is not a runtime hard-code.
+- `統一` does not automatically resolve as a non-target identity.
+- `7-ELEVEN`, `OPENPOINT`, and `foodomo` do not automatically resolve to `2912.TW`.
+- Alias-only non-target identity is recognized only within bounded company-reference contexts: `公司名稱：<alias>`, or `<alias>表示`, `指出`, `公告`, `公布`, `宣布`, or `說明`.
+
+Candidate-local safety is fail-closed:
+
+`target identity + explicit conflicting company-and-code identity OR catalog-resolved explicit non-target alias identity -> AMBIGUOUS / non-direct -> cannot independently become VALIDATED`.
+
+Same-group listed companies are not exempt. A retest-shaped regression covers `1216.TW` text containing `統一企業(1216)公布7月營收... 展望8月，統一超表示...`; the catalog resolves `統一超 -> 2912.TW`, so the candidate is non-direct and not `VALIDATED`.
+
+Cluster factual isolation is also covered: a clean candidate remains `VALIDATED`, while an alias-mixed candidate is rejected / non-validated, does not join the clean cluster, cannot increase `support_count`, cannot become `primary_source_id`, and cannot provide the final `event_fact`. Existing `1216 / 5866` explicit mixed-code protection, PRESIDENT BAKERY protection, page-timestamp protection, event-local temporal binding, duplicate protections, `SOURCE_DATE` fail-closed behavior, acquisition precedence, earnings taxonomy, and investor-conference taxonomy remain preserved.
+
+### Validation, Boundaries, And Required Retest
+
+- Focused catalog plus V1I extraction: `41 OK`.
+- Relevant regression: `340 OK`.
+- `compileall`: PASS; `git diff --check`: PASS.
+- The ResearchService snapshot-jargon warning is `BASELINE_PREEXISTING`; V1I-caused regression: `NO`.
+- V1H, V1J-A, V1J-B UI, segmentation, clustering implementation, DB, and Production are unchanged.
+
+`REAL_CATALYST_UI_SMOKE_1216 = BLOCKED_PENDING_RETEST`. The earlier second smoke confirmed that `5866` contamination was removed but exposed alias-only factual contamination from `統一超`. This release patches that code path, but it does not mark real runtime acceptance as passed.
+
+- `NEXT_STEP = BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST_3`.
+- Retest status: `NOT YET EXECUTED`.
+- Acceptance requirement: every displayed `VALIDATED` 1216 event must remain target-local, with no independent factual content from `2912 / 統一超`, `5866 / 統一期`, or another deterministically recognized non-target listed company in its displayed `event_fact`.
+- `REPEATED_IMPACT_FAILURE_OBSERVED = YES`.
+- `IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`.
+- `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE`.
 
 ## Current Working State
 
