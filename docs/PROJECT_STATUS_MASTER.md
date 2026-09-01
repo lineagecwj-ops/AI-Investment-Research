@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-09-01, after Real 1216 Catalyst UI Smoke Retest 3 identity-safety acceptance.
+Last updated: 2026-09-01, after Catalyst Real Runtime Provenance Capture V1 release.
 
 ## Project Purpose
 
@@ -49,6 +49,7 @@ This status document is based on:
 - Research Deep Dive / Catalyst V1I-B durable real-event acceptance release validation
 - Research Deep Dive / Catalyst V1J-A impact-hypothesis prototype release validation
 - Research Deep Dive / Catalyst V1J-B Deep Dive UI integration release validation
+- Catalyst Real Runtime Provenance Capture V1 release validation
 
 No network fetch, DB migration, live DB schema inspection, or production data query was used to create this document.
 
@@ -2583,7 +2584,7 @@ The earlier second smoke confirmed that `5866` contamination was removed but exp
 - Acceptance requirement: every displayed `VALIDATED` 1216 event must remain target-local, with no independent factual content from `2912 / 統一超`, `5866 / 統一期`, or another deterministically recognized non-target listed company in its displayed `event_fact`.
 - `REPEATED_IMPACT_FAILURE_OBSERVED = YES`.
 - `IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`.
-- `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE`.
+- Historical roadmap marker `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE` is superseded by the released V1 capability recorded below.
 
 ### Real 1216 Catalyst UI Smoke Retest 3 Finalization
 
@@ -2606,7 +2607,54 @@ The proven real-runtime safety chain now covers explicit company-and-code protec
 
 No Impact analysis was executed or rendered in Retest 3 because no validated Catalyst event remained: `THIRD_IMPACT_FAILURE_OBSERVED = NO`. Historical state remains unchanged: `REPEATED_IMPACT_FAILURE_OBSERVED = YES`; `IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`.
 
-`REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE`. `RUNTIME_PROVENANCE_GAP = NOT_A_BLOCKER_FOR_REAL_1216_IDENTITY_SMOKE`; it remains a future maintainability item and is not implemented here. The 1216 identity-safety line is closed; no next implementation sprint has been started.
+At the time of Retest 3, `RUNTIME_PROVENANCE_GAP = NOT_A_BLOCKER_FOR_REAL_1216_IDENTITY_SMOKE`. That future maintainability item is now completed and superseded by `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE_V1 = RELEASED`, recorded below. The 1216 identity-safety line remains closed.
+
+## Catalyst Real Runtime Provenance Capture V1 Release (2026-09-01)
+
+### Release Status And Scope
+
+- `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE_V1 = RELEASED`.
+- Release commit: `5da60ca338cd5b0aa89a9d9e71654152f9914221` (`feat: add catalyst runtime provenance capture`).
+- Schema: `CATALYST_RUNTIME_PROVENANCE_V1`.
+- `CATALYST_RUNTIME_PROVENANCE_INFRASTRUCTURE_LINE = CLOSED`.
+- Provenance is orchestration / observability only. It does not change V1H retrieval semantics, V1I extraction or validation, V1I identity safety, V1J ImpactHypothesis core, Catalyst UI, identity catalog, segmentation, clustering, DB, or Production.
+
+### Explicit Trigger And Artifact Isolation
+
+Passive Catalyst page render creates no provenance artifact. One explicit Catalyst Deep Dive refresh creates exactly one unique provenance run and exactly one final local artifact. A same-symbol second explicit refresh receives a new `run_id`; different symbols receive distinct artifacts. An old provenance artifact never becomes the current UI research result, so no cross-session or cross-symbol provenance contamination occurs.
+
+The local runtime directory is `data/research/catalyst_runtime_provenance/`. It is a local research diagnostic artifact location, not Production, not a DB, and not Git-tracked runtime output. The repository `.gitignore` scope is narrow to this directory.
+
+### Forensic Evidence And Failure Accounting
+
+Future explicit runs can preserve bounded, sanitized forensic evidence for symbol, `run_id`, run status, retrieval attempt and status, normalized source evidence, V1I candidate and event provenance, `VALIDATED` event references, per-event Impact attempts, Impact success or failure, actual external-call counts, and safe error evidence. No hidden chain-of-thought is persisted.
+
+Pre-provider context construction and an actual Impact provider invocation are intentionally distinct:
+
+- `IMPACT_CONTEXT` means pre-provider context failure: `impact_attempted = false`, `impact_call_index = null`, provider invocations `0`, Impact call-count increment `0`, and no Impact contribution to external-call count.
+- `IMPACT_PROVIDER` means an actual provider failure: `impact_attempted = true`, the actual provider call index is recorded, and the Impact call count increments exactly once.
+
+The call budget remains retrieval maximum `1` and Impact provider maximum `2`. There is no retry, repair, alternate provider, fallback model, or additional provenance-generated API call. Call accounting records actual external attempts only.
+
+Available future failure evidence is limited to error stage, exception class, sanitized bounded error message, event reference, and provider call index only when a provider call occurred. This makes `FUTURE_REAL_CATALYST_FAILURES = FORENSICALLY_INSPECTABLE` without exposing credentials or internal reasoning.
+
+### Privacy, Persistence, And Zero-Event Safety
+
+Provenance does not persist `OPENAI_API_KEY`, Bearer tokens, Authorization headers, API-key-like secrets, cookies, environment dumps, hidden chain-of-thought, full provider responses, or unbounded tracebacks. Secrets are redacted.
+
+Persistence uses temporary write, flush / `fsync`, and atomic rename. A persistence failure does not alter the original Catalyst research result, does not trigger an API retry or recursive persistence retry, and surfaces provenance persistence failure status.
+
+When retrieval succeeds but there are no `VALIDATED` events, provenance status is `NO_VALIDATED_EVENTS`; Impact calls are `0`; and no fabricated Impact failure is recorded. This remains consistent with `REAL_CATALYST_UI_SMOKE_1216 = PASS` and `ZERO_VALIDATED_EVENT_RESULT = ACCEPTABLE_FAIL_CLOSED`.
+
+### Historical And Future Boundaries
+
+Historical state is preserved: `REPEATED_IMPACT_FAILURE_OBSERVED = YES` and `HISTORICAL_IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`. The V1 release does not claim the historical root cause is now known; it enables future real Catalyst failures to be forensically inspectable.
+
+Final release validation: focused provenance plus Deep Dive `19 OK`; relevant regression `411 OK`; `compileall`: PASS; `git diff --check`: PASS; and the pre-provider P1 blocker is CLOSED. Final pre-commit status: `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE_FINAL_PRECOMMIT_PASS`.
+
+Dedicated provenance real smoke after release is intentionally `NOT EXECUTED`. No API call is spent solely to validate provenance; real-artifact validation will occur during the next normal product-motivated explicit Catalyst Deep Dive execution.
+
+DB writes: `NO`; DB schema: `NO`; Production: `UNTOUCHED`; `data/production/ = NOT_FOUND`. `NEXT_PRODUCT_PHASE = TO_BE_SELECTED`. Possible future product-value directions include company-level Deep Dive synthesis, synthesis across validated Catalyst events, Research Priority integration, and forward-observation or batch-research workflow; no such implementation is approved by this documentation update.
 
 ## Current Working State
 
@@ -2621,7 +2669,7 @@ Current state:
 - Risk Evaluation Production Contract: complete, committed, and pushed
 - Technical Risk v1 OOS prerequisites, rule candidate evaluation governance, research policy freeze, production policy promotion, deterministic evaluator, signal producer integration, single-position production orchestration, Technical Risk artifact adapter, Technical Risk portfolio evaluator, full in-memory `PortfolioRiskGenerationService` integration validation, RiskArtifact codec, DB-agnostic artifact persistence contracts, SQLite RiskArtifactRepository core, Technical query / index contracts, SQLite schema v3, verified SQLite Technical query, atomic Technical artifact persistence, Portfolio RunRecord contracts, SQLite Portfolio RunRecord repository, portfolio-level atomic persistence coordination, Productionization P1A bootstrap / backup / migration capability, and Productionization P1B read-only health / verify capability: complete, committed, and pushed
 - Sprint 6C Portfolio Persistence Integration / Run-Level Persistence Record implementation chain: complete, committed, and pushed
-- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1J-A event-level impact hypothesis and V1J-B selected-company Deep Dive UI are released, while real V1J-B UI smoke, company-level Catalyst synthesis, and Research Priority integration remain not yet approved. Productionization P2 remains a separate future technical-risk planning track.
+- Current product roadmap decision point: Research Evidence Expansion V1B remains not yet approved; Catalyst V1J-A event-level impact hypothesis, V1J-B selected-company Deep Dive UI, real `1216.TW` UI smoke, and Runtime Provenance Capture V1 are released. Company-level Catalyst synthesis and Research Priority integration remain not yet approved. `NEXT_PRODUCT_PHASE = TO_BE_SELECTED`; Productionization P2 remains a separate future technical-risk planning track.
 
 Current committed Long-Term Growth directories include:
 
@@ -2689,8 +2737,8 @@ Completed:
 
 Next planning candidates:
 
-- Bounded real `1216.TW` Catalyst UI smoke approval review
 - Catalyst company-level synthesis approval review
+- Research Priority integration approval review
 - Research Evidence Expansion V1B approval review
 
 Future:
@@ -2963,11 +3011,11 @@ Hard rules to preserve:
 Before continuing from this state:
 
 1. Run `git status --short`.
-2. Confirm HEAD is still `3d4a50195667b7ce171c7ea9acbf4e6dca0977f3` or inspect any newer commits.
+2. Confirm HEAD is still `5da60ca338cd5b0aa89a9d9e71654152f9914221` or inspect any newer commits.
 3. Confirm whether Technical Risk v1 through Productionization P1B files are still committed and whether new worktree changes exist.
 4. Inspect the specific next-phase request before editing.
 5. Preserve Scanner, PDF Export, Database Separation, Production V1, V1.1, OOS research, and production policy promotion boundaries unless explicitly authorized.
 6. Re-run targeted tests for the touched framework.
 7. Re-run full unittest, `compileall`, and `git diff --check` before reporting completion.
-8. Treat Research Evidence Expansion V1B, the real V1J-B Catalyst UI smoke, Catalyst company-level synthesis, and Research Priority integration as not yet approved. V1J-B is released bounded selected-company Deep Dive UI capability; V1J-A is released event-level impact-hypothesis capability; V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
+8. Treat Research Evidence Expansion V1B, Catalyst company-level synthesis, and Research Priority integration as not yet approved. V1J-B is released bounded selected-company Deep Dive UI capability; real `1216.TW` UI smoke is PASS; Runtime Provenance Capture V1 is released observability infrastructure; V1J-A is released event-level impact-hypothesis capability; V1I-B is released real-event acceptance; V1I-A is released deterministic extraction; V1H is released retrieval transport; V1G remains temporary real retrieval acceptance evidence, not Catalyst synthesis.
 9. If later starting Technical Risk v1 productionization work, first run a specification review and preserve the distinction between completed portfolio persistence capability and incomplete production DB activation, policy activation, scheduler, dashboard, alert delivery, deployment, or threshold research unless explicitly scoped.
