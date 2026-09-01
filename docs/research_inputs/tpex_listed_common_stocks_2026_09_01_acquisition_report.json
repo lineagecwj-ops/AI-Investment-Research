@@ -1,0 +1,15 @@
+{
+  "classification_scope": "Official TPEx listed-company basic-data records with non-zero common-stock par value.",
+  "excluded_record_counts": {},
+  "format_version": "TPEX_LISTED_COMMON_STOCKS_2026_09_01_V1",
+  "http_result_status": 200,
+  "normalized_common_stock_count": 890,
+  "normalized_content_checksum": "473bfdddf552647c13b41f0c3c73ad0a1e1f76290c8e4a4a3c0e591b3b4a4837",
+  "normalized_sha256": "664efd38fe734c163f869316c8f789e372ea9798f31407af7dc300e0f285c1a7",
+  "normalized_snapshot_path": "docs/research_inputs/tpex_listed_common_stocks_2026_09_01_normalized.json",
+  "official_source_url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O",
+  "raw_record_count": 890,
+  "raw_sha256": "a2a39e8380d6fb0769355135bac384a13297d3b9cbec41cbaaf10df273486509",
+  "raw_snapshot_path": "docs/research_inputs/tpex_listed_common_stocks_2026_09_01.json",
+  "retrieved_at": "2026-09-01T04:21:01Z"
+}

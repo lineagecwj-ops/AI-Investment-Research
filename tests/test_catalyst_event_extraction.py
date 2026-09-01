@@ -14,6 +14,9 @@ from catalyst_event import CandidateStatus
 from catalyst_event import CatalystEventType
 from catalyst_event import EventConflictStatus
 from catalyst_event import EventValidationStatus
+from catalyst_identity_catalog import ApprovedAlias
+from catalyst_identity_catalog import ListedCompanyIdentity
+from catalyst_identity_catalog import TaiwanListedCompanyIdentityCatalog
 from catalyst_event_extraction import cluster_validated_events
 from catalyst_event_extraction import extract_event_candidates
 from catalyst_event_extraction import validate_event_candidate
@@ -48,13 +51,14 @@ def source(url, title, snippet, *, target=TARGET):
     )
 
 
-def candidates(*sources, target=TARGET):
+def candidates(*sources, target=TARGET, identity_catalog=None):
     return extract_event_candidates(
         sources,
         target_symbol=target.symbol,
         target_company_name=target.canonical_name,
         validated_aliases=target.supported_aliases,
         research_window=WINDOW,
+        identity_catalog=identity_catalog,
     )
 
 
@@ -202,6 +206,62 @@ class CatalystEventExtractionTestCase(unittest.TestCase):
         self.assertEqual(extracted[0].company_association_status, CompanyAssociationStatus.AMBIGUOUS)
         event = cluster_validated_events(extracted, sources=(item,), research_window=WINDOW)[0]
         self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+
+    def test_alias_only_mixed_identity_fails_closed_for_real_retest_shape(self):
+        item = source(
+            "https://media.test/alias-only-mixed-company",
+            "統一(1216) 營收公告",
+            "日期：2026年08月10日 統一企業(1216)公布7月營收；展望8月，統一超表示台灣7-ELEVEN將持續展店。",
+        )
+        event = cluster_validated_events(candidates(item), sources=(item,), research_window=WINDOW)[0]
+        self.assertEqual(event.company_association_status, CompanyAssociationStatus.AMBIGUOUS)
+        self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+
+    def test_alias_only_mixed_candidate_remains_isolated_from_clean_candidate(self):
+        clean = source(
+            "https://official.test/clean-alias-isolation",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 統一企業(1216)公告7月合併營收。",
+        )
+        mixed = source(
+            "https://media.test/mixed-alias-isolation",
+            "統一(1216) 公告",
+            "日期：2026年08月10日 統一企業(1216)公告7月合併營收；統一超表示台灣7-ELEVEN將持續展店。",
+        )
+        events = cluster_validated_events(candidates(clean, mixed), sources=(clean, mixed), research_window=WINDOW)
+        validated = next(event for event in events if event.validation_status is EventValidationStatus.VALIDATED)
+        rejected = next(event for event in events if event.validation_status is EventValidationStatus.REJECTED)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(validated.source_ids, (clean.source_id,))
+        self.assertEqual(rejected.source_ids, (mixed.source_id,))
+        self.assertEqual(validated.event_fact, candidates(clean)[0].candidate_anchor)
+        self.assertNotIn("統一超", validated.event_fact)
+
+    def test_generic_unique_alias_attribution_fails_closed_without_substring_matching(self):
+        catalog = TaiwanListedCompanyIdentityCatalog(
+            version="TEST",
+            checksum="a" * 64,
+            records=(
+                ListedCompanyIdentity("1000.TW", "甲公司股份有限公司", "甲公司", (ApprovedAlias("甲公司", "OFFICIAL_SHORT_NAME"),), "TWSE"),
+                ListedCompanyIdentity("2000.TWO", "乙公司股份有限公司", "乙公司", (ApprovedAlias("乙公司", "OFFICIAL_SHORT_NAME"),), "TPEx"),
+            ),
+            resolvable_alias_count=2,
+            ambiguous_alias_count=0,
+        )
+        target = TargetCompanyIdentity("1000.TW", "甲公司", None, ("甲公司(1000)",))
+        item = source(
+            "https://media.test/generic-alias",
+            "甲公司(1000) 營收公告",
+            "日期：2026年08月10日 甲公司(1000)公布7月營收；乙公司表示將擴充產能。",
+            target=target,
+        )
+        event = cluster_validated_events(
+            candidates(item, target=target, identity_catalog=catalog),
+            sources=(item,),
+            research_window=WINDOW,
+        )[0]
+        self.assertEqual(event.validation_status, EventValidationStatus.REJECTED)
+        self.assertEqual(catalog.find_explicit_non_target_identities("非乙公司表示", "1000.TW"), ())
 
     def test_mixed_and_clean_candidates_with_same_revenue_subject_remain_isolated(self):
         clean = source(

@@ -6,6 +6,8 @@ from datetime import date
 from hashlib import sha256
 import re
 
+from catalyst_identity_catalog import TaiwanListedCompanyIdentityCatalog
+from catalyst_identity_catalog import load_default_identity_catalog
 from catalyst_event import CandidateStatus
 from catalyst_event import CatalystEventType
 from catalyst_event import EventCandidate
@@ -74,14 +76,16 @@ def extract_event_candidates(
     target_company_name: str,
     validated_aliases: tuple[str, ...] = (),
     research_window: EventResearchWindow,
+    identity_catalog: TaiwanListedCompanyIdentityCatalog | None = None,
 ) -> tuple[EventCandidate, ...]:
     """Create source-local candidates without network, AI, persistence, or mutation."""
     _validate_window(research_window)
+    catalog = identity_catalog or load_default_identity_catalog()
     unique_sources = {source.source_id: source for source in sources}
     candidates: list[EventCandidate] = []
     for source in sorted(unique_sources.values(), key=lambda item: item.source_id):
         _validate_source_target(source, target_symbol, target_company_name)
-        candidates.extend(_extract_source_candidates(source, validated_aliases))
+        candidates.extend(_extract_source_candidates(source, validated_aliases, catalog))
     return tuple(sorted(candidates, key=lambda item: item.candidate_id))
 
 
@@ -135,7 +139,11 @@ def cluster_validated_events(
     return tuple(sorted(events, key=lambda item: item.event_id))
 
 
-def _extract_source_candidates(source: ExternalSourceRef, validated_aliases: tuple[str, ...]) -> list[EventCandidate]:
+def _extract_source_candidates(
+    source: ExternalSourceRef,
+    validated_aliases: tuple[str, ...],
+    identity_catalog: TaiwanListedCompanyIdentityCatalog,
+) -> list[EventCandidate]:
     text = _source_local_text(source)
     if not text:
         return []
@@ -150,14 +158,15 @@ def _extract_source_candidates(source: ExternalSourceRef, validated_aliases: tup
                 ExtractionBasis.STRUCTURED_DATE_BLOCK,
                 _matching_temporal_evidence(source, match.group(0)),
                 validated_aliases,
+                identity_catalog,
             )
             for index, match in enumerate(matches)
         ]
     if _EVENT_MARKERS.search(text):
         return [_candidate_from_span(
-            source, text, 0, len(text), ExtractionBasis.TITLE_OR_EXCERPT_FALLBACK, (), validated_aliases,
+            source, text, 0, len(text), ExtractionBasis.TITLE_OR_EXCERPT_FALLBACK, (), validated_aliases, identity_catalog,
         )]
-    return [_background_candidate(source, text)]
+    return [_background_candidate(source, text, identity_catalog=identity_catalog)]
 
 
 def _candidate_from_date_span(
@@ -168,11 +177,19 @@ def _candidate_from_date_span(
     basis: ExtractionBasis,
     temporal_evidence: tuple[SourceTemporalEvidence, ...],
     validated_aliases: tuple[str, ...],
+    identity_catalog: TaiwanListedCompanyIdentityCatalog,
 ) -> EventCandidate:
     """Reject page chrome as a date source before it reaches event validation."""
     if _is_page_chrome_span(text, start, end):
-        return _background_candidate(source, text, start=start, end=end, validated_aliases=validated_aliases)
-    return _candidate_from_span(source, text, start, end, basis, temporal_evidence, validated_aliases)
+        return _background_candidate(
+            source,
+            text,
+            start=start,
+            end=end,
+            validated_aliases=validated_aliases,
+            identity_catalog=identity_catalog,
+        )
+    return _candidate_from_span(source, text, start, end, basis, temporal_evidence, validated_aliases, identity_catalog)
 
 
 def _candidate_from_span(
@@ -183,9 +200,10 @@ def _candidate_from_span(
     basis: ExtractionBasis,
     temporal_evidence: tuple[SourceTemporalEvidence, ...],
     validated_aliases: tuple[str, ...],
+    identity_catalog: TaiwanListedCompanyIdentityCatalog,
 ) -> EventCandidate:
     anchor, local_start, local_end = _bounded_anchor(text, start, end)
-    association = _candidate_association(source, anchor, validated_aliases)
+    association = _candidate_association(source, anchor, validated_aliases, identity_catalog)
     event_type = _classify_event_type(anchor)
     candidate_key = _candidate_key(source.source_id, local_start, local_end, event_type, anchor)
     return EventCandidate(
@@ -213,9 +231,15 @@ def _background_candidate(
     start: int = 0,
     end: int | None = None,
     validated_aliases: tuple[str, ...] = (),
+    identity_catalog: TaiwanListedCompanyIdentityCatalog | None = None,
 ) -> EventCandidate:
     anchor, start, end = _bounded_anchor(text, start, len(text) if end is None else end)
-    association = _candidate_association(source, anchor, validated_aliases)
+    association = _candidate_association(
+        source,
+        anchor,
+        validated_aliases,
+        identity_catalog or load_default_identity_catalog(),
+    )
     candidate_key = _candidate_key(source.source_id, start, end, CatalystEventType.OTHER, anchor)
     return EventCandidate(
         candidate_id="catalyst_candidate_" + _digest(candidate_key),
@@ -424,6 +448,7 @@ def _candidate_association(
     source: ExternalSourceRef,
     anchor: str,
     validated_aliases: tuple[str, ...],
+    identity_catalog: TaiwanListedCompanyIdentityCatalog,
 ) -> CompanyAssociationStatus:
     """A page-level direct match never substitutes for candidate-local identity."""
     if source.company_association_status not in {
@@ -436,6 +461,8 @@ def _candidate_association(
     has_code = bool(re.search(rf"(?<!\d){re.escape(target_code)}(?!\d)", anchor))
     has_name = any(name and name in anchor for name in exact_names)
     if _has_conflicting_listed_company_identity(anchor, target_code):
+        return CompanyAssociationStatus.AMBIGUOUS
+    if identity_catalog.find_explicit_non_target_identities(anchor, source.target_symbol):
         return CompanyAssociationStatus.AMBIGUOUS
     return source.company_association_status if has_code or has_name else CompanyAssociationStatus.AMBIGUOUS
 
