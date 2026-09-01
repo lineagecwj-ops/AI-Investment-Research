@@ -1,6 +1,6 @@
 # AI Investment Research Project Status Master
 
-Last updated: 2026-09-01, after the Catalyst V1I versioned Taiwan listed-company identity catalog and alias-only mixed-identity guard release.
+Last updated: 2026-09-01, after Real 1216 Catalyst UI Smoke Retest 3 identity-safety acceptance.
 
 ## Project Purpose
 
@@ -2494,7 +2494,7 @@ V1J-B leaves V1J-A domain/service, V1I factual layer, V1F / V1H retrieval founda
 
 ### Real Smoke Status And Forensic Root Cause
 
-- `REAL_CATALYST_UI_SMOKE_1216 = BLOCKED_PENDING_RETEST`.
+- At the P1 patch release, `REAL_CATALYST_UI_SMOKE_1216` required a separately authorized retest; the final Retest 3 result is recorded below.
 - The first real UI smoke exercised real retrieval, event extraction, the `ImpactHypothesis` path, and UI rendering. It exposed one P1 factual-correctness issue: a `VALIDATED` 1216 governance event contained mixed factual content from `1216` / Uni-President Enterprises and `5866` / 統一期.
 - Root cause: `CANDIDATE_MIXED_IDENTITY_GAP`. Candidate-local identity previously accepted target identity without rejecting a conflicting explicit non-target listed-company identity in the same unsplit candidate span.
 - This was not a V1H normalization issue, V1J context-isolation issue, UI-rendering issue, clustering implementation issue, or taxonomy issue.
@@ -2534,11 +2534,7 @@ Clean `1216` investor-conference and revenue candidates remain direct and eligib
 - `REAL_SMOKE_RUNTIME_PROVENANCE_PERSISTENCE = DEFERRED`.
 - DB writes: `NO`; DB schema: `NO`; Production: `UNTOUCHED`; `data/production/ = NOT_FOUND`.
 
-A new separately authorized real 1216 UI smoke is required before `REAL_CATALYST_UI_SMOKE_1216` can be marked `PASS`. Its acceptance condition is that every rendered `VALIDATED` 1216 event contains only clean target-company factual content; explicit non-target listed-company content such as `5866`, `2912`, or other listed-company factual events must not contaminate the displayed `event_fact`.
-
-- `NEXT_STEP = BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST`.
-- Retest status: `NOT YET EXECUTED`.
-- No new development sprint is approved before that retest result.
+The required real 1216 UI smoke was subsequently completed as Retest 3. Its acceptance condition was that every rendered `VALIDATED` 1216 event contain only clean target-company factual content; explicit non-target listed-company content such as `5866`, `2912`, or other listed-company factual events could not contaminate the displayed `event_fact`.
 
 ## Catalyst V1I Versioned Taiwan Listed-Company Identity Catalog And Alias-Only Guard Release (2026-09-01)
 
@@ -2582,14 +2578,35 @@ Cluster factual isolation is also covered: a clean candidate remains `VALIDATED`
 - The ResearchService snapshot-jargon warning is `BASELINE_PREEXISTING`; V1I-caused regression: `NO`.
 - V1H, V1J-A, V1J-B UI, segmentation, clustering implementation, DB, and Production are unchanged.
 
-`REAL_CATALYST_UI_SMOKE_1216 = BLOCKED_PENDING_RETEST`. The earlier second smoke confirmed that `5866` contamination was removed but exposed alias-only factual contamination from `統一超`. This release patches that code path, but it does not mark real runtime acceptance as passed.
+The earlier second smoke confirmed that `5866` contamination was removed but exposed alias-only factual contamination from `統一超`. This release patched that code path. The separately authorized Retest 3 result is recorded below.
 
-- `NEXT_STEP = BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST_3`.
-- Retest status: `NOT YET EXECUTED`.
 - Acceptance requirement: every displayed `VALIDATED` 1216 event must remain target-local, with no independent factual content from `2912 / 統一超`, `5866 / 統一期`, or another deterministically recognized non-target listed company in its displayed `event_fact`.
 - `REPEATED_IMPACT_FAILURE_OBSERVED = YES`.
 - `IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`.
 - `REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE`.
+
+### Real 1216 Catalyst UI Smoke Retest 3 Finalization
+
+- `BOUNDED_REAL_1216_CATALYST_UI_SMOKE_RETEST_3 = EXECUTED`.
+- `REAL_CATALYST_UI_SMOKE_1216_RETEST_3 = PASS`.
+- `REAL_CATALYST_UI_SMOKE_1216 = PASS`.
+- Actual UI observation: `目前沒有足夠已驗證的 Catalyst 事件可供深度分析。` No `VALIDATED` Catalyst event card was rendered.
+- `ZERO_VALIDATED_EVENT_RESULT = ACCEPTABLE_FAIL_CLOSED`: this is a passing result under the approved acceptance contract because quality is preferred over coverage. A mixed-company or insufficiently attributable candidate is excluded rather than rendered as contaminated target-company factual evidence.
+- `5866 / 統一期` contamination observed: `NO`.
+- `2912 / 統一超` factual contamination observed: `NO`.
+- Other explicit non-target listed-company factual contamination: `NOT OBSERVED`.
+- `MIXED_CODE_IDENTITY_REAL_RUNTIME_PROTECTION = PASS`.
+- `ALIAS_ONLY_IDENTITY_REAL_RUNTIME_PROTECTION = PASS`.
+- `CANDIDATE_MIXED_IDENTITY_GAP = CLOSED`.
+- `CANDIDATE_ALIAS_ONLY_NON_TARGET_IDENTITY_GAP = CLOSED`.
+- `REAL_1216_IDENTITY_ACCEPTANCE_BLOCKER = CLOSED`.
+- `CATALYST_V1I_REAL_1216_IDENTITY_SAFETY_ACCEPTANCE = PASS`.
+
+The proven real-runtime safety chain now covers explicit company-and-code protection, the versioned Taiwan listed-company identity catalog, exact unique alias reverse lookup, bounded alias attribution matching, candidate-local fail-closed association, and cluster factual isolation. No contaminated `VALIDATED` 1216 event was rendered.
+
+No Impact analysis was executed or rendered in Retest 3 because no validated Catalyst event remained: `THIRD_IMPACT_FAILURE_OBSERVED = NO`. Historical state remains unchanged: `REPEATED_IMPACT_FAILURE_OBSERVED = YES`; `IMPACT_FAILURE_ROOT_CAUSE = NOT_FORENSICALLY_RECOVERABLE`.
+
+`REAL_CATALYST_RUNTIME_PROVENANCE_CAPTURE = FUTURE`. `RUNTIME_PROVENANCE_GAP = NOT_A_BLOCKER_FOR_REAL_1216_IDENTITY_SMOKE`; it remains a future maintainability item and is not implemented here. The 1216 identity-safety line is closed; no next implementation sprint has been started.
 
 ## Current Working State
 
