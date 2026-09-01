@@ -53,6 +53,10 @@ _STRUCTURED_SUBJECT = re.compile(
     r"(?:(?:公告\s*)?主\s*旨|標題)\s*[：:]\s*(?P<subject>[^\n。；;]{1,240})",
     re.IGNORECASE,
 )
+_STRUCTURED_STOCK_CODE = re.compile(r"(?:股票代號|股票代碼)\s*[：:]\s*(?P<code>\d{4})(?!\d)")
+_NAMED_STOCK_CODE = re.compile(
+    r"(?P<name>[\u4e00-\u9fffA-Za-z][\u4e00-\u9fffA-Za-z .&-]{0,40})\s*[（(]\s*(?P<code>\d{4})\s*[）)]"
+)
 _ENGLISH_MONTH_NUMBERS = {
     "january": "1", "february": "2", "march": "3", "april": "4", "may": "5", "june": "6",
     "july": "7", "august": "8", "september": "9", "october": "10", "november": "11", "december": "12",
@@ -431,7 +435,22 @@ def _candidate_association(
     exact_names = (source.target_company_name, *validated_aliases)
     has_code = bool(re.search(rf"(?<!\d){re.escape(target_code)}(?!\d)", anchor))
     has_name = any(name and name in anchor for name in exact_names)
+    if _has_conflicting_listed_company_identity(anchor, target_code):
+        return CompanyAssociationStatus.AMBIGUOUS
     return source.company_association_status if has_code or has_name else CompanyAssociationStatus.AMBIGUOUS
+
+
+def _has_conflicting_listed_company_identity(anchor: str, target_code: str) -> bool:
+    """Fail closed only for explicit non-target listed-company identity forms."""
+    explicit_codes = {
+        match.group("code")
+        for match in _STRUCTURED_STOCK_CODE.finditer(anchor)
+    }
+    explicit_codes.update(
+        match.group("code")
+        for match in _NAMED_STOCK_CODE.finditer(anchor)
+    )
+    return any(code != target_code for code in explicit_codes)
 
 
 def _is_page_chrome_span(text: str, start: int, end: int) -> bool:
