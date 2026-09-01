@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from datetime import UTC
 from datetime import date
@@ -196,6 +197,13 @@ def source(path, title, snippet):
 
 
 class CatalystDeepDiveTestCase(unittest.TestCase):
+    def setUp(self):
+        self.temp_directory = tempfile.TemporaryDirectory()
+        self.provenance_directory = Path(self.temp_directory.name)
+
+    def tearDown(self):
+        self.temp_directory.cleanup()
+
     def refresh(self, context, sources, **kwargs):
         retrieval = FakeRetrievalService(artifact_for(context, sources))
         impact = kwargs.pop("impact", FakeImpactGenerator())
@@ -207,6 +215,7 @@ class CatalystDeepDiveTestCase(unittest.TestCase):
             api_key_available=lambda: True,
             retrieval_service=retrieval,
             impact_generator=impact,
+            provenance_directory=self.provenance_directory,
             **kwargs,
         )
         return result, retrieval, impact
@@ -219,6 +228,7 @@ class CatalystDeepDiveTestCase(unittest.TestCase):
             explicit_refresh=False,
             api_key_available=lambda: True,
             retrieval_service=retrieval,
+            provenance_directory=self.provenance_directory,
         )
         self.assertEqual(result.state, "NOT_REFRESHED")
         self.assertEqual(retrieval.calls, [])
@@ -261,6 +271,7 @@ class CatalystDeepDiveTestCase(unittest.TestCase):
             explicit_refresh=True,
             api_key_available=lambda: False,
             retrieval_service=retrieval,
+            provenance_directory=self.provenance_directory,
         )
         self.assertEqual(result.state, "API_KEY_MISSING")
         self.assertEqual(retrieval.calls, [])
@@ -274,6 +285,7 @@ class CatalystDeepDiveTestCase(unittest.TestCase):
             api_key_available=lambda: True,
             retrieval_service=FakeRetrievalService(error=RuntimeError("fixture")),
             impact_generator=impact,
+            provenance_directory=self.provenance_directory,
         )
         self.assertEqual(result.state, "RETRIEVAL_FAILED")
         self.assertEqual(impact.calls, [])

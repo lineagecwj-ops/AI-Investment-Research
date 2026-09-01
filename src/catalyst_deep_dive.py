@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import replace
 from datetime import UTC
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
 import os
+from pathlib import Path
 from typing import Any
 
 from ai_config import get_ai_research_config
@@ -18,6 +20,7 @@ from catalyst_event_extraction import extract_event_candidates
 from catalyst_impact import ImpactHypothesis
 from catalyst_impact_service import build_event_impact_context
 from catalyst_impact_service import generate_event_impact_hypothesis
+from catalyst_runtime_provenance import CatalystRuntimeProvenanceRun
 from external_source import TargetCompanyIdentity
 from openai_web_search_client import build_company_research_query
 from openai_web_search_client import build_openai_web_search_retrieval_service
@@ -60,6 +63,9 @@ class CatalystDeepDiveResult:
     omitted_validated_event_count: int = 0
     retrieval_request_count: int = 0
     impact_call_count: int = 0
+    provenance_run_id: str | None = None
+    provenance_status: str = "NOT_TRIGGERED"
+    provenance_warning: str | None = None
 
 
 def build_selected_catalyst_context(
@@ -93,15 +99,30 @@ def run_catalyst_deep_dive_refresh(
     impact_generator: Callable[..., ImpactHypothesis] = generate_event_impact_hypothesis,
     impact_client: Any | None = None,
     impact_config: Any | None = None,
+    provenance_directory: Path | str | None = None,
+    provenance_factory: Callable[..., CatalystRuntimeProvenanceRun] = CatalystRuntimeProvenanceRun,
 ) -> CatalystDeepDiveResult:
     """Run the one-retrieval, at-most-two-event Catalyst flow after an explicit click."""
     target = _target_from_context(selected_context)
     if not explicit_refresh:
         return _result(target, "NOT_REFRESHED", "尚未更新 Catalyst 深度分析。")
 
+    provenance = provenance_factory(
+        symbol=target.symbol,
+        trigger="CATALYST_DEEP_DIVE_EXPLICIT_REFRESH",
+        started_at=retrieved_at or datetime.now(UTC),
+        output_directory=provenance_directory or _default_provenance_directory(),
+        known_secrets=_runtime_known_secrets(),
+    )
+
     key_available = api_key_available or _openai_api_key_available
     if not key_available():
-        return _result(target, "API_KEY_MISSING", "未設定 OPENAI_API_KEY，尚未進行 Catalyst 深度分析。")
+        return _finalize_with_provenance(
+            _result(target, "API_KEY_MISSING", "未設定 OPENAI_API_KEY，尚未進行 Catalyst 深度分析。"),
+            provenance=provenance,
+            run_status="PIPELINE_FAILED",
+            completed_at=retrieved_at,
+        )
 
     end_date = as_of_date or datetime.now(UTC).date()
     start_date = end_date - timedelta(days=CATALYST_DEEP_DIVE_WINDOW_DAYS)
@@ -123,20 +144,34 @@ def run_catalyst_deep_dive_refresh(
             request,
             retrieved_at=retrieved_at or datetime.now(UTC),
         )
-    except Exception:
-        return _result(
+    except Exception as exc:
+        provenance.record_retrieval_failure(exc)
+        return _finalize_with_provenance(
+            _result(
             target,
             "RETRIEVAL_FAILED",
             "Catalyst 來源擷取暫時無法完成，請稍後由使用者再次更新。",
             retrieval_request_count=1,
+            ),
+            provenance=provenance,
+            run_status="RETRIEVAL_FAILED",
+            completed_at=retrieved_at,
         )
 
+    provenance.record_retrieval(artifact)
+
     if not artifact.sources:
-        return _result(
-            target,
-            "NO_USABLE_SOURCES",
-            "目前沒有可用的 Catalyst 來源證據。",
-            retrieval_request_count=1,
+        provenance.record_event_pipeline(candidates=(), events=())
+        return _finalize_with_provenance(
+            _result(
+                target,
+                "NO_USABLE_SOURCES",
+                "目前沒有可用的 Catalyst 來源證據。",
+                retrieval_request_count=1,
+            ),
+            provenance=provenance,
+            run_status="NO_VALIDATED_EVENTS",
+            completed_at=retrieved_at,
         )
 
     try:
@@ -152,21 +187,34 @@ def run_catalyst_deep_dive_refresh(
             sources=artifact.sources,
             research_window=(start_date, end_date),
         )
-    except Exception:
-        return _result(
-            target,
-            "EVENT_EXTRACTION_FAILED",
-            "Catalyst 事件證據無法安全整理，因此未產生深度分析。",
-            retrieval_request_count=1,
+    except Exception as exc:
+        provenance.record_failure(stage="EVENT_EXTRACTION", error=exc)
+        return _finalize_with_provenance(
+            _result(
+                target,
+                "EVENT_EXTRACTION_FAILED",
+                "Catalyst 事件證據無法安全整理，因此未產生深度分析。",
+                retrieval_request_count=1,
+            ),
+            provenance=provenance,
+            run_status="PIPELINE_FAILED",
+            completed_at=retrieved_at,
         )
+
+    provenance.record_event_pipeline(candidates=candidates, events=events)
 
     validated = _ordered_validated_events(events)
     if not validated:
-        return _result(
-            target,
-            "NO_VALIDATED_EVENTS",
-            "目前沒有足夠已驗證的 Catalyst 事件可供深度分析。",
-            retrieval_request_count=1,
+        return _finalize_with_provenance(
+            _result(
+                target,
+                "NO_VALIDATED_EVENTS",
+                "目前沒有足夠已驗證的 Catalyst 事件可供深度分析。",
+                retrieval_request_count=1,
+            ),
+            provenance=provenance,
+            run_status="NO_VALIDATED_EVENTS",
+            completed_at=retrieved_at,
         )
 
     selected_events = validated[:MAX_IMPACT_AI_CALLS]
@@ -180,14 +228,28 @@ def run_catalyst_deep_dive_refresh(
                 selected_context=selected_context,
                 missing_evidence_refs=missing_refs,
             )
-            impact_calls += 1
+        except Exception as exc:
+            provenance.record_impact_context_failure(event=event, error=exc)
+            cards.append(
+                CatalystDeepDiveCard(
+                    event=event,
+                    impact_hypothesis=None,
+                    missing_evidence=tuple(selected_context.selected_missing_data),
+                    impact_error="分析暫時無法產生；此事件未進行自動重試。",
+                )
+            )
+            continue
+
+        impact_calls += 1
+        try:
             hypothesis = impact_generator(
                 impact_context,
                 client=impact_client,
                 config=impact_config or get_ai_research_config(),
                 generated_at=retrieved_at or datetime.now(UTC),
             )
-        except Exception:
+        except Exception as exc:
+            provenance.record_impact_failure(event=event, call_index=impact_calls, error=exc)
             cards.append(
                 CatalystDeepDiveCard(
                     event=event,
@@ -197,6 +259,11 @@ def run_catalyst_deep_dive_refresh(
                 )
             )
         else:
+            provenance.record_impact_success(
+                event=event,
+                call_index=impact_calls,
+                hypothesis=hypothesis,
+            )
             cards.append(
                 CatalystDeepDiveCard(
                     event=event,
@@ -205,7 +272,7 @@ def run_catalyst_deep_dive_refresh(
                 )
             )
 
-    return CatalystDeepDiveResult(
+    result = CatalystDeepDiveResult(
         target_symbol=target.symbol,
         target_company_name=target.canonical_name,
         state="COMPLETED",
@@ -215,6 +282,12 @@ def run_catalyst_deep_dive_refresh(
         omitted_validated_event_count=max(0, len(validated) - len(selected_events)),
         retrieval_request_count=1,
         impact_call_count=impact_calls,
+    )
+    return _finalize_with_provenance(
+        result,
+        provenance=provenance,
+        run_status="COMPLETED_WITH_EVENT_FAILURES" if any(card.impact_error for card in cards) else "COMPLETED",
+        completed_at=retrieved_at,
     )
 
 
@@ -286,6 +359,40 @@ def _event_ordinal(event: ValidatedCatalystEvent) -> int:
 
 def _openai_api_key_available() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY", "").strip())
+
+
+def _runtime_known_secrets() -> tuple[str, ...]:
+    value = os.environ.get("OPENAI_API_KEY", "").strip()
+    return (value,) if value else ()
+
+
+def _default_provenance_directory() -> Path:
+    from catalyst_runtime_provenance import DEFAULT_RUNTIME_PROVENANCE_DIRECTORY
+
+    return DEFAULT_RUNTIME_PROVENANCE_DIRECTORY
+
+
+def _finalize_with_provenance(
+    result: CatalystDeepDiveResult,
+    *,
+    provenance: CatalystRuntimeProvenanceRun,
+    run_status: str,
+    completed_at: datetime | None,
+) -> CatalystDeepDiveResult:
+    try:
+        provenance.finalize_and_persist(run_status=run_status, completed_at=completed_at)
+    except Exception:
+        return replace(
+            result,
+            provenance_run_id=provenance.run_id,
+            provenance_status="PROVENANCE_PERSIST_FAILED",
+            provenance_warning="Catalyst 分析結果已保留，但本次本機追溯紀錄未能寫入。",
+        )
+    return replace(
+        result,
+        provenance_run_id=provenance.run_id,
+        provenance_status="PROVENANCE_SAVED",
+    )
 
 
 def _result(

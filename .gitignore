@@ -23,4 +23,5 @@ data/live/
 data/portfolio_artifacts/
 data/production/
 data/research/snapshots/
+data/research/catalyst_runtime_provenance/
 data/research/opportunity_radar/monthly_revenue_*.json
